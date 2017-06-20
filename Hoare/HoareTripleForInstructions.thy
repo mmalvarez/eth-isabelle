@@ -745,6 +745,10 @@ lemma advance_keeps_gaslimit_elm [simp] :
 apply(simp add: contexts_as_set_def)
 done
 
+lemma advance_keeps_gasprice [simp] :
+  "vctx_gasprice (vctx_advance_pc co_ctx x1) = vctx_gasprice x1"
+by(simp add: vctx_advance_pc_def)
+
 lemma gasprice_not_constant [simp] :
   "GaspriceElm x26 \<notin> constant_ctx_as_set co_ctx"
 apply(simp add: constant_ctx_as_set_def program_as_set_def)
@@ -752,13 +756,13 @@ done
 
 lemma gasprice_elm_means [simp] :
   "GaspriceElm x26 \<in> variable_ctx_as_set x1
-  = (x26 = block_gasprice (vctx_block x1))"
+  = (x26 = vctx_gasprice x1)"
 apply(simp add: variable_ctx_as_set_def stack_as_set_def ext_program_as_set_def balance_as_set_def)
 done
 
 lemma gasprice_c_means [simp] :
   "GaspriceElm x26 \<in> contexts_as_set x1 co_ctx
-  = (x26 = block_gasprice (vctx_block x1))"
+  = (x26 = vctx_gasprice x1)"
 apply(simp add: contexts_as_set_def)
 done
 
