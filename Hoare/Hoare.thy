@@ -64,9 +64,9 @@ abbreviation block_info_as_set :: "block_info \<Rightarrow> state_element set"
 where "block_info_as_set b ==
   blockhash_as_elm (block_blockhash b) \<union> { CoinbaseElm (block_coinbase b),
   TimestampElm (block_timestamp b), DifficultyElm (block_difficulty b),
-  GaslimitElm (block_gaslimit b), GaspriceElm (block_gasprice b), BlockNumberElm (block_number b) }"
+  GaslimitElm (block_gaslimit b), BlockNumberElm (block_number b) }"
 
-abbreviation account_existence_as_set :: "(address \<Rightarrow> bool) \<Rightarrow> state_element set"
+definition account_existence_as_set :: "(address \<Rightarrow> bool) \<Rightarrow> state_element set"
 where
 "account_existence_as_set f ==
   { AccountExistenceElm (a, e) | a e. f a = e }"
@@ -137,6 +137,7 @@ definition variable_ctx_as_set :: "variable_ctx \<Rightarrow> state_element set"
       , CallerElm (vctx_caller v)
       , SentValueElm (vctx_value_sent v)
       , OriginElm (vctx_origin v)
+      , GaspriceElm (vctx_gasprice v)
       , GasElm (vctx_gas v)
       , PcElm (vctx_pc v)
       , SentDataLengthElm (length (vctx_data_sent v))
@@ -406,12 +407,14 @@ lemma stack_sound0 :
   "(stack pos w ** p) s \<Longrightarrow> StackElm (pos, w) \<in> s"
 by (clarsimp simp add: sep_basic_simps stack_def)
 
-lemma stack_sound1 :
-  "StackElm (pos, w) \<in> contexts_as_set var con \<Longrightarrow> rev (vctx_stack var) ! pos = w"
-  apply(simp add: contexts_as_set_def variable_ctx_as_set_def constant_ctx_as_set_def
+lemmas context_rw = contexts_as_set_def variable_ctx_as_set_def constant_ctx_as_set_def
       stack_as_set_def memory_as_set_def
       balance_as_set_def storage_as_set_def log_as_set_def program_as_set_def data_sent_as_set_def
-      ext_program_as_set_def)
+      ext_program_as_set_def account_existence_as_set_def
+
+lemma stack_sound1 :
+  "StackElm (pos, w) \<in> contexts_as_set var con \<Longrightarrow> rev (vctx_stack var) ! pos = w"
+  apply(simp add: context_rw)
   done
 
 lemma stack_sem :
@@ -427,13 +430,7 @@ definition instruction_result_as_set :: "constant_ctx \<Rightarrow> instruction_
         ( case rslt of
           InstructionContinue v \<Rightarrow> {ContinuingElm True} \<union> contexts_as_set v c
         | InstructionToEnvironment act v _ \<Rightarrow> {ContinuingElm False, ContractActionElm act} \<union> contexts_as_set v c
-        | InstructionAnnotationFailure \<Rightarrow> {ContinuingElm False} (* need to assume no annotation failure somewhere *)
         )"
-
-lemma annotation_failure_as_set[simp] :
-  "instruction_result_as_set c InstructionAnnotationFailure = {ContinuingElm False}"
-apply(simp add: instruction_result_as_set_def)
-done
 
 definition code :: "(int * inst) set \<Rightarrow> state_element set \<Rightarrow> bool"
   where
@@ -452,10 +449,6 @@ definition magic_filter :: "8 word list \<Rightarrow> bool" where
    (lst = word_rsplit a @ word_rsplit b) \<longrightarrow>
    hash2 a b \<noteq> 0)"
 
-definition no_assertion :: "constant_ctx \<Rightarrow> bool"
-  where "no_assertion c == (\<forall> pos. program_annotation (cctx_program c) pos = [])
-    \<and> cctx_hash_filter c = magic_filter"
-
 definition failed_for_reasons :: "failure_reason set \<Rightarrow> instruction_result \<Rightarrow> bool"
 where
 "failed_for_reasons allowed r =
@@ -469,15 +462,11 @@ definition triple ::
  "network \<Rightarrow> failure_reason set \<Rightarrow> (state_element set \<Rightarrow> bool) \<Rightarrow> (int * inst) set \<Rightarrow> (state_element set \<Rightarrow> bool) \<Rightarrow> bool"
 where
   "triple net allowed_failures pre insts post ==
-    \<forall> co_ctx presult rest stopper. no_assertion co_ctx \<longrightarrow>
+    \<forall> co_ctx presult rest stopper.
        (pre ** code insts ** rest) (instruction_result_as_set co_ctx presult) \<longrightarrow>
        (\<exists> k.
          ((post ** code insts ** rest) (instruction_result_as_set co_ctx (program_sem stopper co_ctx k net presult)))
          \<or> failed_for_reasons allowed_failures (program_sem stopper co_ctx k net presult))"
-
-lemma no_assertion_pass[simp]: "no_assertion co_ctx \<Longrightarrow> check_annotations v co_ctx"
-apply(simp add: no_assertion_def check_annotations_def)
-done
 
 lemma pure_sep : "(((\<langle> b \<rangle>) ** rest) s) = (b \<and> rest s)"
   by ( simp add: sep_conj_def pure_def emp_def )
@@ -600,40 +589,25 @@ lemma sep_memory_usage_sep:
 lemma stackHeightElmEquiv: "StackHeightElm h \<in> contexts_as_set v c =
   (length (vctx_stack v) = h)
   "
-apply(auto simp add: contexts_as_set_def constant_ctx_as_set_def variable_ctx_as_set_def
-      program_as_set_def stack_as_set_def memory_as_set_def storage_as_set_def
-      balance_as_set_def log_as_set_def data_sent_as_set_def ext_program_as_set_def)
-  done
+by (auto simp add:context_rw)
 
 lemma stackElmEquiv: "StackElm (pos, w) \<in> contexts_as_set v c =
   (pos < length (vctx_stack v) \<and> rev (vctx_stack v) ! pos = w)"
-apply(auto simp add: contexts_as_set_def constant_ctx_as_set_def variable_ctx_as_set_def
-      program_as_set_def stack_as_set_def memory_as_set_def storage_as_set_def
-      balance_as_set_def log_as_set_def data_sent_as_set_def ext_program_as_set_def)
-done
+by (auto simp add:context_rw)
 
 lemma pcElmEquiv : "PcElm k \<in> contexts_as_set va_ctx co_ctx =
   (vctx_pc va_ctx = k)"
-apply(auto simp add: contexts_as_set_def constant_ctx_as_set_def variable_ctx_as_set_def
-      program_as_set_def stack_as_set_def memory_as_set_def storage_as_set_def
-      balance_as_set_def log_as_set_def data_sent_as_set_def ext_program_as_set_def)
-done
+by (auto simp add:context_rw)
 
 lemma gasElmEquiv: "GasElm g \<in> contexts_as_set va_ctx co_ctx =
   (vctx_gas va_ctx = g)"
-apply(auto simp add: contexts_as_set_def constant_ctx_as_set_def variable_ctx_as_set_def
-      program_as_set_def stack_as_set_def memory_as_set_def storage_as_set_def
-      balance_as_set_def log_as_set_def data_sent_as_set_def ext_program_as_set_def)
-done
+by (auto simp add:context_rw)
 
 lemma codeElmEquiv:
   "CodeElm (pos, i) \<in> contexts_as_set va_ctx co_ctx =
    ((program_content (cctx_program co_ctx) pos = Some i) \<or>
    (program_content (cctx_program co_ctx) pos = None) \<and> i = Misc STOP)"
-apply(auto simp add: contexts_as_set_def constant_ctx_as_set_def variable_ctx_as_set_def
-      program_as_set_def stack_as_set_def memory_as_set_def storage_as_set_def
-      balance_as_set_def log_as_set_def data_sent_as_set_def ext_program_as_set_def)
-  done
+by (auto simp add:context_rw)
 
 lemmas stateelm_equiv_simps = 
   stackHeightElmEquiv
@@ -710,7 +684,6 @@ lemma triple_continue:
       \<or> failed_for_reasons allowed (program_sem s co_ctx (k + l) net presult))"
 apply(simp add: triple_def)
 apply(drule_tac x = co_ctx in spec)
-apply(simp)
 apply(drule_tac x = "program_sem s co_ctx k net presult" in spec)
 apply(drule_tac x = rest in spec)
 apply(simp)
@@ -744,25 +717,49 @@ lemma composition:
   apply (subst (asm) triple_def[where pre=P])
   apply clarsimp
   apply (rename_tac co_ctx presult rest stopper)
-  apply(drule_tac x = "co_ctx" in spec, simp)
+  apply(drule_tac x = "co_ctx" in spec)
   apply(drule_tac x = "presult" in spec)
   apply(drule_tac x = "code (cR - cL) ** rest" in spec)
   apply (erule impE)
-     apply(simp add: code_diff_union sep_conj_assoc)
+   apply(subgoal_tac "(instruction_result_as_set co_ctx presult - {CodeElm (pos, i) |pos i. (pos, i) \<in> cL \<or> (pos, i) \<in> cR})
+    = (instruction_result_as_set co_ctx presult - {CodeElm (pos, i) |pos i. (pos, i) \<in> cL} -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cR \<and> (pos, i) \<notin> cL})")
+    apply (simp add: code_back)
+   apply blast
   apply(drule_tac x = stopper in spec)
-  apply clarsimp
-  apply (clarsimp simp add: triple_def)
-  apply(drule_tac x = "co_ctx" in spec, simp)
-  apply(drule_tac x = "program_sem stopper co_ctx k net presult" in spec)
+  apply(erule exE)
+  apply (subst (asm) triple_def[where pre=Q])
+  apply(drule_tac x = "co_ctx" in spec)
+  apply(drule_tac x = "(program_sem stopper co_ctx k net presult)" in spec)
   apply(drule_tac x = "code (cL - cR) ** rest" in spec)
-  apply (erule disjE)
-   prefer 2
-   apply fastforce
-  apply (erule impE)
-   apply (simp only: sep_conj_assoc[symmetric] HOL.trans[OF code_diff_union[symmetric] code_diff_union'])
+  apply(erule disjE)
    apply(drule_tac x = stopper in spec)
-   apply (fastforce simp add: code_diff_union' execution_continue)
-  done
+   apply (erule impE)
+    apply(subgoal_tac "(instruction_result_as_set co_ctx (program_sem stopper co_ctx k net presult) -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cL} -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cR \<and> (pos, i) \<notin> cL}) =
+         (instruction_result_as_set co_ctx (program_sem stopper co_ctx k net presult) -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cR} -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cL \<and> (pos, i) \<notin> cR})")
+     apply (metis code_diff_union code_union_comm sep_three)
+    apply blast
+   apply(erule exE)
+   apply(rename_tac k l)
+   apply(rule_tac x = "k + l" in exI)
+   apply(erule disjE)
+   apply(rule disjI1)
+   apply(subgoal_tac "
+   (instruction_result_as_set co_ctx (program_sem stopper co_ctx (k + l) net presult) -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cR} -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cL \<and> (pos, i) \<notin> cR}) =
+   (instruction_result_as_set co_ctx (program_sem stopper co_ctx (k + l) net presult) -
+         {CodeElm (pos, i) |pos i. (pos, i) \<in> cL \<or> (pos, i) \<in> cR})")
+    apply (simp add: code_back code_union_s execution_continue)
+   apply blast
+  apply auto
+ using execution_continue by auto
+
+
 (** Frame **)
 
 lemma frame:
@@ -771,7 +768,6 @@ lemma frame:
   apply clarsimp
   subgoal for co_ctx presult rest stopper
   apply (drule spec[where x=co_ctx])
-  apply clarsimp
   apply (drule spec2[where x=presult and y="R ** rest"])
   apply (simp del: sep_conj_assoc add: sep_conj_ac)
   done
@@ -789,7 +785,6 @@ lemma weaken_post:
   apply clarsimp
   subgoal for co_ctx presult rest stopper
   apply (drule spec[where x=co_ctx])
-  apply clarsimp
   apply (drule spec2[where x=presult and y=rest])
   apply clarsimp
   apply (drule spec[where x=stopper])
@@ -808,7 +803,6 @@ lemma strengthen_pre:
   apply (simp add: triple_def)
   apply(clarify)
   apply(drule_tac x = co_ctx in spec)
-  apply(simp)
   apply(drule_tac x = presult in spec)
   apply(drule_tac x = rest in spec)
   apply (erule impE)
@@ -909,7 +903,6 @@ shows" triple net reasons b c q"
 using assms(2)
   apply(auto simp add: triple_def)
   apply(drule_tac x = co_ctx in spec)
-  apply(auto)
   apply(drule_tac x = presult in spec)
   apply(drule_tac x = rest in spec)
   apply (erule impE)
@@ -939,7 +932,6 @@ lemma preE00:
 lemma preE : "triple net reasons (\<lambda> s. \<exists> x. p x s) c q = (\<forall> x. triple net reasons (p x) c q)"
 apply(auto simp add: triple_def preE1)
  apply(erule_tac x = co_ctx in allE)
- apply simp
  apply(drule_tac x = presult in spec)
   apply(drule_tac x = rest in spec)
   apply (erule impE)
@@ -1026,8 +1018,6 @@ gas_any_sep[simp]
 sep_gas_any_sep[simp]
 sep_log_number_sep[simp]
 memory8_sep[simp]
-annotation_failure_as_set[simp]
-no_assertion_pass[simp]
 pure_sep[simp]
 continuing_sep[simp]
 sep_continuing_sep[simp]

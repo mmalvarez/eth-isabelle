@@ -20,10 +20,11 @@ lemmas as_set_simps =
   constant_ctx_as_set_def
   variable_ctx_as_set_def
   contexts_as_set_def
+  account_existence_as_set_def
 
 lemma continuing_not_context[simp]:
   "ContinuingElm b \<notin> contexts_as_set x32 co_ctx"
-  by (simp add:  as_set_simps)
+by (simp add:  as_set_simps)
 
 lemma caller_elm_means: "
  (CallerElm x12
@@ -412,53 +413,43 @@ lemma this_account_elm_not_variable [simp]:
 
 lemma advance_pc_preserves_storage :
  "vctx_storage (vctx_advance_pc co_ctx x1) = vctx_storage x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_memory:
   "vctx_memory (vctx_advance_pc co_ctx x1) = vctx_memory x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_logs :
   "vctx_logs (vctx_advance_pc co_ctx x1) = vctx_logs x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_memory_usage :
   "vctx_memory_usage (vctx_advance_pc co_ctx x1) = vctx_memory_usage x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_balance  :
    "vctx_balance (vctx_advance_pc co_ctx x1) = vctx_balance x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_caller :
   "vctx_caller (vctx_advance_pc co_ctx x1) = vctx_caller x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_value_sent :
   "vctx_value_sent (vctx_advance_pc co_ctx x1) = vctx_value_sent x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_origin :
   " vctx_origin (vctx_advance_pc co_ctx x1) = vctx_origin x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_preserves_block :
   " vctx_block (vctx_advance_pc co_ctx x1) = vctx_block x1"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_keeps_stack :
   "(vctx_stack (vctx_advance_pc co_ctx v)) = vctx_stack v"
-apply(simp add: vctx_advance_pc_def)
-done
+by(simp add: vctx_advance_pc_def)
 
 lemma advance_pc_change:
   "vctx_pc x1 \<noteq> vctx_pc (vctx_advance_pc co_ctx x1)"
@@ -552,8 +543,7 @@ by (auto simp add: as_set_simps)
 
 lemma stack_height_in[simp]:
   "StackHeightElm (length t) \<in> stack_as_set t"
-apply(simp add: stack_as_set_def)
-done
+by(simp add: stack_as_set_def)
 
 lemma pc_not_stack  :
  "PcElm k \<notin> stack_as_set s"
@@ -755,12 +745,12 @@ by (auto simp add: as_set_simps vctx_advance_pc_def)
 
 lemma gasprice_elm_means :
   "GaspriceElm x26 \<in> variable_ctx_as_set x1
-  = (x26 = block_gasprice (vctx_block x1))"
+  = (x26 = vctx_gasprice x1)"
   by (auto simp add: as_set_simps )
 
 lemma gasprice_c_means :
   "GaspriceElm x26 \<in> contexts_as_set x1 co_ctx
-  = (x26 = block_gasprice (vctx_block x1))"
+  = (x26 = vctx_gasprice x1)"
 by (auto simp add: as_set_simps)
 
 lemma advance_keeps_gasprice_elm:
@@ -930,8 +920,7 @@ by (auto dest: stack_all)
 lemma log_num_v_advance  :
   "LogNumElm x6 \<in> variable_ctx_as_set (vctx_advance_pc co_ctx x1) =
    (LogNumElm x6 \<in> variable_ctx_as_set x1)"
-apply(simp add: as_set_simps vctx_advance_pc_def)
-done
+by(simp add: as_set_simps vctx_advance_pc_def)
 
 lemma log_num_advance :
   "LogNumElm x6 \<in> contexts_as_set (vctx_advance_pc co_ctx x1) co_ctx =
@@ -963,7 +952,6 @@ lemma account_existence_elm_means :
   "AccountExistenceElm p \<in> variable_ctx_as_set x =
    (vctx_account_existence x (fst p) = snd p)"
   by (case_tac p, auto simp add: as_set_simps vctx_advance_pc_def instruction_result_as_set_def)
-
 
 lemma account_existence_elm_means_c :
   "AccountExistenceElm p \<in> contexts_as_set x c =
@@ -1773,7 +1761,7 @@ definition triple_alt ::
  "network \<Rightarrow> failure_reason set \<Rightarrow> (state_element set \<Rightarrow> bool) \<Rightarrow> (int * inst) set \<Rightarrow> (state_element set \<Rightarrow> bool) \<Rightarrow> bool"
 where
   "triple_alt net allowed_failures pre insts post ==
-    \<forall> co_ctx presult rest stopper. no_assertion co_ctx \<longrightarrow>
+    \<forall> co_ctx presult rest stopper.
        (code insts ** pre ** rest) (instruction_result_as_set co_ctx presult) \<longrightarrow>
        (\<exists> k.
          ((post ** code insts ** rest) (instruction_result_as_set co_ctx (program_sem stopper co_ctx k net presult)))
@@ -2923,7 +2911,6 @@ lemma continuing_not_vctx  :
   "ContinuingElm b \<notin> variable_ctx_as_set v"
 by (auto simp add: as_set_simps)
 
-
 lemma log_num_not_ext_program  :
   "LogNumElm x6 \<notin> ext_program_as_set e"
 by (auto simp add: as_set_simps)
@@ -2935,8 +2922,6 @@ lemma log_num_elm_means  :
 by (auto simp add: as_set_simps)
 
 
-
-
 lemma log_num_in_v_means  :
  "LogNumElm x6 \<in> variable_ctx_as_set v =
   (length (vctx_logs v) = x6)"
@@ -2946,19 +2931,11 @@ by (auto simp add: as_set_simps)
 lemma account_existence_means_v  :
   "AccountExistenceElm x29 \<in> variable_ctx_as_set v =
    (vctx_account_existence v (fst x29) = snd x29)"
-apply(auto simp add: as_set_simps)
- apply(rule_tac x = "fst x29" in exI)
- apply(case_tac x29)
- apply simp
-apply(rule_tac x = "fst x29" in exI)
-apply(case_tac x29)
-apply simp
-done
+by (simp add:account_existence_elm_means)
 
 lemma account_existence_not_stack  :
   "AccountExistenceElm p \<notin> stack_as_set ta"
-apply(simp add: stack_as_set_def)
-done
+by (simp add: stack_as_set_def)
 
 lemma vctx_gas_changed  :
    "variable_ctx_as_set
@@ -3182,6 +3159,11 @@ lemmas stateelm_dest =
   not_topmost_all
   ext_all
   not_ext_all
+
+lemma gasprice_advance_pc [simp]:
+ "vctx_gasprice
+        (vctx_advance_pc co_ctx x) = vctx_gasprice x"
+by(simp add: vctx_advance_pc_def)
 
 lemmas stateelm_subset_diff_elim =
   memory_range_in_minus_balance
@@ -3746,4 +3728,3 @@ account_existence_sep[simp]
 sep_sep_account_existence_sep[simp]
 
 end
-

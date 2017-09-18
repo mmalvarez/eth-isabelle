@@ -34,6 +34,7 @@ lemma move_neq_first:
    "{x. P x \<and> x \<noteq> v \<and> Q x} = {x. x \<noteq> v \<and> P x \<and> Q x}"
   by blast+
 
+
 lemma log0_gas_triple :
   "triple net {OutOfGas}
           (\<langle> h \<le> 1022 \<and> length data = unat logged_size \<rangle> **
@@ -63,6 +64,7 @@ apply clarify
     defer
     apply (simp)
    apply (simp  add:  memory_range_sep )
+apply(rename_tac continued)
 apply(simp add: log_inst_numbers.simps sep_memory_range
       sep_memory_range_sep log_def memory_range_sep
         instruction_result_as_set_def insert_minus_set
@@ -77,13 +79,14 @@ apply(rule Set.equalityI)
  apply clarify
  apply simp
  apply(rename_tac elm; case_tac elm; simp)
- apply(case_tac "fst x2 < length ta"; simp)
-apply clarify
-apply simp
-apply (case_tac "a = length ta"; clarsimp)
+   apply(rename_tac st)
+   apply(case_tac st; clarsimp)
+   apply(erule disjE; clarsimp)
+  apply auto[1]
+ apply(simp add: gasprice_advance_pc)
 apply auto
 apply(rename_tac elm; case_tac elm; simp)
-apply(case_tac "length (vctx_logs x1) \<le> fst x5"; auto)
+apply auto
 done
 
 lemma imp_to_disjD: "P \<longrightarrow> Q \<Longrightarrow> \<not>P \<or> Q"
@@ -133,6 +136,7 @@ apply(rule Set.equalityI)
  apply simp
  apply(rename_tac elm; case_tac elm; clarsimp)
  apply (drule imp_to_disjD, erule disjE; clarsimp)
+ apply (simp add: gasprice_advance_pc)
 apply clarify
 apply simp
 apply(rename_tac elm; case_tac elm; clarsimp)
@@ -333,13 +337,12 @@ apply(rule_tac x = 1 in exI)
   apply(case_tac presult; simp)
 apply(clarify)
 apply(simp add: call_def)
-apply(simp add: instruction_result_as_set_def)
+apply(simp add: instruction_result_as_set_def vctx_recipient_def)
 apply(simp add: sep_memory_range_sep sep_memory_range memory_range_sep failed_for_reasons_def)
     apply(simp add: vctx_stack_default_def)
         apply (rule conjI, (auto simp: move_neq_first 
                         elim!: set_mp dest!: memory_range_elms_conjD memory_range_elms_disjD)[1])+
-      
-      
+
 apply(erule_tac P=rest in back_subst)
 apply(rule Set.equalityI)
  apply(clarify)
