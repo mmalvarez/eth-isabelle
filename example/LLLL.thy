@@ -4,16 +4,69 @@ theory LLLL
   
 begin
   
+(* an alternate approach: start with a labeled language *)
+
+(* we need to rule out invalid, PC, and misc instrs *)
+fun inst_valid :: "inst => bool" where
+  "inst_valid (Unknown _) = False"
+| "inst_valid (Pc _) = False"
+| "inst_valid (Misc _) = False"
+| "inst_valid _ = True"
+  
+datatype llexp = 
+  L "inst"
+  | LSeq "llexp" "llexp"
+  | LLab "llexp" (* de Bruijn style label rep. *)
+  | LDec "int" (* declare a label location *)
+  | LJump "int" (* jump indices as local offset *)
+  | LJumpNZ "int" (* conditional jump to local offset if stack top isn't 0 *)
+
+(* Q: do we need a validity check for llexp that makes sure
+   labels have been declared? *)
+    
+definition jump_size :: "int" where
+  "jump_size = Evm.inst_size (Pc JUMP)"
+  
+(* definition jumpi_size :: "int" where
+  "jumpi_size = Evm.inst (Pc JUMPI) *)
+
+(* returns (number of bytes not including jumps, number of jumps) *)
+(* we need to track number of jumps also to make this sound *)
+fun llexp_size_rec :: "llexp \<Rightarrow> int" where
+  "llexp_size (L i) = Evm.inst_size i"
+| "llexp_size (LSeq l1 l2) =
+   llexp_size l1 + llexp_size l2"
+| "llexp_size (Lab l) = llexp_size l"
+| "llexp_size (Ldec _) = 0"
+| "llexp_size (Ljump _) = jump_size + 4"
+| "llexp_size (Ljumpi ) = 
+  
+    
+definiton llexp_size :: "llexp \<Rightarrow> int"
+(* iterate over an llexp, tracking the size in bytes at each step *)
+definition llexp_resolved =
+  Lr "inst"
+  | LSeqr "llexp_resolved" "llexp_resolved"
+  | LLab "int" "llexp"
+  | LJump "int"
+    
+definition llexp_full =
+  Lf "inst"
+  | Lseqf "llexp_full" "llexp_full"
+  | LJump "int"
+  
+    
+(*
 datatype llexp1 =
     L "inst"
     | LSeq "llexp1" "llexp1"
     (* tag on if marks what number the jump dests are *)
     | LIf "llexp1" "llexp1" (* branch on top stack element *)
+*)
 
 (* Q: have an optional tag on "if"
    to mark which number occurrence the dests are
 *)
-      
 datatype llexp2 =
   L2 "inst"
   | L2Seq "llexp2" "llexp2"
