@@ -118,6 +118,16 @@ fun ll2_valid_sz :: "ll2 \<Rightarrow> nat \<Rightarrow> (nat * bool)" and
       
 type_synonym loc2 = "ll2 * path2"
   
+fun ll1_size :: "ll1 \<Rightarrow> nat" and
+    ll1_size_seq :: "ll1 list \<Rightarrow> nat" where
+    "ll1_size (ll1.L inst) = nat (inst_size inst)"
+  | "ll1_size (ll1.LLab idx) = 0"
+  | "ll1_size (ll1.LJmp idx) = 1"
+  | "ll1_size (ll1.LJmpI idx) = 1"
+  | "ll1_size (ll1.LSeq ls) = ll1_size_seq ls"
+  | "ll1_size_seq [] = 0"
+  | "ll1_size_seq (h # t) = ll1_size h + ll1_size_seq t"
+  
 (* first pass, storing sizes *)
 fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
     ll_phase1_seq :: "ll1 list \<Rightarrow> nat \<Rightarrow> ((nat * ll2 * nat) list * nat)"
@@ -138,220 +148,58 @@ fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
 definition ll_pass1 :: "ll1 \<Rightarrow> ll2" where
   "ll_pass1 l = fst (ll_phase1 l 0)"
 
-lemma ll_phase1_ll_phase1_seq :
-  "(ll_phase1_seq ls i = (ls', i')) \<longleftrightarrow> (ll_phase1 (ll1.LSeq ls) i) = (ll2.LSeq (i, ls', i'), i')"
-  apply(induction ls, auto)
-   apply(case_tac "ll_phase1 a i")
-   apply(case_tac "ll_phase1_seq ls i'")
-   apply(auto)
-   apply (case_tac "ll_phase1_seq ls b")
-   apply(auto)
-  apply(case_tac "ll_phase1 a i")
-  apply(case_tac "ll_phase1_seq ls i'")
-  apply(auto)
-  apply(case_tac "ll_phase1_seq ls b")
-    apply(auto)
-  done
-    
-lemma ll_phase1_ll_phase1_seq' :
-  "(ll_phase1 (ll1.LSeq ls) i) = (ll2.LSeq (i, ls', i'), i') \<Longrightarrow> (ll_phase1_seq ls i = (ls', i'))"
-  apply(simp add: ll_phase1_ll_phase1_seq)
-  done 
-    
- lemma ll_phase1_ll_phase1_seq'' :
-  "(ll_phase1_seq ls i = (ls', i')) \<Longrightarrow> (ll_phase1 (ll1.LSeq ls) i) = (ll2.LSeq (i, ls', i'), i')"
-  apply(simp add: ll_phase1_ll_phase1_seq)
-   done 
-     
-lemma ll_phase1_ll_phase1_seqX :
-  "(ll_phase1 x i) = (ll2.LSeq (i, ls', i'), i') \<Longrightarrow> (\<exists> y . x = ll1.LSeq y)"
-  apply(induction x, auto)
-  done 
-
-    
-lemma ll1_another :
-  "(ll_phase1 x i) = (ll2.LSeq (i, ls', i'), i') \<Longrightarrow> (\<exists> y . x = ll1.LSeq y)"
-  apply(induction x, auto)
-  done 
-
-    (*
-lemma ll_phase1_correct :
-  "ll1_valid x \<Longrightarrow> ll_phase1 x i = (x', i') \<Longrightarrow> ll2_valid_sz x' i = (i', True)" and
-  "list_all ll1_valid xs \<Longrightarrow> ll_phase1_seq xs i = (xs', i') \<Longrightarrow> ll2_valid_sz_seq i xs' i'"
-  apply (rule old_ll1_induct)
-   apply (induction xs rule:old_ll1_induct)
-    
-(*, auto)*)
-    
-  apply(case_tac "ll_phase1_seq ls i", auto)
-  apply (induction "fst (ll_phase1 x i)")
-*)
-
-(* we need a lemma about list sizes (?) *)    
-    
-lemma ll_phase1_correct:
-  shows  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (x2, i') \<and> ll2_valid_sz x2 i = (i', True))) \<and>
-          (list_all ll1_valid xs \<longrightarrow>
-           (xs = [] \<or> (xs = h # t \<and> (! j . ? hs . ? j' . ? ts . ? j'' .
-              ll_phase1 h j = (hs, j') \<and> ll_phase1_seq xs j' = (xs2, j'') \<and>
-              ll1_valid_sz hs j = (j', True) \<and> ll2_valid_sz_seq j' xs2 j'' = True))))"
-  apply(induction rule: old_ll1_induct, auto)
-        apply(case_tac "ll_phase1 h i", clarsimp)
-        apply(case_tac "ll_phase1_seq t b", clarsimp)
-        apply(auto)
-        apply(auto)
-   apply(case_tac "ll_phase1_seq l i", clarsimp)
-   apply(auto)
-    
-  apply(auto)
-        
-    
-    
-lemma ll_phase1_correct:
-  shows  "((ll1_valid x \<and> ll_phase1 x i = (x2, i')) \<longrightarrow> ll2_valid_sz x2 i = (i', True)) \<and>
-          ((list_all ll1_valid xs \<and> ll_phase1_seq xs j = (xs2, j')) \<longrightarrow> ll2_valid_sz_seq j xs2 j' = True)"
-  apply(induction rule: old_ll1_induct)
-        apply(auto)
-     apply(case_tac "ll_phase1_seq l i", simp_all)
-     apply(clarsimp)
-    
-(* prove ll_phase1_seq_correct first? *)
-(* need to somehow capture the variation in position ? *)    
-lemma ll_phase1_correct:
-  shows  "((ll1_valid x \<and> ll_phase1 x i = (x2, i')) \<longrightarrow> ll2_valid_sz x2 i = (i', True)) \<and>
-          ((list_all ll1_valid xs \<and> ll_phase1_seq xs i = (xs2, j')) \<longrightarrow> ll2_valid_sz_seq i xs2 j' = True)"
-proof (induction rule: old_ll1_induct) 
+lemma ll_phase1_size_correct :
+  fixes "x" "xs"
+  shows "(! i . ? x2 . (ll_phase1 x i = (x2, ll1_size x + i))) \<and>
+         (! j . ? xs2 . (ll_phase1_seq xs j = (xs2, ll1_size_seq xs + j)))"
+proof (induction rule: old_ll1_induct)
   case (1 inst) thus ?case by auto next
   case (2 idx) thus ?case by auto next
   case (3 idx) thus ?case by auto next
   case (4 idx) thus ?case by auto next
-  case (5 l) thus ?case 
-  proof { simp
-  } 
-  case (6)
-  case (7 t l)
-  { fix x xs 
-    proof (induction rule: old_ll1_induct)
-    
-  apply(case_tac x, auto)
-  apply(case_tac "ll_phase1_seq x5 i")
-  apply(auto)
-  apply(case_tac "is", auto)
-  apply(case_tac "ll_phase1 aa i")
-  apply(auto)
-  apply(case_tac "ll_phase1_seq list ba")
-  apply(clarsimp)
-
-  apply(rule conjE)
-    
-  
-    (*
-    apply(clarify)
-   apply(rule exE)
-   apply(rule exE)
-  apply(rule exE, auto)
-  apply(rule exI)
-  apply(rule exI)
-    apply(auto)
-  apply (case_tac "(ll_phase1_seq x ?i12 x)")  apply(simp)
-    
-  apply(case_tac "a", auto)
-  apply(case_tac "x", auto)
-    
-  apply(case_tac "ll_phase1 a i")
-  apply(case_tac "ll_phase1_seq list ba")
-     apply(simp)
-    
-  apply(case_tac "x", auto)
-    apply(case_tac "ll_phase1 a i")
-    apply(simp)
-  apply(case_tac "ll_phase1_seq lista bb")
-     apply(simp)
-  apply(auto)
-  apply()
-    
-  apply(case_tac "list", auto)
+  case (5 l) thus ?case
     apply(clarsimp)
-
-    
-  apply(case_tac "ac", auto)
-  
-  apply (frule "ll_phase1_ll_phase1_seq''")
-  
-  apply (subgoal_tac "ll1_valid (ll1.LSeq x)")
-   apply(auto)
-   apply (case_tac "(ll_phase1_seq x i)")
-  apply(auto simp add:list_all_def)
-    
-  apply(case_tac "(ll_phase1_seq x i)")
-  apply(auto)
-  apply(insert "ll_phase1_ll_phase1_seq''")
-  apply(erule subst)
-  apply(erule ssubst)
-  apply(auto)
-  apply(subst "ll_phase1_ll_phase1_seq")
-  apply(case_tac "x", auto)
-  apply(case_tac "ll_phase1 aa i")
-  apply(auto)
-  apply(case_tac "ll_phase1_seq list b")
-  apply(clarsimp, auto)
-    
-  
-   
-  apply(auto)
-  apply(simp add:ll_phase1_ll_phase1_seqX)
-  apply(subgoal_tac "? x . 
-  
-  apply(rule ll_phase1_ll_phase1_seqX)
-    
-  apply(case_tac "ll_phase1 
-  
-  apply(case_tac "ll_phase1_seq x i")
-  apply(auto)
-      
-    
-  
-  apply(auto simp add:ll_phase1_ll_phase1_seq)
-  apply (case_tac "ll_phase1_seq x i")
-  apply(auto)
-  case_tac(
-  
-    
-  apply (case_tac "a", auto)
-  apply (simp add:ll_phase1_ll_phase1_seq)
-  apply (case_tac "ll_phase1_seq x i", auto)
-    
-  apply(auto simp add:ll_phase1_ll_phase1_se)
-  apply(case_tac "ll_phase1_seq x i")
-  apply(auto) 
-  case_tac("ll_phase1
-  apply(auto simp add:ll_phase1_ll_phase1_seq)
-  apply(case_tac "ll_phase1_seq x i")
+    apply(drule_tac x = "i" in spec)
+    apply(case_tac "ll_phase1_seq l i", clarsimp)
+    done next
+  case 6 thus ?case by auto next
+  case (7 h t) thus ?case
+    apply(clarsimp)
+    apply(case_tac "ll_phase1 h j", clarsimp)
+    apply(case_tac "ll_phase1_seq t b", clarsimp)
+    apply(drule_tac x = "j" in spec)
+    apply(drule_tac x = "b" in spec)
     apply(auto)
-
-  apply(simp add:ll_phase1.simps(5))
+    done next
+qed
   
-   apply(auto)
+lemma ll_phase1_correct:
+  shows  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (x2, i') \<and> ll2_valid_sz x2 i = (i', True))) \<and>
+          (list_all ll1_valid xs \<longrightarrow>
+            (! j . ? xs2 . ? j' .
+              ll_phase1_seq xs j = (xs2, j') \<and>
+              ll2_valid_sz_seq j xs2 j' = True))"
+proof (induction rule:old_ll1_induct)
+  case (1 i) thus ?case by auto next
+  case (2 idx) thus ?case by auto next
+  case (3 idx) thus ?case by auto next
+  case (4 idx) thus ?case by auto next
+  case (5 l) thus ?case
+    apply(clarsimp)
+    apply(case_tac "ll_phase1_seq l i", clarsimp)
+    apply(drule_tac x = "i" in spec)
     apply(auto)
-   
-    
-  apply(simp add: list_all_def)
-  apply(case_tac "x", auto)
-  apply (case_tac "ll_phase1 aa i")
-  apply(auto)
-  apply (case_tac "ll_phase1_seq list b")
-  apply(case_tac "ab")
-  apply(auto)
-  apply(case_tac "ab")
-  apply(case_tac "(ab, b)")
-  apply(auto) 
-   
-   
-   apply (case_tac "(ll_phase1_seq x i)")
-  apply(simp add: list_all_def)
+    done next
+  case 6 thus ?case by auto next
+  case (7 h t) thus ?case
+    apply(clarsimp)
+    apply(case_tac "ll_phase1 h j", clarsimp)
+    apply(case_tac "ll_phase1_seq t b", clarsimp)
+    apply(drule_tac x = "j" in spec)
+    apply(drule_tac x = "b" in spec)
     apply(auto)
-    apply (simp )
-  
+    done
+qed
   
 value "ll_pass1 (ll1.LSeq [ll1.LLab 0, ll1.L (Arith ADD)])"
   
