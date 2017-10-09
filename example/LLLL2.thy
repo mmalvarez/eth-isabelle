@@ -6,47 +6,6 @@ begin
   
   (* LLLL, mark 2 *)
 
-(* don't mix up de Bruijn indices with sizes *)
-
-datatype 'a treeo =
-Leaf 'a
-| Branch "'a treeo list"
-  
-datatype swag =
-  S "int"
-  | S2 "inst"
-  | SB "bool"
-  | Seq "swagl"
-and swagl =
- SN 
-|  SC "swag" "swagl"
-  
-fun swag_recid :: "swag \<Rightarrow> swag" and
-  swagl_recid :: "swagl \<Rightarrow> swagl"
-  where
-  "swag_recid (S i) = (S i)"
-  | "swag_recid (S2 i) = (S2 i)"
-  | "swag_recid (SB b) = (SB b)"
-  | "swag_recid (Seq l) = Seq (swagl_recid l)"
-  | "swagl_recid (SN) = SN"
-  | "swagl_recid (SC s sl) = SC (swag_recid s) (swagl_recid sl)"
-
-lemma swag_recid_correct : "swagl_recid ls = ls \<and> swag_recid s = s"
-  apply(induction rule:swag_swagl.induct, auto)
-    
-      (*
- rule:LLLL2.swag_recid_swagl_recid.induct(1), auto)
-end*)
-    
-datatype sl =
-  Sl "int"
-  | Sn
-
-datatype swag2 =
-  S "int"
-  | Sseq "sl"
-    
-  
 (* we need to rule out invalid, PC, and misc instrs *)
 (* stack manipulation should be OK *)
 fun inst_valid :: "inst => bool" where
@@ -54,7 +13,8 @@ fun inst_valid :: "inst => bool" where
 | "inst_valid (Pc _) = False"
 | "inst_valid (Misc _) = False"
 | "inst_valid _ = True"
-  
+
+(* don't mix up de Bruijn indices with sizes *)  
 type_synonym idx = nat
   
 datatype ll1 =
@@ -65,7 +25,32 @@ datatype ll1 =
   | LJmpI "idx"
   (* sequencing nodes also serve as local binders *)
   | LSeq "ll1 list"
-    
+
+lemma old_ll1_induct:
+  assumes Ln: "(\<And> i. P1 (L i))"
+  and La: "(\<And> idx . P1 (LLab idx))"
+  and Lj: "(\<And>idx . P1 (LJmp idx))"
+  and Lji : "(\<And>idx . P1 (LJmpI idx))"
+  and Ljs : "(\<And>l . P2 l \<Longrightarrow> P1 (LSeq l))"
+  and Lln : "P2 []"
+  and Llc : "\<And>t l . P1 t \<Longrightarrow> P2 l \<Longrightarrow> P2 (t # l)"
+  shows "P1 t \<and> P2 l"
+proof-
+  {fix t
+    have "P1 t \<and> (\<forall> l . t = LSeq l \<longrightarrow> P2 l)"
+    proof (induction)
+      case (L) thus ?case using Ln by auto next
+      case (LLab) thus ?case using La by auto next
+      case (LJmp) thus ?case using Lj by auto next
+      case (LJmpI) thus ?case using Lji by auto next
+      case (LSeq l) thus ?case
+        apply (induct l) using Ljs Lln Llc by auto blast+
+    qed}
+  
+  thus ?thesis by auto
+qed
+          
+
 (* extra parameter tracks idx depth *)
 (* here we also ensure there is only 1 site per binder *)
 (* Q: is this the right place to do that? *)
@@ -189,33 +174,65 @@ lemma ll1_another :
   apply(induction x, auto)
   done 
 
+    (*
 lemma ll_phase1_correct :
   "ll1_valid x \<Longrightarrow> ll_phase1 x i = (x', i') \<Longrightarrow> ll2_valid_sz x' i = (i', True)" and
   "list_all ll1_valid xs \<Longrightarrow> ll_phase1_seq xs i = (xs', i') \<Longrightarrow> ll2_valid_sz_seq i xs' i'"
-   apply (induct x i and xs i rule: ll_phase1_ll_phase1_seq.induct)
-        apply(auto)
+  apply (rule old_ll1_induct)
+   apply (induction xs rule:old_ll1_induct)
     
 (*, auto)*)
     
   apply(case_tac "ll_phase1_seq ls i", auto)
   apply (induction "fst (ll_phase1 x i)")
+*)
+
+(* we need a lemma about list sizes (?) *)    
+    
+lemma ll_phase1_correct:
+  shows  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (x2, i') \<and> ll2_valid_sz x2 i = (i', True))) \<and>
+          (list_all ll1_valid xs \<longrightarrow>
+           (xs = [] \<or> (xs = h # t \<and> (! j . ? hs . ? j' . ? ts . ? j'' .
+              ll_phase1 h j = (hs, j') \<and> ll_phase1_seq xs j' = (xs2, j'') \<and>
+              ll1_valid_sz hs j = (j', True) \<and> ll2_valid_sz_seq j' xs2 j'' = True))))"
+  apply(induction rule: old_ll1_induct, auto)
+        apply(case_tac "ll_phase1 h i", clarsimp)
+        apply(case_tac "ll_phase1_seq t b", clarsimp)
+        apply(auto)
+        apply(auto)
+   apply(case_tac "ll_phase1_seq l i", clarsimp)
+   apply(auto)
+    
+  apply(auto)
+        
+    
+    
+lemma ll_phase1_correct:
+  shows  "((ll1_valid x \<and> ll_phase1 x i = (x2, i')) \<longrightarrow> ll2_valid_sz x2 i = (i', True)) \<and>
+          ((list_all ll1_valid xs \<and> ll_phase1_seq xs j = (xs2, j')) \<longrightarrow> ll2_valid_sz_seq j xs2 j' = True)"
+  apply(induction rule: old_ll1_induct)
+        apply(auto)
+     apply(case_tac "ll_phase1_seq l i", simp_all)
+     apply(clarsimp)
     
 (* prove ll_phase1_seq_correct first? *)
 (* need to somehow capture the variation in position ? *)    
-notepad
-begin
-  fix x :: ll1
-  fix i i' :: nat
-  fix x2 :: ll2
-  fix xs :: "ll1 list"
-  fix xs2 :: "(nat * ll2 * nat) list"
-  fix j j' :: nat
-  assume "ll1_valid x"
-  assume "list_all ll1_valid xs"
-  assume "ll_phase1 x i = (x2, i')"
-  assume "ll_phase1_seq xs j = (xs2, j')"
-  have "((ll2_valid_sz x2 i = (i', True)) \<and> ll2_valid_sz_seq j xs2 j' = True)"
-  proof ( induct_tac x x2 rule: ll_phase1_ll_phase1_seq.induct)
+lemma ll_phase1_correct:
+  shows  "((ll1_valid x \<and> ll_phase1 x i = (x2, i')) \<longrightarrow> ll2_valid_sz x2 i = (i', True)) \<and>
+          ((list_all ll1_valid xs \<and> ll_phase1_seq xs i = (xs2, j')) \<longrightarrow> ll2_valid_sz_seq i xs2 j' = True)"
+proof (induction rule: old_ll1_induct) 
+  case (1 inst) thus ?case by auto next
+  case (2 idx) thus ?case by auto next
+  case (3 idx) thus ?case by auto next
+  case (4 idx) thus ?case by auto next
+  case (5 l) thus ?case 
+  proof { simp
+  } 
+  case (6)
+  case (7 t l)
+  { fix x xs 
+    proof (induction rule: old_ll1_induct)
+    
   apply(case_tac x, auto)
   apply(case_tac "ll_phase1_seq x5 i")
   apply(auto)
