@@ -50,10 +50,6 @@ proof-
   thus ?thesis by auto
 qed
           
-
-(* extra parameter tracks idx depth *)
-(* here we also ensure there is only 1 site per binder *)
-(* Q: is this the right place to do that? *)
 fun ll1_valid :: "ll1 \<Rightarrow> bool" where
   "ll1_valid (L i) = inst_valid i"
   | "ll1_valid (LSeq is) = list_all ll1_valid is"
@@ -68,7 +64,8 @@ datatype ll2 =
   | LJmpI "int * idx * int"
   | LSeq "int * (int * ll2 * int) list * int"
 *)
-(* ll2 contains a field for us to decorate label locations and jumps with paths *)    
+(* ll2 contains a field for us to decorate label locations and jumps with paths *)
+(* do we need path to be mut ind *)    
 datatype ll2 =
   L "nat * inst * nat"
   | LLab "nat * idx * path2 option * nat"
@@ -78,7 +75,41 @@ datatype ll2 =
 and path2 =
   Top "nat * nat" (* needs an int argument ? two? *)
   | Node "nat * (nat * ll2 * nat) list * nat * path2 * (nat * ll2 * nat) list * nat"
+  
+    
+value "(L (0, Arith ADD, 0))"
 
+
+  
+(* P1 is for nodes ll2, P2 is for lists of nodes ((nat * ll2 * nat) list), P3 is for paths
+   (note that P3 actually takes a path option) *)  
+(* does P1 also need to take nats? maybe they all do *)
+ (*
+lemma old_ll2_induct:
+  assumes Ln: "(\<And> n i n'. P1 (L (n, i, n')) n n')"
+  and La: "(\<And> n idx po n' . P3 po n n' \<Longrightarrow> P1 (LLab (n, idx, po, n')) n n')"
+  and Lj: "(\<And> n idx po n' . P3 po n n' \<Longrightarrow> P1 (LJmp (n, idx, po, n')) n n')"
+  and Lji : "(\<And> n idx po n' . P3 po n n' \<Longrightarrow> P1 (LJmpI (n, idx, po, n')) n n')"
+  and Lsq : "(\<And> n l n' . P2 l n n' \<Longrightarrow> P1 (LSeq (n, l, n')) n n')"
+  and Lln : "P2 [] 0 0"
+  and Llc : "\<And> n t n' l n'' . P1 t n n' \<Longrightarrow> P2 l n' n'' \<Longrightarrow> P2 ((n, t, n') # l) n n''"
+  shows "P1 t n n' \<and> P2 l m m' \<and> P3 po k k'"
+  proof-
+    {fix t
+      (* need an existential somewhere? *)
+      have "P1 t n n' \<and>
+          (\<forall> l . t = LSeq (n, l, n') \<longrightarrow> P2 l n n') \<and>
+          (\<forall> idx po . t = LLab (n, idx, po, n') \<longrightarrow> P3 po n n')"
+    proof(induction t)
+      case(L x) thus ?case using Ln
+        apply(case_tac x)
+        apply(clarsimp)
+        apply(case_tac x)
+        apply(auto)
+    done
+*)  
+  
+    
 definition jump_size :: "nat" where
   "jump_size = nat (inst_size (Pc JUMP))"
   
@@ -88,6 +119,22 @@ definition jumpi_size :: "nat" where
   "jumpi_size = nat (inst_size (Pc JUMPI))"  
 
 declare jumpi_size_def [simp]
+  
+(* validity of ll2 terms that have just been translated from ll1 *)
+inductive_set
+  ll2_valid :: "(nat * ll2 * nat) set" and
+  ll2_validl :: "(nat * ((nat * ll2 * nat) list) * nat) set"
+  where
+    "\<And> i n . inst_valid i \<Longrightarrow> (n, (L (n, i, n + nat (inst_size i))), n + nat (inst_size i)) \<in> ll2_valid"
+  | "\<And> n d . (n, (LLab (n, d, None, n)), n) \<in> ll2_valid"
+  | "\<And> n d . (n, (LJmp (n, d, None, n+1)), n+1) \<in> ll2_valid"
+  | "\<And> n d . (n, (LJmpI (n, d, None, n + 1)), n + 1) \<in> ll2_valid"
+  | "\<And> n l n' . (n, l, n') \<in> ll2_validl \<Longrightarrow> (n, (LSeq (n, l, n')), n') \<in> ll2_valid  "
+  | "\<And> n . (n, [], n) \<in> ll2_validl"  
+  | "\<And> n h n' t n'' .
+     (n, h, n') \<in> ll2_valid \<Longrightarrow>
+     (n', t, n'') \<in> ll2_validl \<Longrightarrow>
+     (n, ((n, h, n') # t), n'') \<in> ll2_validl"    
   
 (* we need a size-validity predicate for ll2 *)
 (* we take an int indicating where we start from *)
@@ -101,7 +148,7 @@ fun ll2_valid_sz :: "ll2 \<Rightarrow> nat \<Rightarrow> (nat * bool)" and
    (i' = i \<and> i'' = i'))"
 | "ll2_valid_sz (LJmp (i', _, _, i'')) i =
    (i'',
-   (i = i' \<and> i'' = i' + jump_size))"
+   (i = i' \<and> i'' = i + jump_size))"
 | "ll2_valid_sz (LJmpI (i', _, _, i'')) i =
    (i'',
    (i = i' \<and> i'' = i + jumpi_size))"
@@ -114,8 +161,15 @@ fun ll2_valid_sz :: "ll2 \<Rightarrow> nat \<Rightarrow> (nat * bool)" and
    ((i = i') \<and>
    (ll2_valid_sz h i' = (i'', True)) \<and>
    (ll2_valid_sz_seq i'' t ifin))"
-   
-      
+     
+value "ll2_valid_sz (ll2.LJmp (n, d, None, n + 4)) n = (n + 4, True)"
+  
+lemma ll2_valid_test :
+  shows "((n, t, n') \<in> ll2_valid \<longrightarrow> ll2_valid_sz t n = (n', True)) \<and>
+         ((m, l, m') \<in> ll2_validl \<longrightarrow> ll2_valid_sz_seq m l m' = True)"
+proof(induction rule: ll2_valid_ll2_validl.induct, auto)
+qed  
+  
 type_synonym loc2 = "ll2 * path2"
   
 fun ll1_size :: "ll1 \<Rightarrow> nat" and
@@ -201,15 +255,79 @@ proof (induction rule:old_ll1_induct)
     done
 qed
   
+lemma ll_phase1_correct' :
+  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (x2, i') \<and> (i, x2, i') \<in> ll2_valid)) \<and>
+   (list_all ll1_valid xs \<longrightarrow>
+    (! j . ? xs2 . ? j' . ll_phase1_seq xs j = (xs2, j') \<and> (j, xs2, j') \<in> ll2_validl))"
+proof(induction rule:old_ll1_induct)
+  case (1 i) thus ?case by (auto simp add:ll2_valid.simps) next
+  case (2 idx) thus ?case by (auto simp add:ll2_valid.simps) next
+  case (3 idx) thus ?case by (auto simp add:ll2_valid.simps) next
+  case (4 idx) thus ?case by (auto simp add:ll2_valid.simps) next
+  case (5 l) thus ?case
+    apply(clarsimp)
+    apply(case_tac "ll_phase1_seq l i", clarsimp)
+    apply(drule_tac x = "i" in spec)
+    apply (auto simp add:ll2_valid.simps)
+    done  next
+  case (6) thus ?case 
+    apply(insert "ll2_valid_ll2_validl.intros")
+    apply(auto)
+    done next
+  case(7 t l) thus ?case
+    apply(clarsimp)
+    apply(case_tac "ll_phase1 t j", clarsimp)
+    apply(case_tac "ll_phase1_seq l b", clarsimp)
+    apply(drule_tac x = "j" in spec)
+    apply(drule_tac x = "b" in spec)
+    apply(auto)
+    apply(insert "ll2_valid_ll2_validl.intros")
+    apply(auto)
+    done
+qed
+  
 value "ll_pass1 (ll1.LSeq [ll1.LLab 0, ll1.L (Arith ADD)])"
   
 value "(inst_size (Arith ADD))"
   
+inductive_set ll2_descend :: "(ll2 * ll2 * nat) set"
+  where
+    "\<And> n n' ls t .
+       (n, LSeq (n, ls, n'), n') \<in> ll2_valid \<Longrightarrow>
+       (_, t, _) \<in> set ls \<Longrightarrow>
+       (LSeq (n, ls, n'), t, 1) \<in> ll2_descend"
+  | "\<And> t t' n t'' n' .
+       (t, t', n) \<in> ll2_descend \<Longrightarrow>
+       (t', t'', n') \<in> ll2_descend \<Longrightarrow>
+       (t, t'', n + n') \<in> ll2_descend"
+  
+(* validity of ll2 terms with labels resolved*)
+(* Q: how do we detect label clashes? *)
+inductive_set
+  ll2_valid2 :: "(nat * ll2 * nat) set" and
+  ll2_validl2 :: "(nat * ((nat * ll2 * nat) list) * nat) set"
+  where
+    "\<And> i n . inst_valid i \<Longrightarrow> (n, (L (n, i, n + nat (inst_size i))), n + nat (inst_size i)) \<in> ll2_valid2"
+  | "\<And> n d . (n, (LLab (n, d, None, n)), n) \<in> ll2_valid2"
+  | "\<And> n d . (n, (LJmp (n, d, None, n+1)), n+1) \<in> ll2_valid2"
+  | "\<And> n d . (n, (LJmpI (n, d, None, n + 1)), n + 1) \<in> ll2_valid2"
+  | "\<And> n l n' . (n, l, n') \<in> ll2_validl2 \<Longrightarrow>
+                 (\<not> (\<exists> k . (LSeq (n, l, n'), LLab (_, k, _, _), k) \<in> ll2_descend)) \<Longrightarrow>
+                 (n, (LSeq (n, l, n')), n') \<in> ll2_valid2"
+  | "\<And> n l n'. (n, l, n') \<in> ll2_validl2 \<Longrightarrow>
+                (\<exists>! k . (LSeq (n, l, n'), LLab (_, k, _, _), k) \<in> ll2_descend) \<Longrightarrow>
+                (n, LSeq (n, l, n'), n') \<in> ll2_valid2"
+  | "\<And> n . (n, [], n) \<in> ll2_validl2"  
+  | "\<And> n h n' t n'' .
+     (n, h, n') \<in> ll2_valid2 \<Longrightarrow>
+     (n', t, n'') \<in> ll2_validl2 \<Longrightarrow>
+     (n, ((n, h, n') # t), n'') \<in> ll2_validl2"
+
+(* idea: how do we calculate label-correctness? *)
+fun ll2_add_labels :: "ll2 \<Rightarrow> ll2" where
+  "ll2_add_labels (L (n, i, n')) = L (n, i, n')"
+ 
+    
 (* before going further with paths, we need some path utilities
    (inspired by Huet's Zippers paper)
  *)
-  
-(* navigation primitives *)
-fun go_left :: "loc2 \<Rightarrow> loc2" where
-  "go_left (t, (Top i j)) = undefined"
-  "go_left (t, (Node (i, l#left, 
