@@ -74,7 +74,7 @@ datatype ll2 =
   | LSeq "nat * (nat * ll2 * nat) list * nat"
 and path2 =
   Top "nat * nat" (* needs an int argument ? two? *)
-  | Node "nat * (nat * ll2 * nat) list * nat * path2 * (nat * ll2 * nat) list * nat"
+  | Node "nat * (nat * ll2 * nat) list * nat * path2 * nat * (nat * ll2 * nat) list * nat"
   
     
 value "(L (0, Arith ADD, 0))"
@@ -123,7 +123,7 @@ declare jumpi_size_def [simp]
 (* validity of ll2 terms that have just been translated from ll1 *)
 inductive_set
   ll2_valid :: "(nat * ll2 * nat) set" and
-  ll2_validl :: "(nat * ((nat * ll2 * nat) list) * nat) set"
+  ll2_validl :: "(nat * ((nat * ll2 * nat) list) * nat) set" 
   where
     "\<And> i n . inst_valid i \<Longrightarrow> (n, (L (n, i, n + nat (inst_size i))), n + nat (inst_size i)) \<in> ll2_valid"
   | "\<And> n d . (n, (LLab (n, d, None, n)), n) \<in> ll2_valid"
@@ -134,7 +134,8 @@ inductive_set
   | "\<And> n h n' t n'' .
      (n, h, n') \<in> ll2_valid \<Longrightarrow>
      (n', t, n'') \<in> ll2_validl \<Longrightarrow>
-     (n, ((n, h, n') # t), n'') \<in> ll2_validl"    
+     (n, ((n, h, n') # t), n'') \<in> ll2_validl"
+ 
   
 (* we need a size-validity predicate for ll2 *)
 (* we take an int indicating where we start from *)
@@ -188,8 +189,8 @@ fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
   where
   "ll_phase1 (ll1.L inst) i = (ll2.L (i, inst, i + nat (inst_size inst)), i + nat (inst_size inst))"
 | "ll_phase1 (ll1.LLab idx) i = (ll2.LLab (i, idx, None, i), i)" (* labels take no room *)
-| "ll_phase1 (ll1.LJmp idx) i = (ll2.LJmp (i, idx, None, i + 1), i + 1)" (* jumps take at least 4 bytes *)
-| "ll_phase1 (ll1.LJmpI idx) i = (ll2.LJmpI (i, idx, None, i + 1), i + 1)"
+| "ll_phase1 (ll1.LJmp idx) i = (ll2.LJmp (i, idx, None, 1 + i), 1 + i)" (* jumps take at least 4 bytes *)
+| "ll_phase1 (ll1.LJmpI idx) i = (ll2.LJmpI (i, idx, None, 1 + i), 1 + i)"
 | "ll_phase1 (ll1.LSeq ls) i =
    (let (ls', i') = ll_phase1_seq ls i in
    (ll2.LSeq (i, ls', i'), i'))"
@@ -260,7 +261,7 @@ lemma ll_phase1_correct' :
    (list_all ll1_valid xs \<longrightarrow>
     (! j . ? xs2 . ? j' . ll_phase1_seq xs j = (xs2, j') \<and> (j, xs2, j') \<in> ll2_validl))"
 proof(induction rule:old_ll1_induct)
-  case (1 i) thus ?case by (auto simp add:ll2_valid.simps) next
+  case (1 i) thus ?case by (auto simp add:ll2_validinductinduct.simps) next
   case (2 idx) thus ?case by (auto simp add:ll2_valid.simps) next
   case (3 idx) thus ?case by (auto simp add:ll2_valid.simps) next
   case (4 idx) thus ?case by (auto simp add:ll2_valid.simps) next
@@ -309,8 +310,8 @@ inductive_set
   where
     "\<And> i n . inst_valid i \<Longrightarrow> (n, (L (n, i, n + nat (inst_size i))), n + nat (inst_size i)) \<in> ll2_valid2"
   | "\<And> n d . (n, (LLab (n, d, None, n)), n) \<in> ll2_valid2"
-  | "\<And> n d . (n, (LJmp (n, d, None, n+1)), n+1) \<in> ll2_valid2"
-  | "\<And> n d . (n, (LJmpI (n, d, None, n + 1)), n + 1) \<in> ll2_valid2"
+  | "\<And> n d . (n, (LJmp (n, d, None, 1+n)), 1+n) \<in> ll2_valid2"
+  | "\<And> n d . (n, (LJmpI (n, d, None, 1+n)), 1+n) \<in> ll2_valid2"
   | "\<And> n l n' . (n, l, n') \<in> ll2_validl2 \<Longrightarrow>
                  (\<not> (\<exists> k . (LSeq (n, l, n'), LLab (_, k, _, _), k) \<in> ll2_descend)) \<Longrightarrow>
                  (n, (LSeq (n, l, n')), n') \<in> ll2_valid2"
@@ -326,8 +327,50 @@ inductive_set
 (* idea: how do we calculate label-correctness? *)
 fun ll2_add_labels :: "ll2 \<Rightarrow> ll2" where
   "ll2_add_labels (L (n, i, n')) = L (n, i, n')"
- 
-    
+   
+  
 (* before going further with paths, we need some path utilities
    (inspired by Huet's Zippers paper)
  *)
+  
+  
+(* assumes our first notion of validity *)
+(* TODO make this parametric w/r/t our syntax ? *)
+
+inductive_set ll2_validl_rev :: "(nat * ((nat * ll2 * nat) list) * nat) set" where
+    "\<And> n . (n, [], n) \<in> ll2_validl_rev"
+  | "\<And> n l n' h n''.
+    (n', h, n'') \<in> ll2_valid \<Longrightarrow>
+    (n, l, n') \<in> ll2_validl_rev \<Longrightarrow>
+    (n, (n',h,n'')#l, n'') \<in> ll2_validl_rev"
+    
+    
+  (* NOT DONE *)
+  (* Q: should path correctness just be indexed to where root is in buffer? *)
+  (* Q: better to have a few mut.ind. sets? *)
+  (* we are using the first notion of validity *)
+    (*
+inductive_set path2_valid :: "(nat * loc2 * nat) set" where
+  "\<And> n n'.
+   (n, t, n') \<in> ll2_valid2 \<Longrightarrow>
+   (n, (t, Top (n, n')), n') \<in> path2_valid"
+|"\<And> n n' m m' up.
+   (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
+   (k, up, k') \<in> path2_valid \<Longrightarrow>
+   (n, l, n') \<in>  \<Longrightarrow>
+   (k, (t, Node(n, [], n, up, n', [], n')), k') \<in> path2_valid"
+|"\<And>
+   (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
+   (x, newl, n) \<in> ll2_valid2
+   (k, (t, Node(n, l, n', up, n'', r, n''')), k') \<in> path2_valid \<Longrightarrow>
+   (k, (t, Node(x, (l@[(newl)]), n'  , k') \<in> path2_valid"
+|"\<And> 
+   (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
+   (k, (t, Node(n, l, n', up, n'', r, n''')), k') \<in> path2_valid \<Longrightarrow>
+   (k, (t, Node(
+ \<Longrightarrow>" *)
+  
+fun go_left :: "loc2 \<Rightarrow> loc2" where
+  "go_left (t, path2.Node(n, (m,h,m')#ls, n', up, rs, n'')) = 
+           (l, path2.Node(n, ls, n', up, ()#rs, n''))"
+  | "go_left loc = loc"
