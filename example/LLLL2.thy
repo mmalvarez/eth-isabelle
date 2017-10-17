@@ -261,7 +261,7 @@ lemma ll_phase1_correct' :
    (list_all ll1_valid xs \<longrightarrow>
     (! j . ? xs2 . ? j' . ll_phase1_seq xs j = (xs2, j') \<and> (j, xs2, j') \<in> ll2_validl))"
 proof(induction rule:old_ll1_induct)
-  case (1 i) thus ?case by (auto simp add:ll2_validinductinduct.simps) next
+  case (1 i) thus ?case by (auto simp add:ll2_valid.simps) next
   case (2 idx) thus ?case by (auto simp add:ll2_valid.simps) next
   case (3 idx) thus ?case by (auto simp add:ll2_valid.simps) next
   case (4 idx) thus ?case by (auto simp add:ll2_valid.simps) next
@@ -343,13 +343,42 @@ inductive_set ll2_validl_rev :: "(nat * ((nat * ll2 * nat) list) * nat) set" whe
     (n', h, n'') \<in> ll2_valid \<Longrightarrow>
     (n, l, n') \<in> ll2_validl_rev \<Longrightarrow>
     (n, (n',h,n'')#l, n'') \<in> ll2_validl_rev"
-    
+ 
+(* need an induction lemma for valid_rev *)    
+
+lemma ll2_validl_rev_correct' [rule_format] : 
+    "(k, l1, k') \<in> ll2_validl_rev \<Longrightarrow> (\<forall> l2 . (k', l2, k'') \<in> ll2_validl \<longrightarrow> (k, rev l1 @ l2, k'') \<in> ll2_validl)"
+proof(induction "k" "l1" "k'"  rule: ll2_validl_rev.induct)
+  case (1 n)
+  thus ?case by auto 
+  case (2 n l n' h n'')
+  thus ?case
+    apply(auto)
+    apply(subgoal_tac "(n', (n', h, n'')#l2, k'') \<in> ll2_validl")
+     apply(auto)
+    apply(rule ll2_valid_ll2_validl.intros(7))
+     apply(auto)
+    done
+qed
+
+lemma ll2_validl_rev_correct :
+  "(k, r, k') \<in> ll2_validl_rev \<Longrightarrow> (k, rev r, k') \<in> ll2_validl"
+proof-
+  assume H1: "(k, r, k') \<in> ll2_validl_rev"
+  have H2: "(k', [], k') \<in> ll2_validl"
+    apply(rule ll2_valid_ll2_validl.intros)
+  done
+  from ll2_validl_rev_correct'[OF H1 H2] have ?thesis
+    apply(auto)
+    done
+  thus ?thesis by auto
+qed
+
     
   (* NOT DONE *)
   (* Q: should path correctness just be indexed to where root is in buffer? *)
   (* Q: better to have a few mut.ind. sets? *)
   (* we are using the first notion of validity *)
-    (*
 inductive_set path2_valid :: "(nat * loc2 * nat) set" where
   "\<And> n n'.
    (n, t, n') \<in> ll2_valid2 \<Longrightarrow>
@@ -368,7 +397,7 @@ inductive_set path2_valid :: "(nat * loc2 * nat) set" where
    (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
    (k, (t, Node(n, l, n', up, n'', r, n''')), k') \<in> path2_valid \<Longrightarrow>
    (k, (t, Node(
- \<Longrightarrow>" *)
+ \<Longrightarrow>
   
 fun go_left :: "loc2 \<Rightarrow> loc2" where
   "go_left (t, path2.Node(n, (m,h,m')#ls, n', up, rs, n'')) = 
