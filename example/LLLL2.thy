@@ -374,6 +374,53 @@ proof-
   thus ?thesis by auto
 qed
 
+lemma ll2_validl_induct' [rule_format]:
+  assumes Ll: "(n, t, n') \<in> ll2_validl"
+  and Ln: "\<And> n . P n [] n"
+  and Lind: "\<And> n h n' l n'' . (n, h, n') \<in> ll2_valid \<Longrightarrow> (n', l, n'') \<in> ll2_validl \<Longrightarrow> P n' l n'' \<Longrightarrow> P n ((n, h, n')#l) n''"
+shows "P n t n'"
+proof-
+  {fix h l n n' m m'
+    have "((n, h, n') \<in> ll2_valid \<longrightarrow> (n, h, n') \<in> ll2_valid) \<and>
+          ((n, l, n') \<in> ll2_validl \<longrightarrow> P n l n')"
+    proof (induction  rule:ll2_valid_ll2_validl.induct)
+      case(1 i n) thus ?case by (rule ll2_valid_ll2_validl.intros) next
+      case(2 n d) thus ?case by (rule ll2_valid_ll2_validl.intros) next
+      case(3 n d) thus ?case by (rule ll2_valid_ll2_validl.intros) next
+      case(4 n d) thus ?case by (rule ll2_valid_ll2_validl.intros) next
+      case(5 n l n') 
+        assume Hlv: "(n, l, n') \<in> ll2_validl"
+        thus ?case using ll2_valid_ll2_validl.intros(5)[OF Hlv] 
+          apply(auto)
+            done next
+      case(6 n) thus ?case using Ln by auto next
+      case(7 n h n' l n'') 
+        assume Hlv: "(n, h, n') \<in> ll2_valid"
+         and Hllv : "(n', l, n'') \<in> ll2_validl"
+         and Hp : "P n' l n''"
+        thus ?case using Lind[OF Hlv]
+          apply(auto)
+          done
+      qed}
+    thus ?thesis using Ll by auto
+qed
+
+lemma ll2_validl_rev_correct_conv' [rule_format]:
+  assumes H1: "(k', l1, k'') \<in> ll2_validl" 
+  shows "(\<forall> l2 . (k, l2, k') \<in> ll2_validl_rev \<longrightarrow> (k, (rev l1) @ l2, k'') \<in> ll2_validl_rev)"
+proof(induction "k'" "l1" "k''" rule: ll2_validl_induct')
+  case (1) thus ?case using H1 by auto
+  case (2 n) thus ?case by auto
+  case (3 n h n' l n'') thus ?case
+    apply(auto)
+    apply(subgoal_tac "(k, (n, h, n') # l2, n') \<in> ll2_validl_rev")
+     apply(auto)
+    apply(rule ll2_validl_rev.intros)
+     apply(auto)
+    done
+qed
+    
+    
     
   (* NOT DONE *)
   (* Q: should path correctness just be indexed to where root is in buffer? *)
