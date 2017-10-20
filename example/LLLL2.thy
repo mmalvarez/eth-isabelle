@@ -419,34 +419,84 @@ proof(induction "k'" "l1" "k''" rule: ll2_validl_induct')
      apply(auto)
     done
 qed
-    
+
+lemma ll2_validl_rev_correct_conv :
+  "(k, r, k') \<in> ll2_validl \<Longrightarrow> (k, rev r, k') \<in> ll2_validl_rev"
+proof-
+  assume H1 : "(k, r, k') \<in> ll2_validl"
+  have H2 : "(k, [], k) \<in> ll2_validl_rev"
+    apply(rule ll2_validl_rev.intros)
+    done
+  from ll2_validl_rev_correct_conv'[OF H1 H2] have ?thesis by auto
+  thus ?thesis by auto
+qed
     
     
   (* NOT DONE *)
   (* Q: should path correctness just be indexed to where root is in buffer? *)
   (* Q: better to have a few mut.ind. sets? *)
   (* we are using the first notion of validity *)
+  (* Q: make this inductive def better? Can't prove go_left correct *)
 inductive_set path2_valid :: "(nat * loc2 * nat) set" where
   "\<And> n n'.
-   (n, t, n') \<in> ll2_valid2 \<Longrightarrow>
+   (n, t, n') \<in> ll2_valid \<Longrightarrow>
    (n, (t, Top (n, n')), n') \<in> path2_valid"
-|"\<And> n n' m m' up.
-   (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
-   (k, up, k') \<in> path2_valid \<Longrightarrow>
-   (n, l, n') \<in>  \<Longrightarrow>
-   (k, (t, Node(n, [], n, up, n', [], n')), k') \<in> path2_valid"
-|"\<And>
-   (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
-   (x, newl, n) \<in> ll2_valid2
-   (k, (t, Node(n, l, n', up, n'', r, n''')), k') \<in> path2_valid \<Longrightarrow>
-   (k, (t, Node(x, (l@[(newl)]), n'  , k') \<in> path2_valid"
-|"\<And> 
-   (n', t, n'') \<in> ll2_valid2 \<Longrightarrow>
-   (k, (t, Node(n, l, n', up, n'', r, n''')), k') \<in> path2_valid \<Longrightarrow>
-   (k, (t, Node(
- \<Longrightarrow>
+(*|"\<And> .
+  (n, t, n') \<in> ll2_valid \<Longrightarrow>
+  (n, (t, up), n') \<in> path2_valid \<Longrightarrow>
+  ()
+"*)
+(* Q: move rev into premise to free up form of conclusion? *)
+|"\<And> n l n' t n'' r n''' k up k'.
+   (n', t, n'') \<in> ll2_valid \<Longrightarrow>
+   (n, l, n') \<in> ll2_validl_rev  \<Longrightarrow>
+   (n'', r, n''') \<in> ll2_validl \<Longrightarrow>
+   (k, (LSeq (n, rev l @ ((n', t, n'')#r), n'''), up), k') \<in> path2_valid \<Longrightarrow> 
+   (k, (t, Node(n, l, n', up, n'', r, n''')), k') \<in> path2_valid"
+
+
   
 fun go_left :: "loc2 \<Rightarrow> loc2" where
-  "go_left (t, path2.Node(n, (m,h,m')#ls, n', up, rs, n'')) = 
-           (l, path2.Node(n, ls, n', up, ()#rs, n''))"
-  | "go_left loc = loc"
+  "go_left (t, path2.Node(n, (m,l,m')#ls, n', up, n'', rs, n''')) = 
+           (l, path2.Node(n, ls, m, up, m', (n', t, n'')#rs, n'''))"
+| "go_left loc = loc" (* bogus *)
+
+(* Q: should these nav functions signal error *)
+  
+lemma go_left_correct :
+  shows "(n, (t, l), n') \<in> path2_valid \<Longrightarrow> (n, go_left (t, l), n') \<in> path2_valid"
+proof(induction rule: path2_valid.induct)
+  case(1 t n n') thus ?case
+    apply(simp)
+    apply(rule path2_valid.intros, auto)
+    done next
+  case(2 n l n' t n'' r n''' k up k')
+    thus ?case using ll2_valid_ll2_validl.intros(7)[OF `(n', t, n'')
+       \<in> ll2_valid` `(n'', r, n''') \<in> ll2_validl`]
+      apply(case_tac l)
+       apply(auto)
+       apply(erule path2_valid.intros, auto)
+        apply(frule ll2_validl_rev.cases, auto)
+      apply(rule path2_valid.intros, auto)
+      done
+qed
+
+  (* go_right *)
+fun go_right :: "loc2 \<Rightarrow> loc2" where
+  "go_right (t, path2.Node(n, ls, n', up, n'', (m,r,m')#rs, n''')) = 
+            (r, path2.Node(n, (n', t, n'')#ls, m, up, m', rs, n'''))"
+| "go_right loc = loc" (*bogus*)
+  
+  (* go_up *)
+fun go_up :: "loc2 \<Rightarrow> loc2" where
+  "go_up (t, path2.Node(n, ls, n', up, n'', rs, n''')) =
+         (LSeq (n, (rev ls)@((n',t,n'')#rs), n'''), up)"
+| "go_up loc = loc" (*bogus*)
+  
+  (* go_down *)
+fun go_down :: "loc2 \<Rightarrow> loc2" where
+  "go_down (LSeq (n, (m,t,m')#ts, n'), p) =
+           (t, path2.Node(n, [], m, p, m', ts, n'))"  
+| "go_down loc = loc"
+  
+  (* then we can start talking about recursion *)
