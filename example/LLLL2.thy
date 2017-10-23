@@ -500,3 +500,15 @@ fun go_down :: "loc2 \<Rightarrow> loc2" where
 | "go_down loc = loc"
   
   (* then we can start talking about recursion *)
+  
+function sweep :: "loc2 \<Rightarrow> loc2" where
+   "sweep (t, path2.Node(n, ls, n', up, n'', (m,r,m')#rs, n''')) =
+    sweep (go_right (t, path2.Node(n, ls, n', up, n'', (m,r,m')#rs, n''')))" 
+ | "sweep loc = loc"
+  
+     apply(auto)
+     apply(auto)
+      
+    apply(simp)
+   
+
