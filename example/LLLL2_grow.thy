@@ -17,20 +17,48 @@ fun inst_valid :: "inst => bool" where
 (* don't mix up de Bruijn indices with sizes *)  
 type_synonym idx = nat
   
-datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx) ll =
+(* we need 1 more parameter, for metadata that applies to all nodes *)
+(* latter 2 are "pass through" for path datatype *)
+datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll =
   L "'lix" "inst"
   (* de-Bruijn style approach to local binders *)
   | LLab "'llx" "idx"
   | LJmp "'ljx" "idx"
   | LJmpI "'ljix" "idx"
   (* sequencing nodes also serve as local binders *)
-  | LSeq "'lsx" "(('lix, 'llx, 'ljx, 'ljix, 'lsx )ll )list"
+  | LSeq "'lsx" "(('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )ll )list"
 
+datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llp =
+  Top "'ptx" 
+  | Node "'pnx" "'lsx" "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
+               "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llp"
+               "'lsx" "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
+           
+
+(* TODO: uniform way of marking all nodes (e.g. nat * nat)? 
+   Perhaps make it so that the inter-node predicates (e.g. size)
+   can only depend on this, for easier induction) *)               
+               
 (* undecorated surface syntax
    TODO define "smart constructors" that plug in unit automatically *)    
-type_synonym ll1 = "(unit, unit, unit, unit, unit) ll"
+type_synonym ll1 = "(unit, unit, unit, unit, unit, unit, unit) ll"
 
+(* TODO: to what extent do we "extrude"?
+   The idea is that
+   
+
+   P2's thing relies on P1's metadata only (in induction principle below)
+   is this what we want?
+
+   Yes. But we need an appropriate notion of "joining" a new element into an
+   LSeq. When we do this, we need to ensure some notion of consistency.
+
+   I believe this notion of consistency is just "being a monoid"?
+   Or...?
+*)  
+  
 (* size decorations *)
+  (*
 type_synonym ll2 = "((nat * nat), (nat * nat), (nat * nat), (nat * nat), (nat * nat)) ll"
     
 (* now we record label target locations, for seq nodes *)
@@ -38,28 +66,35 @@ type_synonym ll3 = "((nat * nat), (nat * nat), (nat * nat), (nat * nat), (nat * 
   
 (* now we record jump target locations *)
 type_synonym ll4 = "((nat * nat), (nat * nat), (nat * nat * nat), (nat * nat * nat), (nat * nat * (nat option))) ll"
-  
+  *)
 lemma my_ll_induct:
-  assumes Ln: "(\<And> i. P1 (L i))"
-  and La: "(\<And> idx . P1 (LLab idx))"
-  and Lj: "(\<And>idx . P1 (LJmp idx))"
-  and Lji : "(\<And>idx . P1 (LJmpI idx))"
-  and Ljs : "(\<And>l . P2 l \<Longrightarrow> P1 (LSeq l))"
+  assumes Ln: "(\<And> i e . P1 (L e i))"
+  and La: "(\<And> idx e . P1 (LLab e idx))"
+  and Lj: "(\<And>idx e . P1 (LJmp e idx))"
+  and Lji : "(\<And>idx e . P1 (LJmpI e idx))"
+  and Ljs : "(\<And>e l . P2 l \<Longrightarrow> P1 (LSeq e l))"
   and Lln : "P2 []"
-  and Llc : "\<And>t l . P1 t \<Longrightarrow> P2 l \<Longrightarrow> P2 (t # l)"
+  and Llc : "\<And>t l. P1 t \<Longrightarrow> P2 l \<Longrightarrow> P2 (t # l)"
   shows "P1 t \<and> P2 l"
 proof-
   {fix t
-    have "P1 t \<and> (\<forall> l . t = LSeq l \<longrightarrow> P2 l)"
-    proof (induction)
+    have "P1 t \<and> (\<forall> l e . (t = LSeq e l \<longrightarrow> P2 l))"
+    proof (induction t)
       case (L) thus ?case using Ln by auto next
       case (LLab) thus ?case using La by auto next
       case (LJmp) thus ?case using Lj by auto next
       case (LJmpI) thus ?case using Lji by auto next
-      case (LSeq l) thus ?case
-        apply (induct l) using Ljs Lln Llc by auto blast+
+      case (LSeq e l) thus ?case 
+      proof(induction l)
+        case Nil thus ?case using Ljs Lln by auto next
+        case (Cons x1 x2) thus ?case using Ljs Lln Llc
+          apply(clarsimp)
+          apply(subgoal_tac "P1 x1", clarsimp)
+           apply(subgoal_tac "P2 x2", clarsimp)
+           apply(auto)
+          done next
+      qed
     qed}
-  
   thus ?thesis by auto
 qed
           
@@ -78,6 +113,7 @@ datatype ll2 =
   | LSeq "int * (int * ll2 * int) list * int"
 *)
 (* ll2 contains a field for us to decorate label locations and jumps with paths *)
+    
 (* do we need path to be mut ind *)    
 datatype ll2 =
   L "nat * inst * nat"
