@@ -19,40 +19,31 @@ type_synonym idx = nat
   
 (* we need 1 more parameter, for metadata that applies to all nodes *)
 (* latter 2 are "pass through" for path datatype *)
-datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll =
+  (* we need 1 more parameter, for metadata that applies to all nodes *)
+(* latter 2 are "pass through" for path datatype *)
+datatype ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt =
   L "'lix" "inst"
   (* de-Bruijn style approach to local binders *)
   | LLab "'llx" "idx"
   | LJmp "'ljx" "idx"
   | LJmpI "'ljix" "idx"
   (* sequencing nodes also serve as local binders *)
-  | LSeq "'lsx" "(('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )ll )list"
+  (* do we put an "'ix" in here? *)
+  | LSeq "'lsx" "'ix" "('ix * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )llt )list"
 
-datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llp =
+type_synonym ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll =
+  "('ix * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt)"
+    
+datatype ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath =
   Top "'ptx" 
-  | Node "'pnx" "'lsx" "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
-               "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llp"
-               "'lsx" "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
-           
+  | Node "'pnx" "'lsx" "'ix" "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
+               "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath"
+               "'lsx" "'ix" "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
 
-(* TODO: uniform way of marking all nodes (e.g. nat * nat)? 
-   Perhaps make it so that the inter-node predicates (e.g. size)
-   can only depend on this, for easier induction) *)               
-               
-  
-(* TODO: to what extent do we "extrude"?
-   The idea is that
-   
+type_synonym ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llp =
+  "('ix * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath)"                              
 
-   P2's thing relies on P1's metadata only (in induction principle below)
-   is this what we want?
-
-   Yes. But we need an appropriate notion of "joining" a new element into an
-   LSeq. When we do this, we need to ensure some notion of consistency.
-
-   I believe this notion of consistency is just "being a monoid"?
-   Or...?
-*)  
+                          
   
 (* size decorations *)
   (*
@@ -63,31 +54,64 @@ type_synonym ll3 = "((nat * nat), (nat * nat), (nat * nat), (nat * nat), (nat * 
 (* now we record jump target locations *)
 type_synonym ll4 = "((nat * nat), (nat * nat), (nat * nat * nat), (nat * nat * nat), (nat * nat * (nat option))) ll"
   *)
+  (*
 lemma my_ll_induct:
-  assumes Ln: "(\<And> i e . P1 (L e i))"
-  and La: "(\<And> idx e . P1 (LLab e idx))"
-  and Lj: "(\<And>idx e . P1 (LJmp e idx))"
-  and Lji : "(\<And>idx e . P1 (LJmpI e idx))"
-  and Ljs : "(\<And>e l . P2 l \<Longrightarrow> P1 (LSeq e l))"
+  assumes Ln: "(\<And> i e x . P1 (x, L e i))"
+  and La: "(\<And> idx e x . P1 (x, LLab e idx))"
+  and Lj: "(\<And>idx e x. P1 (x, LJmp e idx))"
+  and Lji : "(\<And>idx e x. P1 (x, LJmpI e idx))"
+  and Ljs : "(\<And>e l x . P2 l \<Longrightarrow> P1 (x, LSeq e l))"
   and Lln : "P2 []"
-  and Llc : "\<And>l t. P1 t \<Longrightarrow> P2 l \<Longrightarrow> P2 (t # l)"
-  shows "P1 t \<and> P2 l"
+  and Llc : "\<And>l h. P1 h \<Longrightarrow> P2 l \<Longrightarrow> P2 (h # l)"
+  shows "P1 (x, t) \<and> P2 l"
+*)
+  (* do we need a neutral? yesyes *)
+  (* what if P3 is a predicate over a list of 'ix data? *)
+  (* we need to put this in a locale, make sure x is a monoid *)
+
+locale llll
+  
+lemma my_ll_induct:
+  assumes Ln: "(\<And> i e x . P1 (x, L e i))"
+  and La: "(\<And> idx e x . P1 (x, LLab e idx))"
+  and Lj: "(\<And>idx e x. P1 (x, LJmp e idx))"
+  and Lji : "(\<And>idx e x. P1 (x, LJmpI e idx))"
+  and Lls : "(\<And>e l x . P2 x l \<Longrightarrow> P1 (x, LSeq x e l))"
+  and Lln : "\<And> n . P2 n []"
+  and Llc : "\<And>l x y t z. P1 (x, t) \<Longrightarrow> P2 y l \<Longrightarrow> P3 x y z \<Longrightarrow> P2 z ((x,t) # l)"
+  and Hneut : "(\<And> x . P3 x neut x)"
+  and Hneut2 : "\<And> x . P3 neut x x"
+  and HP2 : "\<And> y x z l . P2 y l \<Longrightarrow> P2 z ((x,t)#l) \<Longrightarrow> P3 x y z"
+shows "P1 (x, t) \<and> P2 x l"
 proof-
   {fix t
-    have "P1 t \<and> (\<forall> l e . (t = LSeq e l \<longrightarrow> P2 l))"
+    have "P1 (x, t) \<and> (\<forall> l e . (t = LSeq x e l \<longrightarrow> P2 x l))"
     proof (induction t)
       case (L) thus ?case using Ln by auto next
       case (LLab) thus ?case using La by auto next
       case (LJmp) thus ?case using Lj by auto next
       case (LJmpI) thus ?case using Lji by auto next
-      case (LSeq e l) thus ?case 
-      proof(induction l)
-        case Nil thus ?case using Ljs Lln by auto next
+      case (LSeq) thus ?case 
+      proof(induction l rule:list.induct)
+        case Nil 
+        thus ?case using Lls[OF Lln] Lln Hneut
+          apply(auto)
+          apply(subgoal_tac "P2 x []")
+            apply(clarsimp)
+           apply(auto)
+            
+            
+          
+          by auto next
         case (Cons x1 x2) thus ?case using Ljs Lln Llc
           apply(clarsimp)
-          apply(subgoal_tac "P1 x1", clarsimp)
+          apply(case_tac "x1", clarsimp)
+          apply(subgoal_tac "P1 (x, b)", auto)
            apply(subgoal_tac "P2 x2", clarsimp)
-           apply(auto)
+            
+            apply(auto)
+            apply(clarsimp)
+            apply(auto)
           done next
       qed
     qed}
