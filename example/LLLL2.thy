@@ -65,7 +65,63 @@ datatype ll2 =
   | LSeq "int * (int * ll2 * int) list * int"
 *)
 (* ll2 contains a field for us to decorate label locations and jumps with paths *)
-(* do we need path to be mut ind *)    
+
+(* "quantitative annotations" *)
+type_synonym qan = "nat * nat"
+
+(* let's try the uniform version with pairs first *)
+datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt =
+  L "'lix" "inst"
+  (* de-Bruijn style approach to local binders *)
+  | LLab "'llx" "idx"
+  | LJmp "'ljx" "idx"
+  | LJmpI "'ljix" "idx"
+  (* sequencing nodes also serve as local binders *)
+  (* do we put an "'ix" in here? *)
+  | LSeq "'lsx" "(qan * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )llt )list"
+
+type_synonym ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll =
+  "(qan * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt)"
+
+(*Q: do we need more qan's in the path *)
+datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath =
+  Top "'ptx" 
+  | Node "'pnx" "'lsx" "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
+               "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath"
+               "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list" 
+
+(* undecorated syntax with qan *)               
+type_synonym ll2 =
+  "(unit, unit, unit, unit, unit, unit, unit) ll"
+  
+type_synonym ll2p = 
+  "(unit, unit, unit, unit, unit, unit, unit) llpath"
+
+(* location = path + node *)  
+type_synonym ll2l = "(ll2 * ll2p)"  
+
+(* decorate Seq nodes with label resolution *)  
+(* Q: just store which number child? list of nats representing path?*)
+type_synonym ll3t =
+  "(unit, unit, unit, unit, nat list, unit, unit) llt"  
+  
+type_synonym ll3 =
+  "(unit, unit, unit, unit, nat list, unit, unit) ll"  
+  
+type_synonym ll3p = 
+  "(unit, unit, unit, unit, nat list, unit, unit) llpath"
+  
+type_synonym ll3l = "ll3 * ll3p"
+  
+type_synonym ll4 =
+  "(unit, unit, nat, nat, nat list, unit, unit) ll"  
+  
+type_synonym ll4p = 
+  "(unit, unit, nat, nat, nat list, unit, unit) llpath"
+  
+type_synonym ll4l = "ll4 * ll4p"
+  
+(*    
 datatype ll2 =
   L "nat * inst * nat"
   | LLab "nat * idx * path2 option * nat"
@@ -75,7 +131,7 @@ datatype ll2 =
 and path2 =
   Top "nat * nat" (* needs an int argument ? two? *)
   | Node "nat * (nat * ll2 * nat) list * nat * path2 * nat * (nat * ll2 * nat) list * nat"
-  
+*)  
     
 value "(L (0, Arith ADD, 0))"
 
@@ -122,23 +178,24 @@ declare jumpi_size_def [simp]
   
 (* validity of ll2 terms that have just been translated from ll1 *)
 inductive_set
-  ll2_valid :: "(nat * ll2 * nat) set" and
-  ll2_validl :: "(nat * ((nat * ll2 * nat) list) * nat) set" 
+  ll_valid_q :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set" and
+  ll_validl_q :: "(qan * (('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list)) set " 
   where
-    "\<And> i n . inst_valid i \<Longrightarrow> (n, (L (n, i, n + nat (inst_size i))), n + nat (inst_size i)) \<in> ll2_valid"
-  | "\<And> n d . (n, (LLab (n, d, None, n)), n) \<in> ll2_valid"
-  | "\<And> n d . (n, (LJmp (n, d, None, n+1)), n+1) \<in> ll2_valid"
-  | "\<And> n d . (n, (LJmpI (n, d, None, n + 1)), n + 1) \<in> ll2_valid"
-  | "\<And> n l n' . (n, l, n') \<in> ll2_validl \<Longrightarrow> (n, (LSeq (n, l, n')), n') \<in> ll2_valid  "
-  | "\<And> n . (n, [], n) \<in> ll2_validl"  
+    "\<And> i n e . inst_valid i \<Longrightarrow> ((n, n + nat (inst_size i)), L e i) \<in> ll_valid_q"
+  | "\<And> n d e . ((n, n), (LLab e d)) \<in> ll_valid_q"
+  | "\<And> n d e . ((n, n+1), (LJmp e d)) \<in> ll_valid_q"
+  | "\<And> n d e . ((n, n+1), (LJmpI e d)) \<in> ll_valid_q"
+  | "\<And> n l n' e . ((n, n'), l) \<in> ll_validl_q \<Longrightarrow> ((n, n'), (LSeq e l)) \<in> ll_valid_q"
+  | "\<And> n . ((n,n), []) \<in> ll_validl_q"  
   | "\<And> n h n' t n'' .
-     (n, h, n') \<in> ll2_valid \<Longrightarrow>
-     (n', t, n'') \<in> ll2_validl \<Longrightarrow>
-     (n, ((n, h, n') # t), n'') \<in> ll2_validl"
+     ((n,n'), h) \<in> ll_valid_q \<Longrightarrow>
+     ((n',n''), t) \<in> ll_validl_q \<Longrightarrow>
+     ((n,n''), ((n,n'), h) # t) \<in> ll_validl_q"
  
   
 (* we need a size-validity predicate for ll2 *)
 (* we take an int indicating where we start from *)
+    (*
 fun ll2_valid_sz :: "ll2 \<Rightarrow> nat \<Rightarrow> (nat * bool)" and
     ll2_valid_sz_seq :: "nat \<Rightarrow> (nat * ll2 * nat) list \<Rightarrow> nat \<Rightarrow> bool" where
   "ll2_valid_sz (L (i', c, i'')) i =
@@ -170,8 +227,7 @@ lemma ll2_valid_test :
          ((m, l, m') \<in> ll2_validl \<longrightarrow> ll2_valid_sz_seq m l m' = True)"
 proof(induction rule: ll2_valid_ll2_validl.induct, auto)
 qed  
-  
-type_synonym loc2 = "ll2 * path2"
+*)
   
 fun ll1_size :: "ll1 \<Rightarrow> nat" and
     ll1_size_seq :: "ll1 list \<Rightarrow> nat" where
@@ -185,24 +241,24 @@ fun ll1_size :: "ll1 \<Rightarrow> nat" and
   
 (* first pass, storing sizes *)
 fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
-    ll_phase1_seq :: "ll1 list \<Rightarrow> nat \<Rightarrow> ((nat * ll2 * nat) list * nat)"
+    ll_phase1_seq :: "ll1 list \<Rightarrow> nat \<Rightarrow> (ll2 list * nat)"
   where
-  "ll_phase1 (ll1.L inst) i = (ll2.L (i, inst, i + nat (inst_size inst)), i + nat (inst_size inst))"
-| "ll_phase1 (ll1.LLab idx) i = (ll2.LLab (i, idx, None, i), i)" (* labels take no room *)
-| "ll_phase1 (ll1.LJmp idx) i = (ll2.LJmp (i, idx, None, 1 + i), 1 + i)" (* jumps take at least 4 bytes *)
-| "ll_phase1 (ll1.LJmpI idx) i = (ll2.LJmpI (i, idx, None, 1 + i), 1 + i)"
+  "ll_phase1 (ll1.L inst) i = (((i, i + nat (inst_size inst)), L () inst), i + nat (inst_size inst))"
+| "ll_phase1 (ll1.LLab idx) i = (((i, i), LLab () idx), i)" (* labels take no room *)
+| "ll_phase1 (ll1.LJmp idx) i = (((i, 1 + i), LJmp () idx), 1 + i)" (* jumps take at least 4 bytes *)
+| "ll_phase1 (ll1.LJmpI idx) i = (((i, 1 + i), LJmpI () idx), 1 + i)"
 | "ll_phase1 (ll1.LSeq ls) i =
    (let (ls', i') = ll_phase1_seq ls i in
-   (ll2.LSeq (i, ls', i'), i'))"
+   (((i, i'), LSeq () ls'), i'))"
 | "ll_phase1_seq [] i = ([], i)"
 | "ll_phase1_seq (h # t) i =
    (let (h', i') = ll_phase1 h i in
     (let (t', i'') = ll_phase1_seq t i' in
-      ( (i, h', i') # t', i'')))"
+      (h' # t', i'')))"
   
 definition ll_pass1 :: "ll1 \<Rightarrow> ll2" where
   "ll_pass1 l = fst (ll_phase1 l 0)"
-
+(*
 lemma ll_phase1_size_correct :
   fixes "x" "xs"
   shows "(! i . ? x2 . (ll_phase1 x i = (x2, ll1_size x + i))) \<and>
@@ -255,74 +311,92 @@ proof (induction rule:old_ll1_induct)
     apply(auto)
     done
 qed
-  
-lemma ll_phase1_correct' :
-  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (x2, i') \<and> (i, x2, i') \<in> ll2_valid)) \<and>
+*)  
+lemma ll_phase1_correct :
+  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (((i, i'), x2), i') \<and> ((i, i'), x2) \<in> ll_valid_q)) \<and>
    (list_all ll1_valid xs \<longrightarrow>
-    (! j . ? xs2 . ? j' . ll_phase1_seq xs j = (xs2, j') \<and> (j, xs2, j') \<in> ll2_validl))"
+    (! j . ? xs2 . ? j' . ll_phase1_seq xs j = (xs2, j') \<and> ((j,j'),xs2) \<in> ll_validl_q))"
 proof(induction rule:old_ll1_induct)
-  case (1 i) thus ?case by (auto simp add:ll2_valid.simps) next
-  case (2 idx) thus ?case by (auto simp add:ll2_valid.simps) next
-  case (3 idx) thus ?case by (auto simp add:ll2_valid.simps) next
-  case (4 idx) thus ?case by (auto simp add:ll2_valid.simps) next
+  case (1 i) thus ?case by (auto simp add:ll_valid_q.simps) next
+  case (2 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
+  case (3 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
+  case (4 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
   case (5 l) thus ?case
     apply(clarsimp)
     apply(case_tac "ll_phase1_seq l i", clarsimp)
     apply(drule_tac x = "i" in spec)
-    apply (auto simp add:ll2_valid.simps)
+    apply (auto simp add:ll_valid_q.simps)
     done  next
-  case (6) thus ?case 
-    apply(insert "ll2_valid_ll2_validl.intros")
-    apply(auto)
-    done next
-  case(7 t l) thus ?case
+  case (6) thus ?case using ll_valid_q_ll_validl_q.intros(6) by auto next
+  case(7 t l) thus ?case 
     apply(clarsimp)
     apply(case_tac "ll_phase1 t j", clarsimp)
-    apply(case_tac "ll_phase1_seq l b", clarsimp)
+    apply(rename_tac "b'")
+    apply(case_tac "ll_phase1_seq l b'", clarsimp)
     apply(drule_tac x = "j" in spec)
+    apply(clarsimp)
     apply(drule_tac x = "b" in spec)
-    apply(auto)
-    apply(insert "ll2_valid_ll2_validl.intros")
-    apply(auto)
+    apply(clarsimp)
+    apply(rule ll_valid_q_ll_validl_q.intros(7), auto)
     done
 qed
   
 value "ll_pass1 (ll1.LSeq [ll1.LLab 0, ll1.L (Arith ADD)])"
   
 value "(inst_size (Arith ADD))"
-  
-inductive_set ll2_descend :: "(ll2 * ll2 * nat) set"
+
+inductive_set ll_descend :: "(('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * nat) set"
   where
-    "\<And> n n' ls t .
-       (n, LSeq (n, ls, n'), n') \<in> ll2_valid \<Longrightarrow>
-       (_, t, _) \<in> set ls \<Longrightarrow>
-       (LSeq (n, ls, n'), t, 1) \<in> ll2_descend"
+    "\<And> n n' e ls t .
+       ((n, n'), LSeq e ls) \<in> ll_valid \<Longrightarrow>
+       t \<in> set ls \<Longrightarrow>
+       (((n,n'), LSeq e ls), t, 1) \<in> ll_descend"
   | "\<And> t t' n t'' n' .
-       (t, t', n) \<in> ll2_descend \<Longrightarrow>
-       (t', t'', n') \<in> ll2_descend \<Longrightarrow>
-       (t, t'', n + n') \<in> ll2_descend"
+       (t, t', n) \<in> ll_descend \<Longrightarrow>
+       (t', t'', n') \<in> ll_descend \<Longrightarrow>
+       (t, t'', n + n') \<in> ll_descend"
+
+definition ll_valid_q3 :: "ll3 set" where
+  "ll_valid_q3 = ll_valid_q"
+  
+definition ll_validl_q3 :: "(qan * ll3 list) set" where
+  "ll_validl_q3 = ll_validl_q"
+  
+definition ll_valid_q3' :: "('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll set" where
+  "ll_valid_q3' = ll_valid_q"
+
+definition ll_validl_q3' :: "(qan * (('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll list)) set" where
+  "ll_validl_q3' = ll_validl_q"
+
+definition ll_descend3' :: "(('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll * ('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll * nat) set" where
+  "ll_descend3' = ll_descend"
   
 (* validity of ll2 terms with labels resolved*)
 (* Q: how do we detect label clashes? *)
-inductive_set
-  ll2_valid2 :: "(nat * ll2 * nat) set" and
-  ll2_validl2 :: "(nat * ((nat * ll2 * nat) list) * nat) set"
+(* Q: make ll2 size validity an explicit hypothesis? *)
+(* Q: make this parametric in everything but Seq annotations? *)
+    (* Q: do we need a locale here for explicit type instantiation? *)
+inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll set"
   where
-    "\<And> i n . inst_valid i \<Longrightarrow> (n, (L (n, i, n + nat (inst_size i))), n + nat (inst_size i)) \<in> ll2_valid2"
-  | "\<And> n d . (n, (LLab (n, d, None, n)), n) \<in> ll2_valid2"
-  | "\<And> n d . (n, (LJmp (n, d, None, 1+n)), 1+n) \<in> ll2_valid2"
-  | "\<And> n d . (n, (LJmpI (n, d, None, 1+n)), 1+n) \<in> ll2_valid2"
-  | "\<And> n l n' . (n, l, n') \<in> ll2_validl2 \<Longrightarrow>
-                 (\<not> (\<exists> k . (LSeq (n, l, n'), LLab (_, k, _, _), k) \<in> ll2_descend)) \<Longrightarrow>
-                 (n, (LSeq (n, l, n')), n') \<in> ll2_valid2"
-  | "\<And> n l n'. (n, l, n') \<in> ll2_validl2 \<Longrightarrow>
-                (\<exists>! k . (LSeq (n, l, n'), LLab (_, k, _, _), k) \<in> ll2_descend) \<Longrightarrow>
-                (n, LSeq (n, l, n'), n') \<in> ll2_valid2"
-  | "\<And> n . (n, [], n) \<in> ll2_validl2"  
-  | "\<And> n h n' t n'' .
-     (n, h, n') \<in> ll2_valid2 \<Longrightarrow>
-     (n', t, n'') \<in> ll2_validl2 \<Longrightarrow>
-     (n, ((n, h, n') # t), n'') \<in> ll2_validl2"
+    "\<And> i e x. (x, L e i) \<in> ll_valid_q3' \<Longrightarrow>
+               (x, L e i) \<in> ll_valid3"
+  | "\<And> e x d. (x, LLab e d) \<in> ll_valid_q3' \<Longrightarrow>
+             (x, LLab e d) \<in> ll_valid3"
+  | "\<And> e x d . (x, (LJmp e d)) \<in> ll_valid_q3' \<Longrightarrow>
+                (x, (LJmp e d)) \<in> ll_valid3"
+  | "\<And> e x d. (x, (LJmpI e d)) \<in> ll_valid_q3' \<Longrightarrow>
+               (x, (LJmp e d)) \<in> ll_valid3"
+  | "\<And> x l e e' . (x, l) \<in> ll_validl_q3' \<Longrightarrow>
+                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
+                 (\<not> (\<exists> k y . ((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
+                 (x, (LSeq e l)) \<in> ll_valid3"
+  | "\<And> x l e e' z. (x, l) \<in> ll_validl_q3' \<Longrightarrow>
+                (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
+                (\<exists>! k . \<exists>! y . (((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
+                (x, LSeq e l) \<in> ll_valid3"
+
+(* add labels function - outline *)
+(* track which number child we are (series of indices) so we can store it *)
 
 (* idea: how do we calculate label-correctness? *)
 fun ll2_add_labels :: "ll2 \<Rightarrow> ll2" where
