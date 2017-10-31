@@ -90,7 +90,8 @@ datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath =
                "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath"
                "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list" 
 
-(* undecorated syntax with qan *)               
+(* undecorated syntax with qan *)  
+(* TODO: change these from units to any type *)
 type_synonym ll2 =
   "(unit, unit, unit, unit, unit, unit, unit) ll"
   
@@ -348,7 +349,7 @@ value "(inst_size (Arith ADD))"
 inductive_set ll_descend :: "(('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * nat) set"
   where
     "\<And> n n' e ls t .
-       ((n, n'), LSeq e ls) \<in> ll_valid \<Longrightarrow>
+       ((n, n'), LSeq e ls) \<in> ll_valid_q \<Longrightarrow>
        t \<in> set ls \<Longrightarrow>
        (((n,n'), LSeq e ls), t, 1) \<in> ll_descend"
   | "\<And> t t' n t'' n' .
@@ -362,35 +363,60 @@ definition ll_valid_q3 :: "ll3 set" where
 definition ll_validl_q3 :: "(qan * ll3 list) set" where
   "ll_validl_q3 = ll_validl_q"
   
-definition ll_valid_q3' :: "('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll set" where
-  "ll_valid_q3' = ll_valid_q"
-
+(*definition ll_valid_q3' :: "('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll set" where
+  "ll_valid_q3' = ll_valid_q"*)
+definition ll_valid_q3' :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set" where
+  "ll_valid_q3' = {}"
+  
 definition ll_validl_q3' :: "(qan * (('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll list)) set" where
   "ll_validl_q3' = ll_validl_q"
 
 definition ll_descend3' :: "(('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll * ('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll * nat) set" where
   "ll_descend3' = ll_descend"
+
+type_synonym natlist = "nat list"
+
+inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
+  where
+    "\<And> i e x. (x, L e i) \<in> ll_valid_q \<Longrightarrow>
+               (x, L e i) \<in> ll_valid3"
+  | "\<And> e x d. (x, LLab e d) \<in> ll_valid_q \<Longrightarrow>
+             (x, LLab e d) \<in> ll_valid3"
+  | "\<And> e x d . (x, (LJmp e d)) \<in> ll_valid_q \<Longrightarrow>
+                (x, (LJmp e d)) \<in> ll_valid3"
+  | "\<And> e x d. (x, (LJmpI e d)) \<in> ll_valid_q \<Longrightarrow>
+               (x, (LJmp e d)) \<in> ll_valid3"
+  | "\<And> x l e e' . (x, l) \<in> ll_validl_q \<Longrightarrow>
+                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
+                 (\<not> (\<exists> k y . ((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
+                 (x, (LSeq e l)) \<in> ll_valid3"
+  | "\<And> x l e e' z. (x, l) \<in> ll_validl_q \<Longrightarrow>
+                (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
+                (\<exists>! k . \<exists>! y . (((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
+                (x, LSeq e l) \<in> ll_valid3"
   
 (* validity of ll2 terms with labels resolved*)
 (* Q: how do we detect label clashes? *)
 (* Q: make ll2 size validity an explicit hypothesis? *)
 (* Q: make this parametric in everything but Seq annotations? *)
     (* Q: do we need a locale here for explicit type instantiation? *)
-inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll set"
+
+
+inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lix, 'ptx, 'pnx) ll set"
   where
-    "\<And> i e x. (x, L e i) \<in> ll_valid_q3' \<Longrightarrow>
+    "\<And> i e x. (x, L e i) \<in> ll_valid_ll3local \<Longrightarrow>
                (x, L e i) \<in> ll_valid3"
-  | "\<And> e x d. (x, LLab e d) \<in> ll_valid_q3' \<Longrightarrow>
+  | "\<And> e x d. (x, LLab e d) \<in> ll_valid_ll3local \<Longrightarrow>
              (x, LLab e d) \<in> ll_valid3"
-  | "\<And> e x d . (x, (LJmp e d)) \<in> ll_valid_q3' \<Longrightarrow>
+  | "\<And> e x d . (x, (LJmp e d)) \<in> ll_valid_ll3local \<Longrightarrow>
                 (x, (LJmp e d)) \<in> ll_valid3"
-  | "\<And> e x d. (x, (LJmpI e d)) \<in> ll_valid_q3' \<Longrightarrow>
+  | "\<And> e x d. (x, (LJmpI e d)) \<in> ll_valid_ll3local \<Longrightarrow>
                (x, (LJmp e d)) \<in> ll_valid3"
-  | "\<And> x l e e' . (x, l) \<in> ll_validl_q3' \<Longrightarrow>
+  | "\<And> x l e e' . (x, l) \<in> ll_validl_ll3local \<Longrightarrow>
                  (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
                  (\<not> (\<exists> k y . ((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
                  (x, (LSeq e l)) \<in> ll_valid3"
-  | "\<And> x l e e' z. (x, l) \<in> ll_validl_q3' \<Longrightarrow>
+  | "\<And> x l e e' z. (x, l) \<in> ll_validl_ll3local \<Longrightarrow>
                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
                 (\<exists>! k . \<exists>! y . (((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
                 (x, LSeq e l) \<in> ll_valid3"
@@ -406,7 +432,6 @@ fun ll2_add_labels :: "ll2 \<Rightarrow> ll2" where
 (* before going further with paths, we need some path utilities
    (inspired by Huet's Zippers paper)
  *)
-  
   
 (* assumes our first notion of validity *)
 (* TODO make this parametric w/r/t our syntax ? *)

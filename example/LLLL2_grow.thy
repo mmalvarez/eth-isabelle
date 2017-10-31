@@ -21,27 +21,32 @@ type_synonym idx = nat
 (* latter 2 are "pass through" for path datatype *)
   (* we need 1 more parameter, for metadata that applies to all nodes *)
 (* latter 2 are "pass through" for path datatype *)
+  
+datatype 'ix anno =
+  Le "'ix"
+  | Br "'ix anno list"
+  
 datatype ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt =
-  L "'lix" "inst"
+  L "'ix anno \<Rightarrow> 'lix" "inst"
   (* de-Bruijn style approach to local binders *)
-  | LLab "'llx" "idx"
-  | LJmp "'ljx" "idx"
-  | LJmpI "'ljix" "idx"
+  | LLab "'ix anno \<Rightarrow> 'llx" "idx"
+  | LJmp "'ix anno \<Rightarrow> 'ljx" "idx"
+  | LJmpI "'ix anno \<Rightarrow> 'ljix" "idx"
   (* sequencing nodes also serve as local binders *)
   (* do we put an "'ix" in here? *)
-  | LSeq "'lsx" "'ix" "('ix * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )llt )list"
+  | LSeq "'ix anno \<Rightarrow> 'lsx" "('ix anno * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )llt )list"
 
 type_synonym ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll =
-  "('ix * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt)"
+  "('ix list * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt)"
     
 datatype ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath =
   Top "'ptx" 
-  | Node "'pnx" "'lsx" "'ix" "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
+  | Node "'pnx" "'lsx" "'ix list" "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
                "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath"
-               "'lsx" "'ix" "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
+               "'lsx" "'ix list" "('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list"
 
 type_synonym ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llp =
-  "('ix * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath)"                              
+  "('ix list * ('ix, 'lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath)"                              
 
                           
   
@@ -54,6 +59,98 @@ type_synonym ll3 = "((nat * nat), (nat * nat), (nat * nat), (nat * nat), (nat * 
 (* now we record jump target locations *)
 type_synonym ll4 = "((nat * nat), (nat * nat), (nat * nat * nat), (nat * nat * nat), (nat * nat * (nat option))) ll"
   *)
+  
+lemma my_ll_induct:
+  assumes Ln: "(\<And> i e x . P1 (Le x, L e i))"
+  and La: "(\<And> idx e x . P1 (Le x, LLab e idx))"
+  and Lj: "(\<And>idx e x. P1 (Le x, LJmp e idx))"
+  and Lji : "(\<And>idx e x. P1 (Le x, LJmpI e idx))"
+  and Lls : "(\<And>e ts xs . P2 (xs, ts) \<Longrightarrow> P1 (Br xs, LSeq e ts))"
+ (* and Lls' : "(\<And>e ts xs . P1 (Br xs, LSeq e ts) \<Longrightarrow> P2 (xs, ts))" (* do i need this *) *)
+  and Lln : "P2 ([], [])" (* what should this be? *)
+  and Llc : "(\<And>x h xs l. P1 (x,h) \<Longrightarrow> P2 (xs,l) \<Longrightarrow> P2 (x#xs, ((x,h) # l)))"
+  shows "P1 (x, t) \<and> P2 (x2, l)"  
+proof-
+  {fix t 
+      have "(P1 (x, t)) \<and> (\<forall> l e . (t = LSeq e l) \<longrightarrow> (\<exists> xs . P2 (xs, l)))"
+    proof (induction t)
+      case (L) thus ?case using Ln by auto next
+      case (LLab) thus ?case using La by auto next
+      case (LJmp) thus ?case using Lj by auto next
+      case (LJmpI) thus ?case using Lji by auto next
+      case (LSeq x1 x2) thus ?case 
+      proof(induction x2 rule:list.induct)
+        case Nil 
+        thus ?case using Lls Lln Llc(*
+            apply(clarsimp)
+          apply(subgoal_tac "P1 (x, LSeq x1 [])")
+           apply(subgoal_tac "P2 (x, [])", auto)
+            
+          apply(subgoal_tac "P1 (x, LSeq x1 [])", auto)
+            
+          apply(auto)
+          apply(subgoal_tac "P2 (x, [])")
+            apply(clarsimp)
+           apply(auto)
+            *)
+          apply(auto)
+          apply(rule_tac x = "Br []" in exI)
+          apply(auto)
+          done next
+        case (Cons h t) thus ?case using Lls Lln Llc
+          apply(clarsimp)
+          apply(case_tac "h", clarsimp)
+          apply(auto)
+          apply(subgoal_tac "P1 (a, b)")
+            
+            
+          apply(subgoal_tac "P2 (x, b)")
+            apply(auto)
+    have "((\<exists> x . P1 (x, t))) \<and> (\<forall> l e . (t = LSeq e l) \<longrightarrow> (\<exists> xs . P2 (xs, l)))"
+    proof (induction t)
+      case (L) thus ?case using Ln by auto next
+      case (LLab) thus ?case using La by auto next
+      case (LJmp) thus ?case using Lj by auto next
+      case (LJmpI) thus ?case using Lji by auto next
+      case (LSeq x1 x2) thus ?case 
+      proof(induction x2 rule:list.induct)
+        case Nil 
+        thus ?case using Lls Lln Llc(*
+            apply(clarsimp)
+          apply(subgoal_tac "P1 (x, LSeq x1 [])")
+           apply(subgoal_tac "P2 (x, [])", auto)
+            
+          apply(subgoal_tac "P1 (x, LSeq x1 [])", auto)
+            
+          apply(auto)
+          apply(subgoal_tac "P2 (x, [])")
+            apply(clarsimp)
+           apply(auto)
+            *)
+          apply(auto)
+          apply(rule_tac x = "Br []" in exI)
+          apply(auto)
+          done next
+        case (Cons h t) thus ?case using Lls Lln Llc
+          apply(clarsimp)
+          apply(case_tac "h", clarsimp)
+          apply(auto)
+          apply(subgoal_tac "P1 (a, b)")
+            
+            
+          apply(subgoal_tac "P2 (x, b)")
+            apply(auto)
+
+, clarsimp)
+            
+            apply(auto)
+            apply(clarsimp)
+            apply(auto)
+          done next
+      qed
+    qed}
+  thus ?thesis by auto
+qed  
   (*
 lemma my_ll_induct:
   assumes Ln: "(\<And> i e x . P1 (x, L e i))"
