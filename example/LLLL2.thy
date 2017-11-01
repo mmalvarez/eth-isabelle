@@ -108,21 +108,24 @@ type_synonym ll2l = "(ll2 * ll2p)"
 (* decorate Seq nodes with label resolution *)  
 (* Q: just store which number child? list of nats representing path?*)
 type_synonym ll3t =
-  "(unit, unit, unit, unit, nat list, unit, unit) llt"  
+  "(unit, bool, unit, unit, nat list, unit, unit) llt"  
   
 type_synonym ll3 =
-  "(unit, unit, unit, unit, nat list, unit, unit) ll"  
+  "(unit, bool, unit, unit, nat list, unit, unit) ll"  
   
 type_synonym ll3p = 
-  "(unit, unit, unit, unit, nat list, unit, unit) llpath"
+  "(unit, bool, unit, unit, nat list, unit, unit) llpath"
   
 type_synonym ll3l = "ll3 * ll3p"
   
+type_synonym ll4t =
+  "(unit, bool, nat, nat, nat list, unit, unit) llt"  
+  
 type_synonym ll4 =
-  "(unit, unit, nat, nat, nat list, unit, unit) ll"  
+  "(unit, bool, nat, nat, nat list, unit, unit) ll"  
   
 type_synonym ll4p = 
-  "(unit, unit, nat, nat, nat list, unit, unit) llpath"
+  "(unit, bool, nat, nat, nat list, unit, unit) llpath"
   
 type_synonym ll4l = "ll4 * ll4p"
   
@@ -185,26 +188,34 @@ declare jumpi_size_def [simp]
 (* TODO: we need to break this up into separate pieces for each constructor,
    this way we can reuse them later without type variable ambiguities *)
 
-definition ll_valid_qi :: "(qan * 'lix * inst) set" where
-  "ll_valid_qi = {((n,n'),e,i) . inst_valid i \<and> n' = n + nat (inst_size i)}"
- 
-definition ll_valid_ql :: "(qan * 'llx * idx) set" where
-  "ll_valid_ql = {((n,n'),e,i) . n' = n}"
-  
-definition ll_valid_qj :: "(qan * 'ljx * idx) set" where
-  "ll_valid_qj = {((n,n'),e,d) . n' = n + 1}"
-  
-definition ll_valid_qji :: "(qan * 'ljix * idx) set" where
-  "ll_valid_qji = {((n,n'),e,d) . n' = n + 1}"
+definition ll_valid_qi :: "(qan * inst) set" where
+  "ll_valid_qi = {((n,n'),i) . inst_valid i \<and> n' = n + nat (inst_size i)}"
 
+declare ll_valid_qi_def [simp]  
+  
+definition ll_valid_ql :: "(qan * idx) set" where
+  "ll_valid_ql = {((n,n'),i) . n' = n}"
+  
+declare ll_valid_ql_def [simp]  
+  
+definition ll_valid_qj :: "(qan * idx) set" where
+  "ll_valid_qj = {((n,n'),d) . n' = n + 1}"
+
+declare ll_valid_qj_def [simp]  
+  
+definition ll_valid_qji :: "(qan * idx) set" where
+  "ll_valid_qji = {((n,n'),d) . n' = n + 1}"
+
+declare ll_valid_qji_def [simp]
+  
 inductive_set
   ll_valid_q :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set" and
   ll_validl_q :: "(qan * (('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list)) set " 
   where
-    "\<And> i n e . inst_valid i \<Longrightarrow> ((n, n + nat (inst_size i)), L e i) \<in> ll_valid_q"
-  | "\<And> n d e . ((n, n), (LLab e d )) \<in> ll_valid_q"
-  | "\<And> n d e . ((n, n+1), (LJmp e d )) \<in> ll_valid_q"
-  | "\<And> n d e . ((n, n+1), (LJmpI e d )) \<in> ll_valid_q"
+    "\<And> i x e . (x, i) \<in> ll_valid_qi \<Longrightarrow> (x, L e i) \<in> ll_valid_q"
+  | "\<And> x d e . (x, d) \<in> ll_valid_ql \<Longrightarrow> (x, LLab e d) \<in> ll_valid_q"
+  | "\<And> x d e . (x, d) \<in> ll_valid_qj \<Longrightarrow> (x, LJmp e d) \<in> ll_valid_q"
+  | "\<And> x d e . (x, d) \<in> ll_valid_qji \<Longrightarrow> (x, LJmpI e d) \<in> ll_valid_q"
   | "\<And> n l n' e . ((n, n'), l) \<in> ll_validl_q \<Longrightarrow> ((n, n'), (LSeq e l)) \<in> ll_valid_q"
   | "\<And> n . ((n,n), []) \<in> ll_validl_q"  
   | "\<And> n h n' t n'' .
@@ -414,13 +425,13 @@ definition ll_descend3' :: "(('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll 
    unfortunate behavior of inductive_set when type vars are involved *)  
 inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
   where
-    "\<And> i e x. (x, e, i) \<in> ll_valid_qi \<Longrightarrow>
+    "\<And> i e x. (x, i) \<in> ll_valid_qi \<Longrightarrow>
                (x, L e i) \<in> ll_valid3"
-  | "\<And> e x d. (x, e, d) \<in> ll_valid_ql \<Longrightarrow>
+  | "\<And> e x d. (x, d) \<in> ll_valid_ql \<Longrightarrow>
              (x, LLab e d) \<in> ll_valid3" 
-  | "\<And> e x d . (x, e, d) \<in> ll_valid_qj \<Longrightarrow>
+  | "\<And> e x d . (x, d) \<in> ll_valid_qj \<Longrightarrow>
                 (x, (LJmp e d)) \<in> ll_valid3"
-  | "\<And> e x d. (x, e, d) \<in> ll_valid_qji \<Longrightarrow>
+  | "\<And> e x d. (x, d) \<in> ll_valid_qji \<Longrightarrow>
                (x, (LJmpI e d)) \<in> ll_valid3"
   | "\<And> x l e e' . (x, l) \<in> ll_validl_q \<Longrightarrow>
                  (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
@@ -430,6 +441,7 @@ inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
                 (\<exists>! k . \<exists>! y . (((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
                 (x, LSeq e l) \<in> ll_valid3"
+    
 (* validity of ll2 terms with labels resolved*)
 (* Q: how do we detect label clashes? *)
 (* Q: make ll2 size validity an explicit hypothesis? *)
@@ -440,10 +452,21 @@ inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
 (* track which number child we are (series of indices) so we can store it *)
 
 type_synonym childpath = "nat list"
-    
+
+(* dump an l2 to l3, marking all labels as unconsumed *)
+(*fun l2l3 :: "ll2 \<Rightarrow> ll3" *)
+  
 (* idea: how do we calculate label-correctness? *)
-fun ll2_add_labels :: "ll2 \<Rightarrow> ll3" where
-  "ll2_add_labels (x, L i e)) = (x, L i e)"
+fun ll3_assign_labels :: "ll3 \<Rightarrow> ll3 option" and
+  (* take a childpath as an arg?*)
+    ll3_consume_label :: "childpath \<Rightarrow> ll3 list \<Rightarrow> (ll3 list * childpath) option" where
+  "ll3_assign_labels (x, LSeq ls e) n =
+   (case (ll3_consume_label [] ls) of
+   Some (ls', p) => (x, LSeq ls' p)
+   | None => None)
+"
+| "ll3_assign_labels T = T"
+| "ll3_consume_label p l
    
   
 (* before going further with paths, we need some path utilities
