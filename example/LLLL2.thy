@@ -223,6 +223,28 @@ inductive_set
      ((n',n''), t) \<in> ll_validl_q \<Longrightarrow>
      ((n,n''), ((n,n'), h) # t) \<in> ll_validl_q"
 
+(* TODO: define "bump" to move the given ll to the "right" in the buffer by X bytes
+   in order for this to be useful, we will need to make our annotations
+   parametric in the size (? - maybe we don't use this until the
+   very end so it will work out)
+*)    
+fun ll_bump :: "nat \<Rightarrow> ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
+                       ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll" where
+    "ll_bump b ((n,n'), LSeq e ls) = ((n+b,n'+b), LSeq e (map (ll_bump b) ls))"
+  | "ll_bump b ((n,n'),x) = ((n+b, n'+b),x)"
+    
+(* this is also suffering from the same problem as the validity predicate itself had.
+   we need a case for each constructor. *)
+(* to fix this we should have a better induction rule for validity that breaks out cases,
+   maybe defining all of them as a mutually inductive set will work... *)
+lemma ll_bump_valid [rule_format]:
+  (*"((x, t) \<in> ll_valid_q \<longrightarrow> ((ll_bump b (x,t)) \<in> ll_valid_q)) \<and>*)
+  "(((m,m'), l) \<in> ll_validl_q \<Longrightarrow> (((m+b', m'+b'), map (ll_bump b') l) \<in> ll_validl_q))"
+(*Q: why is this failing? *)   
+  proof(induction rule:ll_valid_q_ll_validl_q.induct)
+proof(rule conjI)
+ apply(erule:ll_valid_q_ll_validl_q.inducts(1))
+proof(induction rule: ll_valid_q_ll_validl_q.induct)
 (*    
  inductive_set
   ll_valid_q :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set" and
@@ -454,20 +476,66 @@ inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
 type_synonym childpath = "nat list"
 
 (* dump an l2 to l3, marking all labels as unconsumed *)
-(*fun l2l3 :: "ll2 \<Rightarrow> ll3" *)
+fun ll3_init :: "ll2 \<Rightarrow> ll3" where
+  "ll3_init (x, L e i) = (x, L e i)"
+| "ll3_init (x, LLab e idx) = (x, LLab False idx)"
+| "ll3_init (x, LJmp e idx) = (x, LJmp e idx)"
+| "ll3_init (x, LJmpI e idx) = (x, LJmpI e idx)"
+| "ll3_init (x, LSeq e ls) = 
+   (x, LSeq [] (map ll3_init ls))"
+
+(* pipeline so far : ll_pass1 l1 \<rightarrow> l2
+   ll3_init l2 \<rightarrow> l3
+   ll3_assign_labels l3 \<rightarrow> l3 *)
+  
+value "ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])) :: ll3"
   
 (* idea: how do we calculate label-correctness? *)
 fun ll3_assign_labels :: "ll3 \<Rightarrow> ll3 option" and
-  (* take a childpath as an arg?*)
-    ll3_consume_label :: "childpath \<Rightarrow> ll3 list \<Rightarrow> (ll3 list * childpath) option" where
-  "ll3_assign_labels (x, LSeq ls e) n =
-   (case (ll3_consume_label [] ls) of
-   Some (ls', p) => (x, LSeq ls' p)
-   | None => None)
+    ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> (ll3 list * childpath) option" where
+  "ll3_assign_labels (x, LSeq e ls) =
+   (case (ll3_consume_label [] 0 ls) of
+   Some (ls', p) \<Rightarrow> 
+    Some (x, LSeq p ls')
+   | None \<Rightarrow> None)"
+(* the seq case also needs to call assign_labels recursively on children*)
+(* unconsumed labels are an error *)
+| "ll3_assign_labels (x, LLab False idx) = None"
+| "ll3_assign_labels T = Some T"
+| "ll3_consume_label p n [] = None"
+(* this case should never happen *)
+| "ll3_consume_label p n ((x, LLab True idx) # ls) = None"
+| "ll3_consume_label p n ((x, LLab False idx) # ls) = 
+   (if idx = length p then Some (((x, LLab True idx)#ls), p)
+   else case (ll3_consume_label p (n+1) ls) of
+    Some (ls', p) \<Rightarrow>
+     Some ((x, LLab False idx)#ls', p)
+   | None \<Rightarrow> None)"
+
+| "ll3_consume_label p n ((x, LSeq e lsdec) # ls) =
+   (case ll3_consume_label (n#p) 0 lsdec of
+    Some (lsdec', p) \<Rightarrow>
+     Some ((x, LSeq e lsdec') # ls, p)
+    | None \<Rightarrow> (case ll3_consume_label p (n+1) ls of
+      Some (ls', p) \<Rightarrow> Some (((x, LSeq e lsdec) # ls'),p)
+      | None \<Rightarrow> None))"
+| "ll3_consume_label p n (T#ls) =
+   (case ll3_consume_label p (n+1) ls of
+    Some (ls', p) \<Rightarrow>
+     Some (T#ls', p)
+    | None \<Rightarrow> None)"
+
+value "ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LSeq [], ll1.LSeq [], ll1.LSeq [ll1.LLab 1]])))"
+
+fun ll3_insert :: "childpath \<Rightarrow> ll3 \<Rightarrow> ll3 option" and
+    ll3_bump :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3" where
+    "ll3_insert (h#h'#t) (x, LSeq _ ls) = 
 "
-| "ll3_assign_labels T = T"
-| "ll3_consume_label p l
-   
+    | "ll3_insert _ _ = None"
+    
+  
+  
+(* idea: *)
   
 (* before going further with paths, we need some path utilities
    (inspired by Huet's Zippers paper)
