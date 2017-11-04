@@ -1,7 +1,6 @@
 theory LLLL2
   
-  imports Main "../ContractSem" "../RelationalSem" "../ProgramInAvl" "../Hoare/Hoare" "../lem/Evm"
-  
+  imports Main "../ContractSem" "../RelationalSem" "../ProgramInAvl" "../Hoare/Hoare" "../lem/Evm" 
 begin
   
   (* LLLL, mark 2 *)
@@ -78,8 +77,10 @@ datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt =
   L "'lix" "inst"
   (* de-Bruijn style approach to local binders *)
   | LLab "'llx" "idx"
-  | LJmp "'ljx" "idx"
-  | LJmpI "'ljix" "idx"
+  (* idx stores which label it is
+     nat stores how many bytes *)
+  | LJmp "'ljx" "idx" "nat"
+  | LJmpI "'ljix" "idx" "nat"
   (* sequencing nodes also serve as local binders *)
   (* do we put an "'ix" in here? *)
   | LSeq "'lsx" "(qan * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx )llt )list"
@@ -198,13 +199,13 @@ definition ll_valid_ql :: "(qan * idx) set" where
   
 declare ll_valid_ql_def [simp]  
   
-definition ll_valid_qj :: "(qan * idx) set" where
-  "ll_valid_qj = {((n,n'),d) . n' = n + 1}"
+definition ll_valid_qj :: "(qan * idx * nat) set" where
+  "ll_valid_qj = {((n,n'),d,s) . n' = n + 1 + s}"
 
 declare ll_valid_qj_def [simp]  
   
-definition ll_valid_qji :: "(qan * idx) set" where
-  "ll_valid_qji = {((n,n'),d) . n' = n + 1}"
+definition ll_valid_qji :: "(qan * idx * nat) set" where
+  "ll_valid_qji = {((n,n'),d,s) . n' = n + 1 + s}"
 
 declare ll_valid_qji_def [simp]
   
@@ -214,8 +215,8 @@ inductive_set
   where
     "\<And> i x e . (x, i) \<in> ll_valid_qi \<Longrightarrow> (x, L e i) \<in> ll_valid_q"
   | "\<And> x d e . (x, d) \<in> ll_valid_ql \<Longrightarrow> (x, LLab e d) \<in> ll_valid_q"
-  | "\<And> x d e . (x, d) \<in> ll_valid_qj \<Longrightarrow> (x, LJmp e d) \<in> ll_valid_q"
-  | "\<And> x d e . (x, d) \<in> ll_valid_qji \<Longrightarrow> (x, LJmpI e d) \<in> ll_valid_q"
+  | "\<And> x d e s . (x, d, s) \<in> ll_valid_qj \<Longrightarrow> (x, LJmp e d s) \<in> ll_valid_q"
+  | "\<And> x d e s . (x, d, s) \<in> ll_valid_qji \<Longrightarrow> (x, LJmpI e d s) \<in> ll_valid_q"
   | "\<And> n l n' e . ((n, n'), l) \<in> ll_validl_q \<Longrightarrow> ((n, n'), (LSeq e l)) \<in> ll_valid_q"
   | "\<And> n . ((n,n), []) \<in> ll_validl_q"  
   | "\<And> n h n' t n'' .
@@ -227,24 +228,45 @@ inductive_set
    in order for this to be useful, we will need to make our annotations
    parametric in the size (? - maybe we don't use this until the
    very end so it will work out)
-*)    
+*)
+(* this should operate on a (qan * (ll list))?
+   otherwise there is and repacking we have to do... *)    
 fun ll_bump :: "nat \<Rightarrow> ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
                        ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll" where
-    "ll_bump b ((n,n'), LSeq e ls) = ((n+b,n'+b), LSeq e (map (ll_bump b) ls))"
-  | "ll_bump b ((n,n'),x) = ((n+b, n'+b),x)"
+    "ll_bump b ((n,n'), l) = ((n+b,n'+b), (case l of
+                                           LSeq e ls \<Rightarrow> LSeq e (map (ll_bump b) ls)
+                                           | _ \<Rightarrow>  l))"
     
 (* this is also suffering from the same problem as the validity predicate itself had.
    we need a case for each constructor. *)
 (* to fix this we should have a better induction rule for validity that breaks out cases,
    maybe defining all of them as a mutually inductive set will work... *)
+(* I am unsure if this is actually necessary though as both rules work individually *)
+    
+value "\<lambda> x . ()"    
 lemma ll_bump_valid [rule_format]:
-  (*"((x, t) \<in> ll_valid_q \<longrightarrow> ((ll_bump b (x,t)) \<in> ll_valid_q)) \<and>*)
-  "(((m,m'), l) \<in> ll_validl_q \<Longrightarrow> (((m+b', m'+b'), map (ll_bump b') l) \<in> ll_validl_q))"
-(*Q: why is this failing? *)   
-  proof(induction rule:ll_valid_q_ll_validl_q.induct)
-proof(rule conjI)
- apply(erule:ll_valid_q_ll_validl_q.inducts(1))
-proof(induction rule: ll_valid_q_ll_validl_q.induct)
+  "((x, (t :: ('lix, 'llx, 'ljx, 'ljix, 'llx, 'ptx, 'pnx) llt)) \<in> ll_valid_q \<longrightarrow> (! b . ((ll_bump b (x,t))) \<in> ll_valid_q)) \<and>
+   (((m,m'), (l :: ('lix, 'llx, 'ljx, 'ljix, 'llx, 'ptx, 'pnx) ll list)) \<in> ll_validl_q \<longrightarrow> (! b' .((m+b', m'+b'), map (ll_bump b') l) \<in> ll_validl_q))"
+proof(induction rule: ll_valid_q_ll_validl_q.induct) 
+  case 1 thus ?case by (auto simp add: ll_valid_q_ll_validl_q.intros) next
+  case 2 thus ?case by (auto simp add: ll_valid_q_ll_validl_q.intros) next
+  case 3 thus ?case by (auto simp add: ll_valid_q_ll_validl_q.intros) next
+  case 4 thus ?case by (auto simp add: ll_valid_q_ll_validl_q.intros) next
+  case (5 n l n' e) thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case 6 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case (7 n h n' t n'') thus ?case
+    apply(clarsimp)
+    apply(drule_tac x = "b'" in spec)
+    apply(drule_tac x = "b'" in spec)
+    apply(rule ll_valid_q_ll_validl_q.intros(7), auto)
+    done qed
+  
+      (*
+    apply(rule ll_valid_q_ll_validl_q.induct[of "(\<lambda> x t .(ll_bump b (x,t)) \<in> ll_valid_q)"
+                                                  "(\<lambda> m m' l . ((m + b', m' + b'), map(ll_bump b') l) \<in> ll_validl_q)"
+                                                  "x" "t" "m" "m'" "l"
+                                              ])
+*)       
 (*    
  inductive_set
   ll_valid_q :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set" and
@@ -314,8 +336,8 @@ fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
   where
   "ll_phase1 (ll1.L inst) i = (((i, i + nat (inst_size inst)), L () inst ), i + nat (inst_size inst))"
 | "ll_phase1 (ll1.LLab idx) i = (((i, i), LLab () idx ), i)" (* labels take no room *)
-| "ll_phase1 (ll1.LJmp idx) i = (((i, 1 + i), LJmp () idx ), 1 + i)" (* jumps take at least 4 bytes *)
-| "ll_phase1 (ll1.LJmpI idx) i = (((i, 1 + i), LJmpI () idx ), 1 + i)"
+| "ll_phase1 (ll1.LJmp idx) i = (((i, 1 + i), LJmp () idx 0), 1 + i)" (* jumps take at least 1 bytes *)
+| "ll_phase1 (ll1.LJmpI idx) i = (((i, 1 + i), LJmpI () idx 0), 1 + i)"
 | "ll_phase1 (ll1.LSeq ls) i =
    (let (ls', i') = ll_phase1_seq ls i in
    (((i, i'), LSeq () ls'), i'))"
@@ -451,10 +473,10 @@ inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
                (x, L e i) \<in> ll_valid3"
   | "\<And> e x d. (x, d) \<in> ll_valid_ql \<Longrightarrow>
              (x, LLab e d) \<in> ll_valid3" 
-  | "\<And> e x d . (x, d) \<in> ll_valid_qj \<Longrightarrow>
-                (x, (LJmp e d)) \<in> ll_valid3"
-  | "\<And> e x d. (x, d) \<in> ll_valid_qji \<Longrightarrow>
-               (x, (LJmpI e d)) \<in> ll_valid3"
+  | "\<And> e x d s. (x, d, s) \<in> ll_valid_qj \<Longrightarrow>
+                (x, (LJmp e d s)) \<in> ll_valid3"
+  | "\<And> e x d s. (x, d, s) \<in> ll_valid_qji \<Longrightarrow>
+               (x, (LJmpI e d s)) \<in> ll_valid3"
   | "\<And> x l e e' . (x, l) \<in> ll_validl_q \<Longrightarrow>
                  (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
                  (\<not> (\<exists> k y . ((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
@@ -479,8 +501,8 @@ type_synonym childpath = "nat list"
 fun ll3_init :: "ll2 \<Rightarrow> ll3" where
   "ll3_init (x, L e i) = (x, L e i)"
 | "ll3_init (x, LLab e idx) = (x, LLab False idx)"
-| "ll3_init (x, LJmp e idx) = (x, LJmp e idx)"
-| "ll3_init (x, LJmpI e idx) = (x, LJmpI e idx)"
+| "ll3_init (x, LJmp e idx s) = (x, LJmp e idx s)"
+| "ll3_init (x, LJmpI e idx s) = (x, LJmpI e idx s)"
 | "ll3_init (x, LSeq e ls) = 
    (x, LSeq [] (map ll3_init ls))"
 
@@ -490,50 +512,193 @@ fun ll3_init :: "ll2 \<Rightarrow> ll3" where
   
 value "ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])) :: ll3"
   
-(* idea: how do we calculate label-correctness? *)
-fun ll3_assign_labels :: "ll3 \<Rightarrow> ll3 option" and
-    ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> (ll3 list * childpath) option" where
-  "ll3_assign_labels (x, LSeq e ls) =
+(*TODO: this does not handle the case where there is no label correctly
+  we need to change our output type *)
+datatype consume_label_result =
+  CFound "ll3 list" "childpath"
+  | CNone "ll3 list"
+  | CFail
+  
+  
+fun ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
+    ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> consume_label_result" where
+  "ll3_assign_label (x, LSeq e ls) =
    (case (ll3_consume_label [] 0 ls) of
-   Some (ls', p) \<Rightarrow> 
-    Some (x, LSeq p ls')
-   | None \<Rightarrow> None)"
+    CFound ls' p \<Rightarrow> Some (x, LSeq (rev p) ls')
+   | CNone ls' \<Rightarrow> Some (x, LSeq [] ls')
+   | CFail \<Rightarrow> None)"
 (* the seq case also needs to call assign_labels recursively on children*)
 (* unconsumed labels are an error *)
-| "ll3_assign_labels (x, LLab False idx) = None"
-| "ll3_assign_labels T = Some T"
-| "ll3_consume_label p n [] = None"
-(* this case should never happen *)
-| "ll3_consume_label p n ((x, LLab True idx) # ls) = None"
-| "ll3_consume_label p n ((x, LLab False idx) # ls) = 
-   (if idx = length p then Some (((x, LLab True idx)#ls), p)
+| "ll3_assign_label (x, LLab False idx) = None"
+| "ll3_assign_label T = Some T"
+| "ll3_consume_label p n [] = CNone []"
+(* Actually consume the label, but it must not be consumed yet *)
+| "ll3_consume_label p n ((x, LLab b idx) # ls) = 
+   (if idx = length p then (if b = False then CFound ((x, LLab True idx)#ls) (n#p) else CFail)
    else case (ll3_consume_label p (n+1) ls) of
-    Some (ls', p) \<Rightarrow>
-     Some ((x, LLab False idx)#ls', p)
-   | None \<Rightarrow> None)"
+    CFound ls' p' \<Rightarrow> CFound ((x, LLab b idx)#ls') p'
+   | CNone ls' \<Rightarrow> CNone ((x, LLab b idx)#ls')
+   | CFail \<Rightarrow> CFail)"
 
+  (* TODO finish this case. *)
 | "ll3_consume_label p n ((x, LSeq e lsdec) # ls) =
    (case ll3_consume_label (n#p) 0 lsdec of
-    Some (lsdec', p) \<Rightarrow>
-     Some ((x, LSeq e lsdec') # ls, p)
-    | None \<Rightarrow> (case ll3_consume_label p (n+1) ls of
+    CFound lsdec' p' \<Rightarrow> CFound ((x, LSeq e lsdec') # ls) p'
+    | CNone lsdec' \<Rightarrow> (case ll3_consume_label p (n+1) ls of
       Some (ls', p) \<Rightarrow> Some (((x, LSeq e lsdec) # ls'),p)
       | None \<Rightarrow> None))"
 | "ll3_consume_label p n (T#ls) =
    (case ll3_consume_label p (n+1) ls of
-    Some (ls', p) \<Rightarrow>
-     Some (T#ls', p)
+    CFound (ls', p') \<Rightarrow> CFound (T#ls') p'
+    | CNone ls' \<Rightarrow> CNone ls'
+    | CFail \<Rightarrow> CFail)"
+
+(* new idea: we don't need qans, because we'll never change sizes in this one *)
+fun ll3_assign_labels_list :: "ll3 list \<Rightarrow> (ll3 list) option" where
+  "ll3_assign_labels_list (h#ls) = 
+   (case ll3_assign_label h of
+    Some h' \<Rightarrow> (case ll3_assign_labels_list ls of
+                Some ls' \<Rightarrow> Some (h'#ls')
+                | None \<Rightarrow> None)
     | None \<Rightarrow> None)"
+| "ll3_assign_labels_list [] = Some []"
 
-value "ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LSeq [], ll1.LSeq [], ll1.LSeq [ll1.LLab 1]])))"
+(* TODO: is this too restrictive, should it return Some more often? *)
+fun ll3_assign_labels :: "ll3 \<Rightarrow> ll3 option" where
+  "ll3_assign_labels T =
+   (case ll3_assign_label T of
+         Some (x, LSeq e ls) \<Rightarrow>
+         (case ll3_assign_labels_list ls of
+            Some ls' \<Rightarrow> Some (x, LSeq e ls')
+          | None \<Rightarrow> None)
+       | Some T' \<Rightarrow> Some T'
+       | None \<Rightarrow> None)"
+(* idea: deconstruct the node, apply ll3_assign_labels *)
 
-fun ll3_insert :: "childpath \<Rightarrow> ll3 \<Rightarrow> ll3 option" and
-    ll3_bump :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3" where
-    "ll3_insert (h#h'#t) (x, LSeq _ ls) = 
-"
-    | "ll3_insert _ _ = None"
-    
+fun ll3_unwrap :: "(ll3 list \<Rightarrow> 'a option) \<Rightarrow> ll3  \<Rightarrow> 'a option" where
+  "ll3_unwrap f (_, LSeq _ ls) = f ls"
+  | "ll3_unwrap _ (_, _) = None"
   
+value "(ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])))"
+value "ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])))"
+value "ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LSeq [ll1.LLab 0], ll1.LSeq [], ll1.LSeq [ll1.LLab 1]])))"
+
+(* get the label at the provided childpath, if it exists *)
+(* TODO: should we check to make sure this label is the right one? *)
+(* TODO: we can generalize this, not just make ll3 specific *)
+(* TODO apply this to a node, not a list (?) *)
+fun ll3_get_label :: "ll3 list \<Rightarrow> childpath \<Rightarrow> nat option" where
+    "ll3_get_label (((x,_),LLab _ _)#_) (0#_) = Some x"
+  | "ll3_get_label ((_, LSeq _ lsdec)#ls) (0#p) = 
+     ll3_get_label lsdec p"
+  | "ll3_get_label (_#ls) (0#_) = None"
+  | "ll3_get_label (_#ls) (n#p) = 
+     ll3_get_label (ls) ((n-1)#p)"
+  | "ll3_get_label _ _ = None"
+
+definition prog1 where
+  "prog1 = ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])))"
+
+value prog1
+  
+definition prog2 where
+  "prog2 = ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.L (Arith ADD), ll1.LLab 0])))"  
+  
+value "(case prog2 of
+        Some (_, LSeq _ lsdec) \<Rightarrow> ll3_get_label lsdec [1]
+        | _ \<Rightarrow> None)"
+
+definition prog3 where
+"prog3 = ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LSeq [ll1.LLab 0], ll1.LSeq [ll1.LJmp 1], ll1.LSeq [ll1.LLab 1]])))"
+  
+value prog3
+
+(* resolve_jump routine, for once we know the label location *)
+(* Idea: for any jump we find, we check if it is big enough to store what we want
+   If it is not, then we need to rebuild the entire tree and try again *)
+(* idea: we once again build a childpath as we go, so that if we must bail out,
+   we know where to enlarge the node *)
+(* the nat this takes as input will be read out of the label node.
+   label resolution should have already taken place for this to work. *)
+
+datatype jump_resolve_result =
+  JSuccess
+  | JFail "childpath"
+  | JBump "childpath"
+  
+(* need a function to get number of bytes needed to encode a
+   location *)
+value "(Evm.log256floor 2048) + 1"
+
+definition encode_size :: "nat \<Rightarrow> nat" where
+  "encode_size n = (nat (Evm.log256floor (Int.int n)) + 1)"
+
+(* declaring this makes the termination prover blow up *)  
+(*declare encode_size_def [simp]  *)
+  
+(* make this mutually recursive with a "consume" function?  *)
+(* the first nat argument is a location in buffer,
+   the second is the current child index *)
+(* NB the childpath output by this function ought to be reversed *)
+fun ll3_resolve_jump :: "ll3 list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath \<Rightarrow> jump_resolve_result" where
+  "ll3_resolve_jump ((_, LJmp e idx s)#ls) addr n c =
+     (if idx + 1 = length c then
+        (if s < encode_size n then JBump c else
+         if s = encode_size n then ll3_resolve_jump ls addr (n + 1) c
+        else JFail c)
+        else ll3_resolve_jump ls addr (n+1) c)"
+   
+| "ll3_resolve_jump ((_, LSeq e lsdec)#ls') addr n c =
+     (case ll3_resolve_jump lsdec addr 0 (n#c) of
+     JSuccess \<Rightarrow> ll3_resolve_jump ls' addr (n+1) c
+     | JFail c \<Rightarrow> JFail c
+     | JBump c \<Rightarrow> JBump c)"
+
+  | "ll3_resolve_jump (h#ls) addr n c =
+     ll3_resolve_jump ls addr (n + 1) c"
+  | "ll3_resolve_jump [] _ _ _ = JSuccess"
+
+(* TODO: later replace this bump routine with a general bump *)    
+
+fun ll3_bump :: "nat \<Rightarrow> ll3 list \<Rightarrow> ll3 list" where
+    "ll3_bump n (((x,x'), LSeq e lsdec)#ls') = ((x+n,x'+n),LSeq e (ll3_bump n lsdec))#(ll3_bump n ls')"
+  | "ll3_bump n (((x,x'), t)#ls') = ((x+n, x'+n),t)#(ll3_bump n ls')"
+  | "ll3_bump n [] = []"
+    
+(* once we find the offending jump, increment it *)
+(* we need to return a qan defining new size things for the overall list *)
+(* do we take a qan? or at least a bool showing whether we grew in that sublist *)    
+fun ll3_inc_jump :: "ll3 list \<Rightarrow> nat \<Rightarrow> childpath \<Rightarrow> ll3 list * bool" where 
+    (* TODO: select jump based on childpath *)
+    "ll3_inc_jump (((x,x'), LJmp e idx s)#ls) n [c] = 
+     (if n = c then
+     (((x,x'+1), LJmp e idx (s+1))#(ll3_bump 1 ls), True)
+       else (case ll3_inc_jump ls (n+1) [c] of
+                  (ls', b) \<Rightarrow> (((x,x'), LJmp e idx s)#(ls'), b)))"
+  (* TODO: should we use computed lsdec' or old lsdec in failure to find case *)
+  | "ll3_inc_jump (((x,x'), LSeq e lsdec)#ls) n (c#cs) =
+     (if n = c then case ll3_inc_jump lsdec 0 cs of
+       (lsdec', True) \<Rightarrow> (((x,x'+1), LSeq e lsdec')#(ll3_bump 1 ls), True)
+       | (lsdec', False) \<Rightarrow> (case ll3_inc_jump ls n (c#cs) of
+                             (ls', b) \<Rightarrow> ((((x,x'), LSeq e lsdec')#ls'), b))
+      else case ll3_inc_jump ls (n+1) (c#cs) of
+       (ls', b) \<Rightarrow> (((x,x'), LSeq e lsdec)#ls', b))"
+  | "ll3_inc_jump (h#ls) n c = (case (ll3_inc_jump ls (n + 1) c) of
+                                  (ls', b) \<Rightarrow> (h#ls', b))"
+  | "ll3_inc_jump [] _ _ = ([], False)"
+  
+    
+value "(case prog3 of
+        Some (_, LSeq _ lsdec) \<Rightarrow> ll3_get_label lsdec [2,0]
+        | _ \<Rightarrow> None)"
+  
+value "(case prog3 of
+        Some (_, LSeq _ lsdec) \<Rightarrow> Some (ll3_inc_jump lsdec 0 [1,0])
+        | _ \<Rightarrow> None)"
+  
+(* finally, we resolve all jumps. for now, this will be fuelled, later we'll prove
+   termination *)
+fun ll3_resolve_jumps :: "ll3 list \<Rightarrow> ll3 list"
   
 (* idea: *)
   
