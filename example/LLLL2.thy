@@ -519,7 +519,6 @@ datatype consume_label_result =
   | CNone "ll3 list"
   | CFail
   
-  
 fun ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> consume_label_result" where
   "ll3_assign_label (x, LSeq e ls) =
@@ -527,10 +526,10 @@ fun ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     CFound ls' p \<Rightarrow> Some (x, LSeq (rev p) ls')
    | CNone ls' \<Rightarrow> Some (x, LSeq [] ls')
    | CFail \<Rightarrow> None)"
-(* the seq case also needs to call assign_labels recursively on children*)
 (* unconsumed labels are an error *)
 | "ll3_assign_label (x, LLab False idx) = None"
 | "ll3_assign_label T = Some T"
+  
 | "ll3_consume_label p n [] = CNone []"
 (* Actually consume the label, but it must not be consumed yet *)
 | "ll3_consume_label p n ((x, LLab b idx) # ls) = 
@@ -540,17 +539,18 @@ fun ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
    | CNone ls' \<Rightarrow> CNone ((x, LLab b idx)#ls')
    | CFail \<Rightarrow> CFail)"
 
-  (* TODO finish this case. *)
 | "ll3_consume_label p n ((x, LSeq e lsdec) # ls) =
    (case ll3_consume_label (n#p) 0 lsdec of
     CFound lsdec' p' \<Rightarrow> CFound ((x, LSeq e lsdec') # ls) p'
     | CNone lsdec' \<Rightarrow> (case ll3_consume_label p (n+1) ls of
-      Some (ls', p) \<Rightarrow> Some (((x, LSeq e lsdec) # ls'),p)
-      | None \<Rightarrow> None))"
+      CFound ls' p \<Rightarrow> CFound ((x, LSeq e lsdec') # ls') p
+      | CNone ls' \<Rightarrow> CNone ((x, LSeq e lsdec')#ls'))
+    | CFail \<Rightarrow> CFail)"
+  
 | "ll3_consume_label p n (T#ls) =
    (case ll3_consume_label p (n+1) ls of
-    CFound (ls', p') \<Rightarrow> CFound (T#ls') p'
-    | CNone ls' \<Rightarrow> CNone ls'
+    CFound ls' p' \<Rightarrow> CFound (T#ls') p'
+    | CNone ls' \<Rightarrow> CNone (T#ls')
     | CFail \<Rightarrow> CFail)"
 
 (* new idea: we don't need qans, because we'll never change sizes in this one *)
@@ -610,7 +610,9 @@ value "(case prog2 of
 
 definition prog3 where
 "prog3 = ll3_assign_labels (ll3_init (ll_pass1 (ll1.LSeq [ll1.LSeq [ll1.LLab 0], ll1.LSeq [ll1.LJmp 1], ll1.LSeq [ll1.LLab 1]])))"
-  
+ 
+(* where did the jump go? *)
+(* NB: it looks like even the non recursive version discards jump *)
 value prog3
 
 (* resolve_jump routine, for once we know the label location *)
@@ -640,6 +642,7 @@ definition encode_size :: "nat \<Rightarrow> nat" where
 (* the first nat argument is a location in buffer,
    the second is the current child index *)
 (* NB the childpath output by this function ought to be reversed *)
+(* NB LJmpI also needs to be handled *)
 fun ll3_resolve_jump :: "ll3 list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath \<Rightarrow> jump_resolve_result" where
   "ll3_resolve_jump ((_, LJmp e idx s)#ls) addr n c =
      (if idx + 1 = length c then
@@ -695,13 +698,49 @@ value "(case prog3 of
 value "(case prog3 of
         Some (_, LSeq _ lsdec) \<Rightarrow> Some (ll3_inc_jump lsdec 0 [1,0])
         | _ \<Rightarrow> None)"
+ 
+(* have a ll3_resolve_jumps_list *)
+(* combine ll3_resolve_jump with ll3_inc_jump *)
+(* we also need to use get_label to get the label location *)
+fun ll3_resolve_jumps :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3 option" where
+  "ll3_resolve_jumps 0 _ = None"
+| "ll3_resolve_jumps n (x, LSeq p []) = Some (x, LSeq p [])"
+| "ll3_resolve_jumps n (x, LSeq p (h#ls)) =
+   ((case ll3_get_label (h#ls) p of
+     Some n \<Rightarrow> case ll3_resolve_jump (h#ls) n 0 [] of
+      JSuccess \<Rightarrow> Some (n, LSeq
+    | None \<Rightarrow> None)
+   "  
   
 (* finally, we resolve all jumps. for now, this will be fuelled, later we'll prove
    termination *)
-fun ll3_resolve_jumps :: "ll3 list \<Rightarrow> ll3 list"
+(* do we need an ll4 init?
+   maybe we don't, we can just use a childpath-stack to track which label is which address *)
+(* should this return an ll4? yes *)
+(* idea: putting the parts together.
+   we require that labels have been assigned
+   steps (should be separate functions?)
+   1: call resolve_jump
+      - bump if we need to, try to resolve again (fuelled)
+      - pass result onto next stage
+   1a: ll4 init?
+   2: call write_jump_targets
+      - if success, we get the thing
+   3: dump bytecodes
+      - L \<Rightarrow> instruction
+      - Seq \<Rightarrow> concatMap
+      - Label \<Rightarrow> ignore
+      - Jmp \<Rightarrow> [Push (encode address)] ++ [Pc JMP]
+      - JmpI \<Rightarrow> similar
+*)
+(* ll3_resolve_jumps :: "ll3 list \<Rightarrow> ll4 list"*)
+
+value "Word.word_of_int 1 :: 1 word"
+  
   
 (* idea: *)
-  
+(* for final codegen pass, use stack_inst.PUSH_N
+   *)
 (* before going further with paths, we need some path utilities
    (inspired by Huet's Zippers paper)
  *)
