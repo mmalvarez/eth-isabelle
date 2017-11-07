@@ -518,7 +518,8 @@ datatype consume_label_result =
   CFound "ll3 list" "childpath"
   | CNone "ll3 list"
   | CFail
-  
+
+(* make these not mut. rec. *)
 fun ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> consume_label_result" where
   "ll3_assign_label (x, LSeq e ls) =
@@ -644,10 +645,11 @@ definition encode_size :: "nat \<Rightarrow> nat" where
 (* NB the childpath output by this function ought to be reversed *)
 (* NB LJmpI also needs to be handled *)
 fun ll3_resolve_jump :: "ll3 list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath \<Rightarrow> jump_resolve_result" where
+  (* TODO: does this handle returning the childpath correctly? should it be n#c?*)
   "ll3_resolve_jump ((_, LJmp e idx s)#ls) addr n c =
      (if idx + 1 = length c then
-        (if s < encode_size n then JBump c else
-         if s = encode_size n then ll3_resolve_jump ls addr (n + 1) c
+        (if s < encode_size addr then JBump c else
+         if s = encode_size addr then ll3_resolve_jump ls addr (n + 1) c
         else JFail c)
         else ll3_resolve_jump ls addr (n+1) c)"
    
@@ -708,10 +710,11 @@ fun ll3_resolve_jumps :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3 option" where
 | "ll3_resolve_jumps n (x, LSeq p (h#ls)) =
    ((case ll3_get_label (h#ls) p of
      Some n \<Rightarrow> case ll3_resolve_jump (h#ls) n 0 [] of
-      JSuccess \<Rightarrow> Some (n, LSeq
-    | None \<Rightarrow> None)
-   "  
-  
+      JSuccess \<Rightarrow> Some (n, LSeq)
+    | None \<Rightarrow> None))"  
+
+| "ll3_resolve_jumps n (
+
 (* finally, we resolve all jumps. for now, this will be fuelled, later we'll prove
    termination *)
 (* do we need an ll4 init?
@@ -736,7 +739,11 @@ fun ll3_resolve_jumps :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3 option" where
 (* ll3_resolve_jumps :: "ll3 list \<Rightarrow> ll4 list"*)
 
 value "Word.word_of_int 1 :: 1 word"
-  
+ 
+(* use word256FromNat to get w256
+   then use word_rsplit245 *)
+definition bytes_of_nat :: "nat \<Rightarrow> 8 word list" where
+  "bytes_of_nat n = "
   
 (* idea: *)
 (* for final codegen pass, use stack_inst.PUSH_N
