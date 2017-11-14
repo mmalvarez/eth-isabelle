@@ -136,12 +136,12 @@ datatype ll1 =
   (* sequencing nodes also serve as local binders *)
   | LSeq "ll1 list"
 
-lemma old_ll1_induct:
+lemma my_ll1_induct:
   assumes Ln: "(\<And> i. P1 (L i))"
   and La: "(\<And> idx . P1 (LLab idx))"
   and Lj: "(\<And>idx . P1 (LJmp idx))"
   and Lji : "(\<And>idx . P1 (LJmpI idx))"
-  and Ljs : "(\<And>l . P2 l \<Longrightarrow> P1 (LSeq l))"
+  and Lls : "(\<And>l . P2 l \<Longrightarrow> P1 (LSeq l))"
   and Lln : "P2 []"
   and Llc : "\<And>t l . P1 t \<Longrightarrow> P2 l \<Longrightarrow> P2 (t # l)"
   shows "P1 t \<and> P2 l"
@@ -154,7 +154,7 @@ proof-
       case (LJmp) thus ?case using Lj by auto next
       case (LJmpI) thus ?case using Lji by auto next
       case (LSeq l) thus ?case
-        apply (induct l) using Ljs Lln Llc by auto blast+
+        apply (induct l) using Lls Lln Llc by auto blast+
     qed}
   
   thus ?thesis by auto
@@ -166,16 +166,6 @@ fun ll1_valid :: "ll1 \<Rightarrow> bool" where
   | "ll1_valid _ = True"
   
     
-(*    
-datatype ll2 =
-  L "int * inst * int"
-  | LLab "int * idx * int"
-  | LJmp "int * idx * int"
-  | LJmpI "int * idx * int"
-  | LSeq "int * (int * ll2 * int) list * int"
-*)
-(* ll2 contains a field for us to decorate label locations and jumps with paths *)
-
 (* "quantitative annotations" *)
 type_synonym qan = "nat * nat"
   
@@ -198,6 +188,43 @@ datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt =
     
 type_synonym ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll =
   "(qan * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llt)"
+
+(* Q: should P2 also take a qan expressing entire list? *)
+lemma my_ll_induct:
+  assumes Ln: "(\<And> q e i. P1 (q, L e i))"
+  and La: "(\<And> q e idx . P1 (q, LLab e idx))"
+  and Lj: "(\<And> q e idx n . P1 (q, LJmp e idx n))"
+  and Lji : "(\<And> q e idx n . P1 (q, LJmpI e idx n))"
+  and Lls : "(\<And> q e l . P2 l \<Longrightarrow> P1 (q, LSeq e l))"
+  and Lln : "P2 []" (* should this only be identical q? *)
+  and Llc : "\<And> h l. P1 h \<Longrightarrow> P2 l \<Longrightarrow> P2 (h # l)"
+  shows "P1 t \<and> P2 l"
+proof-
+  {fix t 
+    have "(\<forall> q . P1 (q, t)) \<and> (\<forall> l e . t = LSeq e l \<longrightarrow> P2 l)"
+    proof (induction)
+      case (L) thus ?case using Ln by auto next
+      case (LLab) thus ?case using La by auto next
+      case (LJmp) thus ?case using Lj by auto next
+      case (LJmpI) thus ?case using Lji by auto next
+      case (LSeq e l) thus ?case 
+      proof(induct l)
+        case Nil thus ?case using Lln Lls by auto next
+        case (Cons a l)
+        thus ?case using Llc Lls
+          apply(clarsimp) 
+          apply(case_tac a)
+          apply(subgoal_tac "P1 a") apply(clarsimp)
+           apply(subgoal_tac "P2 l") apply(clarsimp)
+           apply(auto, blast)
+          apply(metis)
+          done
+      qed
+    qed} 
+  thus ?thesis
+    apply(case_tac t)
+    apply(auto, blast )
+  done qed
 
 (*Q: do we need more qan's in the path *)
 datatype ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) llpath =
@@ -240,50 +267,8 @@ type_synonym ll4p =
   "(unit, bool, nat, nat, nat list, unit, unit) llpath"
   
 type_synonym ll4l = "ll4 * ll4p"
-  
-(*    
-datatype ll2 =
-  L "nat * inst * nat"
-  | LLab "nat * idx * path2 option * nat"
-  | LJmp "nat * idx * path2 option * nat"
-  | LJmpI "nat * idx * path2 option * nat"
-  | LSeq "nat * (nat * ll2 * nat) list * nat"
-and path2 =
-  Top "nat * nat" (* needs an int argument ? two? *)
-  | Node "nat * (nat * ll2 * nat) list * nat * path2 * nat * (nat * ll2 * nat) list * nat"
-*)  
-    
-value "(L (0, Arith ADD, 0))"
 
 
-  
-(* P1 is for nodes ll2, P2 is for lists of nodes ((nat * ll2 * nat) list), P3 is for paths
-   (note that P3 actually takes a path option) *)  
-(* does P1 also need to take nats? maybe they all do *)
- (*
-lemma old_ll2_induct:
-  assumes Ln: "(\<And> n i n'. P1 (L (n, i, n')) n n')"
-  and La: "(\<And> n idx po n' . P3 po n n' \<Longrightarrow> P1 (LLab (n, idx, po, n')) n n')"
-  and Lj: "(\<And> n idx po n' . P3 po n n' \<Longrightarrow> P1 (LJmp (n, idx, po, n')) n n')"
-  and Lji : "(\<And> n idx po n' . P3 po n n' \<Longrightarrow> P1 (LJmpI (n, idx, po, n')) n n')"
-  and Lsq : "(\<And> n l n' . P2 l n n' \<Longrightarrow> P1 (LSeq (n, l, n')) n n')"
-  and Lln : "P2 [] 0 0"
-  and Llc : "\<And> n t n' l n'' . P1 t n n' \<Longrightarrow> P2 l n' n'' \<Longrightarrow> P2 ((n, t, n') # l) n n''"
-  shows "P1 t n n' \<and> P2 l m m' \<and> P3 po k k'"
-  proof-
-    {fix t
-      (* need an existential somewhere? *)
-      have "P1 t n n' \<and>
-          (\<forall> l . t = LSeq (n, l, n') \<longrightarrow> P2 l n n') \<and>
-          (\<forall> idx po . t = LLab (n, idx, po, n') \<longrightarrow> P3 po n n')"
-    proof(induction t)
-      case(L x) thus ?case using Ln
-        apply(case_tac x)
-        apply(clarsimp)
-        apply(case_tac x)
-        apply(auto)
-    done
-*)  
   
     
 definition jump_size :: "nat" where
@@ -370,65 +355,7 @@ proof(induction rule: ll_valid_q_ll_validl_q.induct)
     apply(drule_tac x = "b'" in spec)
     apply(rule ll_valid_q_ll_validl_q.intros(7), auto)
     done qed
-  
-      (*
-    apply(rule ll_valid_q_ll_validl_q.induct[of "(\<lambda> x t .(ll_bump b (x,t)) \<in> ll_valid_q)"
-                                                  "(\<lambda> m m' l . ((m + b', m' + b'), map(ll_bump b') l) \<in> ll_validl_q)"
-                                                  "x" "t" "m" "m'" "l"
-                                              ])
-*)       
-(*    
- inductive_set
-  ll_valid_q :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set" and
-  ll_validl_q :: "(qan * (('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list)) set " 
-  where
-    "\<And> i n e . inst_valid i \<Longrightarrow> ((n, n + nat (inst_size i)), L e i) \<in> ll_valid_q"
-  | "\<And> n d e . ((n, n), (LLab e d )) \<in> ll_valid_q"
-  | "\<And> n d e . ((n, n+1), (LJmp e d )) \<in> ll_valid_q"
-  | "\<And> n d e . ((n, n+1), (LJmpI e d )) \<in> ll_valid_q"
-  | "\<And> n l n' e . ((n, n'), l) \<in> ll_validl_q \<Longrightarrow> ((n, n'), (LSeq e l)) \<in> ll_valid_q"
-  | "\<And> n . ((n,n), []) \<in> ll_validl_q"  
-  | "\<And> n h n' t n'' .
-     ((n,n'), h) \<in> ll_valid_q \<Longrightarrow>
-     ((n',n''), t) \<in> ll_validl_q \<Longrightarrow>
-     ((n,n''), ((n,n'), h) # t) \<in> ll_validl_q"
-*)
-  
-(* we need a size-validity predicate for ll2 *)
-(* we take an int indicating where we start from *)
-    (*
-fun ll2_valid_sz :: "ll2 \<Rightarrow> nat \<Rightarrow> (nat * bool)" and
-    ll2_valid_sz_seq :: "nat \<Rightarrow> (nat * ll2 * nat) list \<Rightarrow> nat \<Rightarrow> bool" where
-  "ll2_valid_sz (L (i', c, i'')) i =
-   (i'',
-   (inst_valid c \<and> (i' = i) \<and> (i'' = i' + nat (inst_size c))))"
-| "ll2_valid_sz (LLab (i', _, _, i'')) i =
-   (i'',
-   (i' = i \<and> i'' = i'))"
-| "ll2_valid_sz (LJmp (i', _, _, i'')) i =
-   (i'',
-   (i = i' \<and> i'' = i + jump_size))"
-| "ll2_valid_sz (LJmpI (i', _, _, i'')) i =
-   (i'',
-   (i = i' \<and> i'' = i + jumpi_size))"
-| "ll2_valid_sz (LSeq (i', ls, i'')) i =
-   (i'',
-   (i = i') \<and> ll2_valid_sz_seq i' ls i'')"
-| "ll2_valid_sz_seq i [] i' =
-   (i = i')"
-| "ll2_valid_sz_seq i ((i', h, i'') # t) ifin =
-   ((i = i') \<and>
-   (ll2_valid_sz h i' = (i'', True)) \<and>
-   (ll2_valid_sz_seq i'' t ifin))"
-     
-value "ll2_valid_sz (ll2.LJmp (n, d, None, n + 4)) n = (n + 4, True)"
-  
-lemma ll2_valid_test :
-  shows "((n, t, n') \<in> ll2_valid \<longrightarrow> ll2_valid_sz t n = (n', True)) \<and>
-         ((m, l, m') \<in> ll2_validl \<longrightarrow> ll2_valid_sz_seq m l m' = True)"
-proof(induction rule: ll2_valid_ll2_validl.induct, auto)
-qed  
-*)
+
   
 fun ll1_size :: "ll1 \<Rightarrow> nat" and
     ll1_size_seq :: "ll1 list \<Rightarrow> nat" where
@@ -459,65 +386,12 @@ fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
   
 definition ll_pass1 :: "ll1 \<Rightarrow> ll2" where
   "ll_pass1 l = fst (ll_phase1 l 0)"
-(*
-lemma ll_phase1_size_correct :
-  fixes "x" "xs"
-  shows "(! i . ? x2 . (ll_phase1 x i = (x2, ll1_size x + i))) \<and>
-         (! j . ? xs2 . (ll_phase1_seq xs j = (xs2, ll1_size_seq xs + j)))"
-proof (induction rule: old_ll1_induct)
-  case (1 inst) thus ?case by auto next
-  case (2 idx) thus ?case by auto next
-  case (3 idx) thus ?case by auto next
-  case (4 idx) thus ?case by auto next
-  case (5 l) thus ?case
-    apply(clarsimp)
-    apply(drule_tac x = "i" in spec)
-    apply(case_tac "ll_phase1_seq l i", clarsimp)
-    done next
-  case 6 thus ?case by auto next
-  case (7 h t) thus ?case
-    apply(clarsimp)
-    apply(case_tac "ll_phase1 h j", clarsimp)
-    apply(case_tac "ll_phase1_seq t b", clarsimp)
-    apply(drule_tac x = "j" in spec)
-    apply(drule_tac x = "b" in spec)
-    apply(auto)
-    done next
-qed
-  
-lemma ll_phase1_correct:
-  shows  "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (x2, i') \<and> ll2_valid_sz x2 i = (i', True))) \<and>
-          (list_all ll1_valid xs \<longrightarrow>
-            (! j . ? xs2 . ? j' .
-              ll_phase1_seq xs j = (xs2, j') \<and>
-              ll2_valid_sz_seq j xs2 j' = True))"
-proof (induction rule:old_ll1_induct)
-  case (1 i) thus ?case by auto next
-  case (2 idx) thus ?case by auto next
-  case (3 idx) thus ?case by auto next
-  case (4 idx) thus ?case by auto next
-  case (5 l) thus ?case
-    apply(clarsimp)
-    apply(case_tac "ll_phase1_seq l i", clarsimp)
-    apply(drule_tac x = "i" in spec)
-    apply(auto)
-    done next
-  case 6 thus ?case by auto next
-  case (7 h t) thus ?case
-    apply(clarsimp)
-    apply(case_tac "ll_phase1 h j", clarsimp)
-    apply(case_tac "ll_phase1_seq t b", clarsimp)
-    apply(drule_tac x = "j" in spec)
-    apply(drule_tac x = "b" in spec)
-    apply(auto)
-    done
-qed
-*)  
+
 lemma ll_phase1_correct :
   "(ll1_valid x \<longrightarrow> (! i . ? x2 . ? i' . ll_phase1 x i = (((i, i'), x2), i') \<and> ((i, i'), x2) \<in> ll_valid_q)) \<and>
    (list_all ll1_valid xs \<longrightarrow>
     (! j . ? xs2 . ? j' . ll_phase1_seq xs j = (xs2, j') \<and> ((j,j'),xs2) \<in> ll_validl_q))"
-proof(induction rule:old_ll1_induct)
+proof(induction rule:my_ll1_induct)
   case (1 i) thus ?case by (auto simp add:ll_valid_q.simps) next
   case (2 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
   case (3 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
@@ -621,41 +495,126 @@ fun ll3_init :: "ll2 \<Rightarrow> ll3" where
    ll3_assign_labels l3 \<rightarrow> l3 *)
   
 value "ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])) :: ll3"
-  
+
+(*
 datatype consume_label_result =
   CFound "ll3 list" "childpath"
   | CNone "ll3 list"
   | CFail
+*)
+
+type_synonym consume_label_result = "(ll3 list * childpath) option"
 
 (* this prevents multiple locations for the same label name
    because it will only "consume" one label per name
    and then it will fail later on the other one *)
 (* subroutine for assign_label, marks label as consumed *)
 fun ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> consume_label_result" where
- "ll3_consume_label p n [] = CNone []"
+ "ll3_consume_label p n [] = Some ([], [])"
 (* Actually consume the label, but it must not be consumed yet *)
 | "ll3_consume_label p n ((x, LLab b idx) # ls) = 
-   (if idx = length p then (if b = False then CFound ((x, LLab True idx)#ls) (n#p) else CFail)
+   (if idx = length p then (if b = False then Some ((x, LLab True idx)#ls, n#p) else None)
    else case (ll3_consume_label p (n+1) ls) of
-    CFound ls' p' \<Rightarrow> CFound ((x, LLab b idx)#ls') p'
-   | CNone ls' \<Rightarrow> CNone ((x, LLab b idx)#ls')
-   | CFail \<Rightarrow> CFail)"
+    Some (ls', p') \<Rightarrow> Some ((x, LLab b idx)#ls', p')
+   | None \<Rightarrow> None)"
 
 | "ll3_consume_label p n ((x, LSeq e lsdec) # ls) =
    (case ll3_consume_label (n#p) 0 lsdec of
-    CFound lsdec' p' \<Rightarrow> CFound ((x, LSeq e lsdec') # ls) p'
-    | CNone lsdec' \<Rightarrow> (case ll3_consume_label p (n+1) ls of
-      CFound ls' p \<Rightarrow> CFound ((x, LSeq e lsdec') # ls') p
-      | CNone ls' \<Rightarrow> CNone ((x, LSeq e lsdec')#ls'))
-    | CFail \<Rightarrow> CFail)"
+    Some (lsdec', []) \<Rightarrow> (case ll3_consume_label p (n+1) ls of
+      Some (ls', p') \<Rightarrow> Some (((x, LSeq e lsdec') # ls'), p')
+      | None \<Rightarrow> None)
+    | Some (lsdec', p') \<Rightarrow> Some (((x, LSeq e lsdec') # ls), p')
+    | None \<Rightarrow> None)"
   
 | "ll3_consume_label p n (T#ls) =
    (case ll3_consume_label p (n+1) ls of
-    CFound ls' p' \<Rightarrow> CFound (T#ls') p'
-    | CNone ls' \<Rightarrow> CNone (T#ls')
-    | CFail \<Rightarrow> CFail)"
+    Some (ls', p') \<Rightarrow> Some ((T#ls'), p')
+    | None \<Rightarrow> None)"
+
+fun numnodes :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> nat" and
+    numnodes_l :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow> nat" where
+"numnodes (_, LSeq _ xs) = 1 + numnodes_l xs"
+| "numnodes _ = 1"
+| "numnodes_l [] = 0"
+| "numnodes_l (h#t) = numnodes h + numnodes_l t"
+
+(* TODO: do I want function induction as an erule? *)
+
+
+(*
+lemma ll3_consume_label_numnodes :
+"\<And> p n l' . ll3_consume_label p n l = Some (l', p') \<Longrightarrow> numnodes_l l \<ge> numnodes_l l'"
+  apply(induction l rule:ll3_consume_label.induct, auto)
+  apply(case_tac [1] "idx = length pa", clarsimp)
+       apply(case_tac [1] "ba", clarsimp) apply(auto) 
+      apply(case_tac [1] "ll3_consume_label pa (Suc na) ls", clarsimp, auto)
+      
+(*
+   *)
+
+  apply(case_tac[1] "ll3_consume_label pa (na + 1) ls", clarsimp, auto)
+         apply(blast)
+       apply(auto)
+  apply(clarsimp)
+
+
+*)
+
+(* should we shove the quantifiers into the Some case? *)
+(* Another option, return a bool representing failure ? *)
+(* no, i think we can just add a thing to the first case about
+   how the numnodes of the result is less than original *)
+(* we need another side for l, regarding what happens if l's head is an lseq *)
+lemma ll3_consume_label_numnodes :
+"
+  (! e l l' p p' n q . t = (q, LSeq e l) \<longrightarrow> ll3_consume_label p n l = Some (l',p') \<longrightarrow> 
+                         (numnodes t \<ge> numnodes_l l' + 1 \<and> numnodes_l l \<ge> numnodes_l l')) \<and>
+  (! l' p p' n . ll3_consume_label p n l = Some (l', p') \<longrightarrow> numnodes_l l \<ge> numnodes_l l')"
+(*
+lemma ll3_consume_label_numnodes :
+"
+  (! e l' p p' n q . t = (q, LSeq e l) \<longrightarrow> ll3_consume_label p n l = Some (l',p') \<longrightarrow> numnodes t \<ge> numnodes_l l' + 1) \<and>
+  (! l' p p' n . ll3_consume_label p n l = Some (l', p') \<longrightarrow> numnodes_l l \<ge> numnodes_l l')"
+*)
+proof(induction rule:my_ll_induct)
+  case 1 thus ?case by auto next
+  case 2 thus ?case by auto next
+  case 3 thus ?case by auto next
+  case 4 thus ?case by auto next
+  case (5 q e l) thus ?case by auto next
+  case 6 thus ?case by auto next
+  case (7 h l) thus ?case
+    apply(case_tac h)
+    apply(clarsimp)
+    apply(case_tac ba, clarsimp)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) l", clarsimp, auto)
+         apply(blast)
+        apply(case_tac[1] "x22 = length p", clarsimp)
+         apply(case_tac[1] "x21", clarsimp, auto)
+    apply(case_tac[1] "ll3_consume_label p (Suc n) l", clarsimp, auto, blast)
+    apply(case_tac[1] "ll3_consume_label p (Suc n) l", clarsimp, auto, blast)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) l", clarsimp, auto, blast)
+     apply(case_tac[1] "ll3_consume_label (n#p) 0 x52", clarsimp, auto)
+     apply(case_tac[1] "ba", clarsimp, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) l", clarsimp, auto)
+    apply(drule_tac [1] x = aa in spec) 
+    apply(drule_tac [1] x = ab in spec)
+    
+    apply(auto)
+    done
+  qed
 
 (*TODO prove ll3_consume_label cannot increase size *)
+(*
+lemma ll3_consume_label_numnodes :
+"ll_consume_label p n l = Some (l', p') \<Longrightarrow> 
+  (\<forall> q e . t = (q, LSeq e l') \<longrightarrow> numnodes t  \<le> numnodes_l l + 1) \<and>
+  (numnodes_l l' \<le> numnodes_l l)"
+*)
+  apply(induction l arbitrary: t rule:my_ll_induct)
+  apply(insert my_ll_induct) apply(clarsimp)
+  apply(induction l and t rule:my_ll_induct)
+  apply(rule my_ll_induct)
 
 function (sequential) ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_assign_label_list :: "ll3 list \<Rightarrow> ll3 list option" where
