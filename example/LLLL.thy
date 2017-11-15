@@ -248,9 +248,16 @@ type_synonym ll2l = "(ll2 * ll2p)"
 (* Q: just store which number child? list of nats representing path?*)
 type_synonym ll3t =
   "(unit, bool, unit, unit, nat list, unit, unit) llt"  
+
+type_synonym ('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3t' =
+  "('lix, bool, 'ljx, 'ljix, nat list, 'ptx, 'pnx) llt"
   
 type_synonym ll3 =
   "(unit, bool, unit, unit, nat list, unit, unit) ll"  
+
+
+type_synonym ('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3' =
+  "('lix, bool, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll"
   
 type_synonym ll3p = 
   "(unit, bool, unit, unit, nat list, unit, unit) llpath"
@@ -431,6 +438,19 @@ inductive_set ll_descend :: "(('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * (
        (t, t', n) \<in> ll_descend \<Longrightarrow>
        (t', t'', n') \<in> ll_descend \<Longrightarrow>
        (t, t'', n + n') \<in> ll_descend"
+
+type_synonym childpath = "nat list"
+
+(* TODO: need a validity premise? for step case? *)
+inductive_set ll3'_descend :: "(('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3' * ('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3' * childpath) set"
+  where
+    "\<And> q e ls t .
+       List.nth ls c = t \<Longrightarrow>
+       ((q, LSeq e ls), t, [c]) \<in> ll3'_descend"    
+  | "\<And> t t' n t'' n' .
+       (t, t', n) \<in> ll3'_descend \<Longrightarrow>
+       (t', t'', n') \<in> ll3'_descend \<Longrightarrow>
+       (t, t'', n @ n') \<in> ll3'_descend"
     
 definition ll_valid_q3 :: "ll3 set" where
   "ll_valid_q3 = ll_valid_q"
@@ -449,8 +469,36 @@ definition ll_validl_q3' :: "(qan * (('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, '
 definition ll_descend3' :: "(('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll * ('lix, 'llx, 'ljx, 'ljix, nat list, 'ptx, 'pnx) ll * nat) set" where
   "ll_descend3' = ll_descend"
 
-(* break up ll_valid_q, this is necessary because of
-   unfortunate behavior of inductive_set when type vars are involved *)  
+(* Q: do we need to winnow this down to an ll3' set?
+   might make this easier to work with, since then we can rely on additional data
+   from the other annotations
+ *)
+
+
+inductive_set ll_valid3' :: "('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3' set" where
+"\<And> i e x. (x, i) \<in> ll_valid_qi \<Longrightarrow>
+               (x, L e i) \<in> ll_valid3'"
+ | "\<And> x d. (x, d) \<in> ll_valid_ql \<Longrightarrow>
+             (x, LLab True d) \<in> ll_valid3'"
+  | "\<And> e x d s. (x, d, s) \<in> ll_valid_qj \<Longrightarrow>
+                (x, (LJmp e d s)) \<in> ll_valid3'"
+  | "\<And> e x d s. (x, d, s) \<in> ll_valid_qji \<Longrightarrow>
+               (x, (LJmpI e d s)) \<in> ll_valid3'"
+
+(* Our descend predicate doesn't seem to be quite what we want here.
+   What we really want is a predicate for searching by childpath *)
+(* replace n with length of child path *)
+  | "\<And> x l e  . (x, l) \<in> ll_validl_q \<Longrightarrow>
+                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3') \<Longrightarrow>
+                 (\<not> (\<exists> k y e' . ((x, LSeq e l), (y, LLab e' (List.length k)), k) \<in> ll3'_descend)) \<Longrightarrow>
+                 (x, (LSeq [] l)) \<in> ll_valid3'"
+  | "\<And> x l e  z k y. (x, l) \<in> ll_validl_q \<Longrightarrow>
+                (z \<in> set l \<Longrightarrow> z \<in> ll_valid3') \<Longrightarrow>
+                (((x, LSeq e l), (y, LLab True (List.length k)), k) \<in> ll3'_descend) \<Longrightarrow>
+                (\<And> k' y' . (((x, LSeq e l), (y, LLab True (List.length k')), k') \<in> ll3'_descend) \<Longrightarrow> k = k' \<and> y = y') \<Longrightarrow>
+                (x, LSeq k l) \<in> ll_valid3'"
+
+(* old version of ll3 validity, may have bugs *)
 inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
   where
     "\<And> i e x. (x, i) \<in> ll_valid_qi \<Longrightarrow>
@@ -479,7 +527,6 @@ inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
 (* add labels function - outline *)
 (* track which number child we are (series of indices) so we can store it *)
 
-type_synonym childpath = "nat list"
 
 (* dump an l2 to l3, marking all labels as unconsumed *)
 fun ll3_init :: "ll2 \<Rightarrow> ll3" where
@@ -535,47 +582,20 @@ fun numnodes :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> na
     numnodes_l :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow> nat" where
 "numnodes (_, LSeq _ xs) = 1 + numnodes_l xs"
 | "numnodes _ = 1"
-| "numnodes_l [] = 0"
+| "numnodes_l [] = 1"
 | "numnodes_l (h#t) = numnodes h + numnodes_l t"
 
-(* TODO: do I want function induction as an erule? *)
-
-
-(*
-lemma ll3_consume_label_numnodes :
-"\<And> p n l' . ll3_consume_label p n l = Some (l', p') \<Longrightarrow> numnodes_l l \<ge> numnodes_l l'"
-  apply(induction l rule:ll3_consume_label.induct, auto)
-  apply(case_tac [1] "idx = length pa", clarsimp)
-       apply(case_tac [1] "ba", clarsimp) apply(auto) 
-      apply(case_tac [1] "ll3_consume_label pa (Suc na) ls", clarsimp, auto)
-      
-(*
-   *)
-
-  apply(case_tac[1] "ll3_consume_label pa (na + 1) ls", clarsimp, auto)
-         apply(blast)
-       apply(auto)
-  apply(clarsimp)
-
-
-*)
 
 (* should we shove the quantifiers into the Some case? *)
 (* Another option, return a bool representing failure ? *)
 (* no, i think we can just add a thing to the first case about
    how the numnodes of the result is less than original *)
 (* we need another side for l, regarding what happens if l's head is an lseq *)
-lemma ll3_consume_label_numnodes :
+lemma ll3_consume_label_numnodes [rule_format] :
 "
-  (! e l l' p p' n q . t = (q, LSeq e l) \<longrightarrow> ll3_consume_label p n l = Some (l',p') \<longrightarrow> 
-                         (numnodes t \<ge> numnodes_l l' + 1 \<and> numnodes_l l \<ge> numnodes_l l')) \<and>
+  (! e l l' p p' n q . t = (q, LSeq e l) \<longrightarrow> ll3_consume_label p n l = Some (l',p') \<longrightarrow> numnodes t \<ge> numnodes_l l' + 1) \<and>
   (! l' p p' n . ll3_consume_label p n l = Some (l', p') \<longrightarrow> numnodes_l l \<ge> numnodes_l l')"
-(*
-lemma ll3_consume_label_numnodes :
-"
-  (! e l' p p' n q . t = (q, LSeq e l) \<longrightarrow> ll3_consume_label p n l = Some (l',p') \<longrightarrow> numnodes t \<ge> numnodes_l l' + 1) \<and>
-  (! l' p p' n . ll3_consume_label p n l = Some (l', p') \<longrightarrow> numnodes_l l \<ge> numnodes_l l')"
-*)
+
 proof(induction rule:my_ll_induct)
   case 1 thus ?case by auto next
   case 2 thus ?case by auto next
@@ -602,31 +622,21 @@ proof(induction rule:my_ll_induct)
     
     apply(auto)
     done
-  qed
+qed
 
-(*TODO prove ll3_consume_label cannot increase size *)
-(*
-lemma ll3_consume_label_numnodes :
-"ll_consume_label p n l = Some (l', p') \<Longrightarrow> 
-  (\<forall> q e . t = (q, LSeq e l') \<longrightarrow> numnodes t  \<le> numnodes_l l + 1) \<and>
-  (numnodes_l l' \<le> numnodes_l l)"
-*)
-  apply(induction l arbitrary: t rule:my_ll_induct)
-  apply(insert my_ll_induct) apply(clarsimp)
-  apply(induction l and t rule:my_ll_induct)
-  apply(rule my_ll_induct)
+lemma ll3_consume_label_numnodes1 : "ll3_consume_label p n l = Some (l', p') \<Longrightarrow> numnodes_l l \<ge> numnodes_l l'"
+  apply(insert ll3_consume_label_numnodes)
+  apply(blast)
+  done
 
 function (sequential) ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_assign_label_list :: "ll3 list \<Rightarrow> ll3 list option" where
   "ll3_assign_label (x, LSeq e ls) =
    (case (ll3_consume_label [] 0 ls) of
-    CFound ls' p \<Rightarrow> (case ll3_assign_label_list ls' of
+    Some (ls', p) \<Rightarrow> (case ll3_assign_label_list ls' of
       Some ls'' \<Rightarrow> Some (x, LSeq (rev p) ls'')
       | None \<Rightarrow> None)
-   | CNone ls' \<Rightarrow> (case ll3_assign_label_list ls' of
-      Some ls'' \<Rightarrow> Some (x, LSeq [] ls'')
-      | None \<Rightarrow> None)
-   | CFail \<Rightarrow> None)"
+   | None \<Rightarrow> None)"
 (* unconsumed labels are an error *)
 | "ll3_assign_label (x, LLab False idx) = None"
 | "ll3_assign_label T = Some T"
@@ -641,8 +651,21 @@ function (sequential) ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
   by pat_completeness auto
 (* this will be true because we never return a larger tree than we started with from
    consume_label. we could deal with this by adding an extra parameter which is the original tree. *)
-termination sorry
+termination 
+  apply(relation "measure (\<lambda> x . case x of Inl t \<Rightarrow> numnodes t | Inr l \<Rightarrow> numnodes_l l)")
+     apply(clarsimp)
+    apply(auto)
+    apply(induct_tac [2] "t", auto)
+  apply(subgoal_tac "numnodes_l a \<le> numnodes_l ls", auto)
+   apply(rule ll3_consume_label_numnodes1, auto)
+  apply(case_tac ba, auto)
+  done
 
+(*
+lemma ll3_assign_label_valid :
+"(\<forall> t . t \<in> ll_valid_q \<longrightarrow> (\<forall> t' . ll3_assign_label t = Some t' \<longrightarrow> t' \<in> ll_valid3'))\<and>
+ (\<forall> l . l \<in> ll_validl_q \<longrightarrow> (\<forall> l' . ll3_assign_label_list l = Some l' \<longrightarrow> (\<forall> t . t \<in> l' \<longrightarrow> t \<in> ll_valid3')))"
+*)
 fun ll3_unwrap :: "(ll3 list \<Rightarrow> 'a option) \<Rightarrow> ll3  \<Rightarrow> 'a option" where
   "ll3_unwrap f (_, LSeq _ ls) = f ls"
   | "ll3_unwrap _ (_, _) = None"
