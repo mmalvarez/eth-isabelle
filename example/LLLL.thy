@@ -499,6 +499,7 @@ inductive_set ll_valid3' :: "('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3' set" where
                 (x, LSeq k l) \<in> ll_valid3'"
 
 (* old version of ll3 validity, may have bugs *)
+(*
 inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
   where
     "\<And> i e x. (x, i) \<in> ll_valid_qi \<Longrightarrow>
@@ -517,15 +518,7 @@ inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3) \<Longrightarrow>
                 (\<exists>! k . \<exists>! y . (((x, LSeq e l), (y, LLab e' k), k) \<in> ll_descend)) \<Longrightarrow>
                 (x, LSeq e l) \<in> ll_valid3"
-    
-(* validity of ll2 terms with labels resolved*)
-(* Q: how do we detect label clashes? *)
-(* Q: make ll2 size validity an explicit hypothesis? *)
-(* Q: make this parametric in everything but Seq annotations? *)
-    (* Q: do we need a locale here for explicit type instantiation? *)
-
-(* add labels function - outline *)
-(* track which number child we are (series of indices) so we can store it *)
+    *)
 
 
 (* dump an l2 to l3, marking all labels as unconsumed *)
@@ -536,11 +529,38 @@ fun ll3_init :: "ll2 \<Rightarrow> ll3" where
 | "ll3_init (x, LJmpI e idx s) = (x, LJmpI e idx s)"
 | "ll3_init (x, LSeq e ls) = 
    (x, LSeq [] (map ll3_init ls))"
+(*
+\<and>
+ 
+*)
 
-(* pipeline so far : ll_pass1 l1 \<rightarrow> l2
-   ll3_init l2 \<rightarrow> l3
-   ll3_assign_labels l3 \<rightarrow> l3 *)
-  
+
+lemma ll3_init_noquant :
+"(fst (ll3_init l) = fst l) \<and>
+ (List.map (\<lambda> t . fst (ll3_init t)) ls = List.map fst ls)"
+  apply(induction rule:my_ll_induct, auto)
+  done
+
+(* step one: prove that ll3_init does not touch qan's
+   maaybe this could be done using parametricity? *)
+
+lemma ll3_init_pres :
+"((q, l2) \<in> ll_valid_q \<longrightarrow> (ll3_init (q, l2)) \<in> ll_valid_q)\<and>
+ (((x,y), ls) \<in> ll_validl_q \<longrightarrow> ((x,y), (map ll3_init ls)) \<in> ll_validl_q)"
+proof(induction rule: ll_valid_q_ll_validl_q.induct)
+  case 1 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case 2 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case 3 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case 4 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case 5 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case 6 thus ?case by (auto simp add:ll_valid_q_ll_validl_q.intros) next
+  case (7 n h n' t n'') thus ?case using ll3_init_noquant[of "((n,n'),h)" "[]"]
+    apply(auto)
+    apply(case_tac "ll3_init ((n,n'),h)", clarsimp)
+    apply(rule ll_valid_q_ll_validl_q.intros(7), auto)
+    done
+qed
+
 value "ll3_init (ll_pass1 (ll1.LSeq [ll1.LLab 0])) :: ll3"
 
 (*
@@ -550,11 +570,27 @@ datatype consume_label_result =
   | CFail
 *)
 
+inductive cp_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
+"\<And> n t . cp_less [] (n#t)"
+| "\<And> n n' t t' . n < n' \<Longrightarrow> cp_less (n#t) (n'#t')"
+| "\<And> n t t' . cp_less t t' \<Longrightarrow> cp_less (n#t) (n#t')"
+
 type_synonym consume_label_result = "(ll3 list * childpath) option"
+
+
+(* TODO - proof plan
+   first, we need to prove that the outputs of consume_label and then assign_label are qan-valid
+   then, we need to have a "strong induction" theorem describing the results of consume_label
+   under the conditions where we actually run it (if we haven't found a descendent yet for
+   lesser paths  
+   then we should have the additional facts we need to prove full ll3 validity for assign_labels
+*)
 
 (* this prevents multiple locations for the same label name
    because it will only "consume" one label per name
    and then it will fail later on the other one *)
+(* modify this to pass around root?
+   modify this to take a node instead of a node list? *)
 (* subroutine for assign_label, marks label as consumed *)
 fun ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> consume_label_result" where
  "ll3_consume_label p n [] = Some ([], [])"
@@ -577,6 +613,10 @@ fun ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<
    (case ll3_consume_label p (n+1) ls of
     Some (ls', p') \<Rightarrow> Some ((T#ls'), p')
     | None \<Rightarrow> None)"
+
+(* we need to make this work with ll_induct, though *)
+(*lemma ll3_consume_label_correct :
+""*)
 
 fun numnodes :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> nat" and
     numnodes_l :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow> nat" where
@@ -629,6 +669,53 @@ lemma ll3_consume_label_numnodes1 : "ll3_consume_label p n l = Some (l', p') \<L
   apply(blast)
   done
 
+(* finish this lemma statement, we may need a "strong" hypothesis
+   about failing to run on previous steps, and re-stitching results *)
+
+
+lemma ll3_consume_label_qvalid' :
+"((q, t) \<in> ll_valid_q \<longrightarrow> (! ls e . t = (LSeq e ls) \<longrightarrow> (! p p' n ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> (q, LSeq e ls') \<in> ll_valid_q)))
+\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> (! p p' n ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q ))"
+  apply(induction rule:ll_valid_q_ll_validl_q.induct, auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(case_tac h, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc na) t", auto simp add:ll_valid_q_ll_validl_q.intros)
+     apply(case_tac [1] "x22 = length p", clarsimp)
+      apply(case_tac [1] "\<not>x21", clarsimp, auto)
+      apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+      apply(erule_tac [1] "ll_valid_q.cases", auto simp add:ll_valid_q_ll_validl_q.intros)
+     apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+     apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+    apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto simp add:ll_valid_q_ll_validl_q.intros)
+   apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(case_tac "ll3_consume_label (na # p) 0 x52", auto)
+  apply(case_tac b, auto)
+   apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto simp add:ll_valid_q_ll_validl_q.intros)
+  done
+
+lemma ll3_consume_label_unch' :
+"(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
+\<and> (! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow> ls = ls')"
+  
+  apply(induction rule:my_ll_induct)
+        apply(auto)
+  apply(case_tac ba, auto)
+      apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+     apply(case_tac [1] "x22 = length p", auto)
+      apply(case_tac [1] "\<not>x21", auto)
+     apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+    apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+   apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+  apply(case_tac "ll3_consume_label (n#p) 0 x52", auto)
+  apply(case_tac ba, auto)
+  apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+  done
+
+lemma ll3_consume_label_unch :
+"ll3_consume_label p n ls = Some (ls', []) \<Longrightarrow> ls = ls'"
+  apply(insert ll3_consume_label_unch')
+  apply(blast)
+  done
+
 function (sequential) ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_assign_label_list :: "ll3 list \<Rightarrow> ll3 list option" where
   "ll3_assign_label (x, LSeq e ls) =
@@ -661,11 +748,95 @@ termination
   apply(case_tac ba, auto)
   done
 
-(*
+(* lemma: "unch" for assign_label*)
+lemma ll3_assign_label_unch' :
+"(! q' t' . ll3_assign_label t = Some (q', t') \<longrightarrow> fst t = q') \<and>
+ (! l' . ll3_assign_label_list l = Some l' \<longrightarrow> map fst l = map fst l')"
+  apply(induction rule:my_ll_induct, auto)
+      apply(case_tac [1] e, auto)
+     apply(case_tac [1] e, auto)
+    apply(case_tac[1] "ll3_consume_label [] 0 l", auto)
+  apply(rename_tac abo) (* W  T F *)
+    apply(case_tac[1] "ll3_assign_label_list ab", clarsimp)
+  apply(auto)
+   apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
+   apply(rename_tac abco)
+   apply(case_tac "ll3_assign_label_list ab", auto)
+  apply(case_tac "ll3_assign_label ((a,b), ba)", auto)
+  apply(case_tac "ll3_assign_label_list l", auto)
+  done
+
+lemma ll3_assign_label_unch1 :
+"ll3_assign_label (q,t) = Some (q', t') \<Longrightarrow> q = q'"
+  apply(case_tac q, auto)
+  apply(case_tac q', auto)
+   apply(insert ll3_assign_label_unch')
+   apply(auto)
+   apply(blast)
+  apply(blast)
+  done
+
+lemma ll3_assign_label_unch2 :
+"ll3_assign_label_list ls = Some ls' \<Longrightarrow> map fst ls = map fst ls'"
+  apply(insert ll3_assign_label_unch')
+  apply(auto)
+  done
+
+lemma ll3_assign_label_qvalid' :
+"((q,t) \<in> ll_valid_q \<longrightarrow> (! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> (q',t') \<in> ll_valid_q))
+\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> (! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q ))"
+  apply(induction rule:ll_valid_q_ll_validl_q.induct)
+        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(case_tac [1] e, auto simp add:ll_valid_q_ll_validl_q.intros)
+   apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
+   apply(case_tac [1] "ll3_assign_label_list aa", auto)
+   (* Q: do we need unch? *)
+   apply(case_tac [2] "ll3_assign_label ((n,n'), h)", auto)
+   apply(case_tac [2] "ll3_assign_label_list t", auto simp add:ll_valid_q_ll_validl_q.intros)
+   apply(drule_tac [2] "ll3_assign_label_unch1")
+   apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+  apply(drule_tac [1] "ll3_consume_label_unch")
+  
+  
+   (* i think we need to strengthen our theorem statement.
+      include the fact that we can also attempt to assign labels for any value and still get validity *)
+   apply(case_tac [1] ba, auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(frule_tac [1] ll3_consume_label_unch, auto simp add:ll_valid_q_ll_validl_q.intros)
+  
+   (* we seem to need a lemma about how we don't change the tree if we don't find anything *)
+
+(* informal statement:
+   IF we find a label with consume_label
+   AND we run assign_labels successfully on the rest
+   THEN we are ll3 *)
+(* it would be better to not refer to assign_labels, now we are back to the problem
+   of describing correctness of consume_label when run with a nonempty path *)
+(*lemma ll3_consume_label_desc :*)
+
 lemma ll3_assign_label_valid :
-"(\<forall> t . t \<in> ll_valid_q \<longrightarrow> (\<forall> t' . ll3_assign_label t = Some t' \<longrightarrow> t' \<in> ll_valid3'))\<and>
- (\<forall> l . l \<in> ll_validl_q \<longrightarrow> (\<forall> l' . ll3_assign_label_list l = Some l' \<longrightarrow> (\<forall> t . t \<in> l' \<longrightarrow> t \<in> ll_valid3')))"
-*)
+  fixes t :: "ll3t"
+  fixes l :: "ll3 list"
+  shows
+"((q,t) \<in> ll_valid_q \<longrightarrow> (\<forall> q' t' . ll3_assign_label (q, t) = Some (q', t') \<longrightarrow> (q',t') \<in> ll_valid3'))\<and>
+ (((n,n'),l) \<in> ll_validl_q \<longrightarrow> (\<forall> l' . ll3_assign_label_list l = Some l' \<longrightarrow> (\<forall> t . t \<in> set l' \<longrightarrow> t \<in> ll_valid3')))"
+  apply(induction rule:ll_valid_q_ll_validl_q.induct)
+        apply(auto simp add:ll_valid3'.intros)
+    apply(case_tac [1] e, auto simp add:ll_valid3'.intros)
+   apply(case_tac [1]" ll3_consume_label [] 0 l", auto)
+   apply(case_tac [1] "ll3_assign_label_list aa", auto)
+   apply(rule_tac [1] ll3_consume_label.elims, auto)
+ 
+   apply(case_tac [1] ba, clarsimp)
+    apply(rule_tac[1] ll_valid3'.intros(5), clarsimp)
+      apply(insert ll3_consume_label_qvalid)
+  apply(auto)
+  
+  apply(clarsimp)
+  apply
+   
+   (* we need to strengthen this *)
+
 fun ll3_unwrap :: "(ll3 list \<Rightarrow> 'a option) \<Rightarrow> ll3  \<Rightarrow> 'a option" where
   "ll3_unwrap f (_, LSeq _ ls) = f ls"
   | "ll3_unwrap _ (_, _) = None"
