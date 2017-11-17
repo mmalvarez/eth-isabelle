@@ -692,6 +692,8 @@ lemma ll3_consume_label_qvalid' :
    apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto simp add:ll_valid_q_ll_validl_q.intros)
   done
 
+(* lemma ll3_consume_label_qvalid1 :*)
+
 lemma ll3_consume_label_unch' :
 "(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
 \<and> (! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow> ls = ls')"
@@ -782,19 +784,41 @@ lemma ll3_assign_label_unch2 :
   apply(auto)
   done
 
+(* my the inductive hypothesis is not right, maybe it needs to be strengthened
+   in the list case. also I'm skeptical about this OR... *)
+(* we need to revise the second clause along these lines *)
+(* restate: if EITHER assigning the label immediately works yielding q''
+   OR consuming the label and then assigning it works yielding q''
+   THEN ll_valid_q holds on the result *)
+(* I need to add in label consumption to the chain of the second case, it's not there now *)
+lemma ll3_assign_label_qvalid' :
+"((q,(t::ll3t)) \<in> ll_valid_q \<longrightarrow> (! q'' t'' . ((ll3_assign_label (q,t) = Some (q'',t'')) \<or> 
+                                           (? e l . t = LSeq e l \<and>
+                                            (! p n . ? p' l' . ll3_consume_label p n l = Some (p', l')) \<and>
+                                             (q'' = q \<and> (? e' . t'' = LSeq e' l))))
+                 \<longrightarrow> (q'',t'') \<in> ll_valid_q))
+\<and> (((x,x'), (ls:: ll3 list)) \<in> ll_validl_q \<longrightarrow> (! ls'' . ((ll3_assign_label_list ls = Some ls'') \<or>
+                                                      (! p n . ? p' ls' . ll3_consume_label p n ls = Some (p', ls')) \<and>
+                                              
+                  \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q ))"
+(*
 lemma ll3_assign_label_qvalid' :
 "((q,t) \<in> ll_valid_q \<longrightarrow> (! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> (q',t') \<in> ll_valid_q))
 \<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> (! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q ))"
+*)
   apply(induction rule:ll_valid_q_ll_validl_q.induct)
+  apply(auto)
         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
     apply(case_tac [1] e, auto simp add:ll_valid_q_ll_validl_q.intros)
    apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
    apply(case_tac [1] "ll3_assign_label_list aa", auto)
    (* Q: do we need unch? *)
    apply(case_tac [2] "ll3_assign_label ((n,n'), h)", auto)
-   apply(case_tac [2] "ll3_assign_label_list t", auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(case_tac [2] "ll3_assign_label_list t", auto simp add:ll_valid_q_ll_validl_q.intros)
    apply(drule_tac [2] "ll3_assign_label_unch1")
    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  (* idea: we want to show that *)
+  (* do we want to talk about ALL predicates not mentioning the annotation? *)
 
   apply(drule_tac [1] "ll3_consume_label_unch")
   
