@@ -698,7 +698,12 @@ lemma ll3_consume_label_qvalid :
   apply(case_tac q)
   apply(auto)
   done
-  
+
+(* idea: have a neater characterization of ll3 correctness. 
+   IF we return something for a particular n and path
+   AND we didn't return anything for the prefix
+   THEN we have returned the label with "smallest" path
+*)
 
 lemma ll3_consume_label_unch' :
 "(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
@@ -789,6 +794,16 @@ lemma ll3_assign_label_unch2 :
   apply(auto)
   done
 
+(*
+lemma ll3_consume_label_nofiddle :
+"
+("(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
+\<and> (! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow> ls = ls')")
+\<and>
+()
+"
+*)
+
 (* my the inductive hypothesis is not right, maybe it needs to be strengthened
    in the list case. also I'm skeptical about this OR... *)
 (* we need to revise the second clause along these lines *)
@@ -809,7 +824,55 @@ lemma ll3_assign_label_unch2 :
    - handle the case where the head of the list is a Seq node?
 *)
 
+(* we need 2 lemmas here:
+  1: if consuming and then assigning a label is q-valid, assigning the label must
+     be valid under the same qan
+  2: if assigning a label is valid, and consuming the label on the original list
+     is also valid, then assigning the consumed label is valid under the same qan *)
+
+(* Idea: doing consume_label can't make assign_labels at the root true
+   and it can't make assign_labels at the root false *)
+(*aeaeae
+lemma ll3_assign_label_consume_label2' :
+"((q, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow>
+  (! e l . t = LSeq e l \<longrightarrow> (! p n l' p' . ll3_consume_label p n l = Some (l', p') \<longrightarrow>
+  
+)
+\<and>
+()
+"
+*)
+(* do we also need to talk about consume_label? *)
 lemma ll3_assign_label_qvalid' :
+"
+((q, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow> 
+  (((! q' t' . ll3_assign_label (q,t) = Some (q', t') \<longrightarrow> (q=q' \<and> (q', t') \<in> ll_valid_q)))
+   \<and> (! e l . t = LSeq e l \<longrightarrow> 
+                        (!  p n l' p'. ll3_consume_label p n l = Some (l', p') \<longrightarrow>
+                        ((q,l') \<in> ll_validl_q) \<and> 
+                         (! l'' . ll3_assign_label_list l' = Some l'' \<longrightarrow>
+                           (! e' . (q, LSeq e' l'') \<in> ll_valid_q))))))
+\<and>
+(((x,x'), (ls :: ll3 list)) \<in> ll_validl_q \<longrightarrow> 
+   ((! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q) 
+    \<and> (! p n p' ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow>
+                          (((x,x'), ls') \<in> ll_validl_q \<and>
+                           (! ls'' . ll3_assign_label_list ls' = Some ls'' \<longrightarrow>
+                            ((x,x'), ls'') \<in> ll_validl_q)))))
+
+(* old last case, other part *)
+(* need an assumption about consume_label here, but which one?
+   this one isn't right, we need to talk about running consume_label on the head? *)
+(* Q:  *)
+(*
+  \<and> (! e qh lsdec tl . ls = ((qh, LSeq e lsdec)#tl) \<longrightarrow>
+     ( ! h' p n p' tl' . ll3_consume_label p n ls = Some (h'#tl', p') \<longrightarrow>
+     (! h'' . ll3_assign_label h' = Some h'' \<longrightarrow>
+        (! tl'' . ll3_assign_label_list tl' = Some tl'' \<longrightarrow>
+        (((x,x'), (h''#tl'')) \<in> ll_validl_q))) *)
+
+"
+(*
 "
 ((q, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow> 
   (((! q' t' . ll3_assign_label (q,t) = Some (q', t') \<longrightarrow> (q=q' \<and> (q', t') \<in> ll_valid_q)))
@@ -826,6 +889,7 @@ lemma ll3_assign_label_qvalid' :
  ))                       
 ))
 "
+*)
 (*
 lemma ll3_assign_label_qvalid' :
 "((q,t) \<in> ll_valid_q \<longrightarrow> (! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> (q',t') \<in> ll_valid_q))
@@ -838,13 +902,13 @@ lemma ll3_assign_label_qvalid' :
            apply(case_tac e, auto simp add:ll_valid_q_ll_validl_q.intros) 
    apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
           apply(case_tac [1] "ll3_assign_label_list aa", auto)
-         apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
-         apply(case_tac [1] "ll3_assign_label_list aa", auto)
+     apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
+     apply(case_tac [1] "ll3_assign_label_list aa", auto)
+
 apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
        apply(case_tac [1] "ll3_assign_label_list aa", auto)
-     apply(rule_tac[1] ll_valid_q_ll_validl_q.intros(5), auto)
-    apply(rule_tac[1] ll_valid_q_ll_validl_q.intros(5))
-    apply(drule_tac[1] ll3_consume_label_qvalid, auto)
+     apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+
    apply(case_tac [1] "ll3_assign_label ((n,n'), h)", auto)
    apply(case_tac [1] "ll3_assign_label_list t", auto simp add:ll_valid_q_ll_validl_q.intros)
 
@@ -856,10 +920,126 @@ apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
       apply(case_tac [1] "ll3_assign_label_list t", auto)
       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
-  apply(drule_tac [1] ll_valid_q.cases, auto)
+        apply(drule_tac [1] ll_valid_q.cases, auto)
+       apply(drule_tac [1] ll_valid_q.cases, auto)
+         apply(rule_tac [1] ll_valid_q_ll_validl_q.intros, auto)
+apply(rule_tac [1] ll_valid_q_ll_validl_q.intros, auto)
+      apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+      apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  
+      apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+      apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  
+    apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+   apply(case_tac [1] "ll3_consume_label (na # p) 0 x52", auto)
+   apply(case_tac [1] b, auto)
+    apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+    apply(rule_tac ll_valid_q_ll_validl_q.intros, auto)
+    apply(drule_tac [1] ll_valid_q.cases, auto)
+    apply(drule_tac [1] x = "(na # p)" in spec)
+  apply(rotate_tac [1] 3)
+    
+    apply(drule_tac [1] x = "0" in spec)
+  apply(drule_tac [1] x = a in spec)
+    apply(rule_tac ll_valid_q_ll_validl_q.intros, auto)
+   apply(drule_tac [1] x = "(na # p)" in spec)
+  apply(rotate_tac[1] 3)
+   apply(drule_tac [1] x = 0 in spec)
+   apply(drule_tac [1] x = "a" in spec)
+   apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto simp add:ll_valid_q_ll_validl_q.intros)
+
+  apply(case_tac "h", auto)
+      apply(drule_tac [1] ll_valid_q.cases, auto)
+      apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+  apply(case_tac [1] "ll3_assign_label_list aa", auto simp add:ll_valid_q_ll_validl_q.intros)
 
 
-     apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+     apply(case_tac[1] "x22 = length p", auto)
+      apply(case_tac [1] "\<not>x21", auto)
+      apply(case_tac[1] "ll3_assign_label_list t", auto)
+
+  apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+      apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+      apply(drule_tac [1] ll_valid_q.cases, auto)
+     apply(case_tac[1] "ll3_consume_label p (Suc na) t", auto)
+     apply(case_tac [1] "ll3_assign_label ((n, n'), llt.LLab x21 x22)", auto)
+        apply(drule_tac [1] ll_valid_q.cases, auto)
+
+     apply(case_tac [1] " ll3_assign_label_list a", auto)
+     apply(drule_tac [1] ll_valid_q_ll_validl_q.intros, auto)
+
+    apply(case_tac[1] "ll3_consume_label p (Suc na) t", auto)
+    apply(case_tac[1] "ll3_assign_label_list a", auto)
+    apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+
+     apply(case_tac[1] "ll3_consume_label p (Suc na) t", auto)
+    apply(case_tac[1] "ll3_assign_label_list a", auto)
+    apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+
+  apply(case_tac "ll3_consume_label (na # p) 0 x52", auto)
+  apply(case_tac b, auto)
+   apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+  apply(case_tac [1] "(case ll3_consume_label [] 0 a of None \<Rightarrow> None
+             | Some (ls', p) \<Rightarrow>
+                 (case ll3_assign_label_list ls' of None \<Rightarrow> None
+                 | Some ls'' \<Rightarrow> Some ((n, n'), llt.LSeq (rev p) ls'')))", auto)
+   apply(case_tac [1] "ll3_consume_label [] 0 a", auto)
+  apply(case_tac [1] "ll3_assign_label_list aa", auto)
+   apply(case_tac [1] "ll3_assign_label_list ac", auto)
+   apply(rule_tac[1] "ll_valid_q_ll_validl_q.intros", auto)
+   apply(frule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+   apply(drule_tac [1] "ll3_consume_label_unch", auto)
+   apply(drule_tac [1] "ll_valid_q.cases", auto)
+
+    apply(case_tac [1] "(case ll3_consume_label [] 0 a of None \<Rightarrow> None
+             | Some (ls', p) \<Rightarrow>
+                 (case ll3_assign_label_list ls' of None \<Rightarrow> None
+                 | Some ls'' \<Rightarrow> Some ((nb, n'a), llt.LSeq (rev p) ls'')))", auto)
+
+  apply(case_tac [1] "ll3_assign_label_list t", auto)
+   apply(case_tac [1] "ll3_consume_label [] 0 a", auto)
+  apply(rename_tac [1] boo)
+  apply(case_tac [1] "ll3_assign_label_list ad", auto)
+  apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+  apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros")
+  apply(frule_tac [1] x = "na#p" in spec)
+  apply(rotate_tac [1] 3)
+  apply(drule_tac [1] x = 0 in spec)
+  apply(drule_tac [1] x = a in spec, auto)
+ apply(case_tac [1] "ll3_assign_label_list a", auto)
+
+   apply(subgoal_tac [2] "((ab, b), llt.LSeq [] af)  \<in> ll_valid_q")
+  apply(drule_tac [2] "ll_valid_q.cases", auto)
+
+  apply(rotate_tac [2] 3)
+   apply(drule_tac [2] x = "[]" in spec)
+
+   apply(subgoal_tac [2] "((ab, b), llt.LSeq [] af)  \<in> ll_valid_q")
+
+  apply(rotate_tac [2] 3)
+ apply(clarsimp add:ll_valid_q_ll_validl_q.intros)
+
+
+  apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
+
+  
+
+  apply(rename_tac [2] boo2)
+  apply(case_tac [2] "ll3_assign_label_list af", auto)
+
+  (* we need some lemmas about interaction of assiging different labels
+     of different lengths. case 3 is the interesting one *)
+
+  apply(rotate_tac [1] 5)
+  apply(drule_tac [1] x = "p" in spec)
+  apply(rotate_tac [1] 5)
+  apply(drule_tac [1] x = na in spec)
+   
+
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
   apply(case_tac [1] "(ll3_assign_label
               ((n, n'), llt.LLab x21 x22))", auto)
      apply(case_tac[1] "ll3_assign_label_list a", auto simp add:ll_valid_q_ll_validl_q.intros)
@@ -869,30 +1049,123 @@ apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
   
     apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
     apply(case_tac[1] "ll3_assign_label_list a", auto simp add:ll_valid_q_ll_validl_q.intros) 
+  apply(drule_tac[1] "ll_valid_q.cases", auto)
 
-  apply(case_tac [1] "ll3_consume_label (na # p) 0 x52", auto)
-  apply(case_tac [1] b, auto)
-   apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
-   apply(case_tac[1] "ll3_consume_label [] 0 a", auto)
-   apply(rename_tac[1] boo)
-  apply(case_tac [1] "case ll3_assign_label_list ab of None \<Rightarrow> None
-             | Some ls'' \<Rightarrow> Some ((n, n'), llt.LSeq (rev boo) ls'')", auto)
+  apply(case_tac [1] "ll3_consume_label (na # p) 0 l", auto)
+  apply(case_tac [1] "b", auto)
+  apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+
+
+  apply(case_tac [1] "case ll3_consume_label [] 0 a of
+             None \<Rightarrow> None
+             | Some (ls', p) \<Rightarrow>
+                 (case ll3_assign_label_list ls' of
+                 None \<Rightarrow> None
+                 | Some ls'' \<Rightarrow>
+                     Some
+                      ((nb, n'a),
+                       llt.LSeq (rev p) ls''))", auto)
+      apply(case_tac [1] "ll3_consume_label [] 0 a", auto)
+
    apply(case_tac [1] "ll3_assign_label_list aa", auto)
-   apply(case_tac [1] "ll3_assign_label_list ab", auto)
-   apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros")
+   apply(case_tac [1] "ll3_assign_label_list ac", auto)
     apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
-   apply(drule_tac[1] "ll_valid_q.cases", auto)
-   apply(frule_tac [1] "ll3_consume_label_unch", auto)
+
+   apply(drule_tac[1] "ll3_consume_label_unch", auto)
+
+  apply(case_tac [1] "case ll3_consume_label [] 0 a of
+             None \<Rightarrow> None
+             | Some (ls', p) \<Rightarrow>
+                 (case ll3_assign_label_list ls' of
+                 None \<Rightarrow> None
+                 | Some ls'' \<Rightarrow>
+                     Some
+                      ((nb, n'a),
+                       llt.LSeq (rev p) ls''))", auto)
+
+  apply(case_tac "ll3_consume_label [] 0 a", auto)
+   apply(rename_tac[1] boo)
+  apply(case_tac [1] "ll3_assign_label_list ac", auto)
+  apply(case_tac [1] "ll3_assign_label_list t" , auto)
+    apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+
+  apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
+   apply(rename_tac [2] boo)
+   apply(case_tac [2] "ll3_assign_label_list af", auto)
+
+  apply(rule_tac[3] "ll_valid_q_ll_validl_q.intros")
+  apply(drule_tac [3] "ll_valid_q.cases", auto)
+
+  (* Q: need to split up list ? *)
+
+   apply(drule_tac [1] x = "na#p" in spec)
+   apply(drule_tac [1] x = 0 in spec)
+   apply(drule_tac x = a in spec, auto)
+  apply(drule_tac [1] "ll3_consume_label_unch")
+  apply(rule_tac[1] "ll_valid_q_ll_validl_q.intros")
+
+     apply(rule_tac[1] "ll_valid_q_ll_validl_q.intros", auto)
+    apply(drule_tac[1] "ll3_consume_label_unch", auto)
+  apply(case_tac [1] "case ll3_consume_label [] 0 a of None \<Rightarrow> None
+             | Some (ls', p) \<Rightarrow>
+                 (case ll3_assign_label_list ls' of None \<Rightarrow> None
+                 | Some ls'' \<Rightarrow> Some ((nb, n'a), llt.LSeq (rev p) ls''))", auto)
+  apply(case_tac[1] " ll3_consume_label [] 0 a", auto)
+   apply(rename_tac[1] boo)
+  apply(case_tac [1] "ll3_assign_label_list ac", auto)
+  apply(case_tac [1] "ll3_assign_label_list t", auto)
+
+   apply(rule_tac "ll_valid_q_ll_validl_q.intros", auto)
+   apply(drule_tac "ll3_consume_label_qvalid", auto)
+   apply(drule_tac "ll3_consume_label_qvalid", auto)
+  apply(drule_tac "ll3_assign_label_unch2")
+
+  apply(case_tac [2] "ll3_consume_label (na # p) 0 l", auto)
   
+
+  apply(drule_tac "ll_valid_q.cases", auto)
+  apply(rotate_tac 3)
+   apply(frule_tac [1] x = "(na#p)" in spec)
+  apply(rotate_tac[1] 3)
+   apply(drule_tac [1] x = "0" in spec)
+   apply( drule_tac [1] x = "a" in spec)
+  apply(auto)
+  apply(case_tac "ll3_consume_label [] 0 l", auto)
    (* we need to use unch here, I think this miiiight be provable*)
+
    
-   apply(subgoal_tac [1] "((n, n'), llt.LSeq [] ae) \<in> ll_valid_q")
+   apply(subgoal_tac [1] "((n, n'), llt.LSeq (rev boo) ae) \<in> ll_valid_q")
     apply(drule_tac [1] "ll_valid_q.cases", auto)
-    apply(drule_tac [1] x = "[]" in spec) (* brittle *)
-    apply(drule_tac[1] x = "0" in spec) 
-  apply(drule_tac[1] x = "ab" in spec)
-  apply(clarsimp)
-    apply(drule_tac [1] ll_valid_q.cases, auto)
+
+  apply(case_tac[1] "(case ll3_consume_label [] 0 a of
+             None \<Rightarrow> None
+             | Some (ls', p) \<Rightarrow>
+                 (case ll3_assign_label_list ls' of
+                 None \<Rightarrow> None
+                 | Some ls'' \<Rightarrow>
+                     Some
+                      ((n, n'),
+                       llt.LSeq (rev p) ls'')))", auto) 
+
+   apply(case_tac [1] "ll3_assign_label_list t", auto)
+   apply(case_tac [1] "ll3_consume_label [] 0 a", auto)  
+  apply(rename_tac boo)
+   apply(case_tac [1] "ll3_assign_label_list ad", auto)
+   apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros", auto)
+
+   apply(drule_tac [1] x = "(na#p)" in spec)
+  apply(rotate_tac[1] 3)
+   apply(drule_tac [1] x = "0" in spec)
+   apply( drule_tac [1] x = "a" in spec)
+   apply(clarsimp)
+   apply(drule_tac [1] "ll_valid_q.cases", auto)
+  apply(case_tac [1] "ll3_consume_label [] 0 l", auto)
+  apply(rule_tac [1] "ll_valid_q_ll_validl_q.intros")
+   apply(rotate_tac[1] 3)
+  apply(subgoal_tac "(\<forall>e'. ((n, n'), llt.LSeq e' ad) \<in> ll_valid_q)", auto)
+  apply(drule_tac [1] x = "rev boo" in spec)
+   
+
   apply(thin_tac [1] 0)
     apply(auto simp add:ll_valid_q.cases)
   apply(rotate_tac [1] 2)
