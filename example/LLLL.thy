@@ -298,7 +298,7 @@ definition ll_valid_qi :: "(qan * inst) set" where
 declare ll_valid_qi_def [simp]  
   
 definition ll_valid_ql :: "(qan * idx) set" where
-  "ll_valid_ql = {((n,n'),i) . n' = n}"
+  "ll_valid_ql = {((n,n'),i) . n' = n+1}"
   
 declare ll_valid_ql_def [simp]  
   
@@ -367,7 +367,7 @@ proof(induction rule: ll_valid_q_ll_validl_q.induct)
 fun ll1_size :: "ll1 \<Rightarrow> nat" and
     ll1_size_seq :: "ll1 list \<Rightarrow> nat" where
     "ll1_size (ll1.L inst) = nat (inst_size inst)"
-  | "ll1_size (ll1.LLab idx) = 0"
+  | "ll1_size (ll1.LLab idx) = 1"
   | "ll1_size (ll1.LJmp idx) = 1"
   | "ll1_size (ll1.LJmpI idx) = 1"
   | "ll1_size (ll1.LSeq ls) = ll1_size_seq ls"
@@ -379,7 +379,7 @@ fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
     ll_phase1_seq :: "ll1 list \<Rightarrow> nat \<Rightarrow> (ll2 list * nat)"
   where
   "ll_phase1 (ll1.L inst) i = (((i, i + nat (inst_size inst)), L () inst ), i + nat (inst_size inst))"
-| "ll_phase1 (ll1.LLab idx) i = (((i, i), LLab () idx ), i)" (* labels take no room *)
+| "ll_phase1 (ll1.LLab idx) i = (((i, i+1), LLab () idx ), 1+i)" (* labels take 1 byte *)
 | "ll_phase1 (ll1.LJmp idx) i = (((i, 1 + i), LJmp () idx 0), 1 + i)" (* jumps take at least 1 bytes *)
 | "ll_phase1 (ll1.LJmpI idx) i = (((i, 1 + i), LJmpI () idx 0), 1 + i)"
 | "ll_phase1 (ll1.LSeq ls) i =
@@ -699,6 +699,101 @@ lemma ll3_consume_label_qvalid :
   apply(auto)
   done
 
+lemma ll3_consume_label_hdq' :
+  "(! e q qh h ts. t = (q, LSeq e ((qh,h)#ts)) \<longrightarrow>
+      (! p n l' p'. ll3_consume_label p n ((qh,h)#ts) = Some (l',p') \<longrightarrow> 
+     (? qh' h' ts' . l' = ((qh',h' )#ts') \<and> qh = qh'))) 
+\<and>
+  (! qh h ts . l = ((qh,h)#ts) \<longrightarrow>
+    (! p n l' p' . ll3_consume_label p n l = Some (l', p') \<longrightarrow> 
+    (? qh' h' ts' . l' = ((qh',h' )#ts') \<and> qh = qh')))"
+
+  apply(induction rule:my_ll_induct)
+        apply(auto)
+  apply(case_tac[1] h, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+       apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+
+  apply(case_tac[1] h, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+
+  apply(case_tac[1] h, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+     apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+
+  apply(case_tac[1] h, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+    apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+
+  apply(case_tac[1] h, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+   apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+
+    apply(case_tac[1] h, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
+  apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+  apply(case_tac [1] b, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
+  done
+
+lemma ll3_consume_label_hdq :
+  "ll3_consume_label p n ((qh,h)#ts') = Some (l', p') \<Longrightarrow>
+    (? qh' h' ts' . l' = ((qh',h' )#ts') \<and> qh = qh')"
+  apply(insert ll3_consume_label_hdq'[of bunk "((qh, h) # ts')"])
+  apply(auto)
+  apply(drule_tac x = p in spec)
+  apply(drule_tac x = p in spec)
+  apply(drule_tac x = n in spec)
+  apply(drule_tac x = n in spec)
+  apply(auto)
+  done
+
 (* idea: have a neater characterization of ll3 correctness. 
    IF we return something for a particular n and path
    AND we didn't return anything for the prefix
@@ -759,6 +854,8 @@ termination
    apply(rule ll3_consume_label_numnodes1, auto)
   apply(case_tac ba, auto)
   done
+
+
 
 (* lemma: "unch" for assign_label*)
 lemma ll3_assign_label_unch' :
@@ -845,10 +942,12 @@ lemma ll3_assign_label_consume_label2' :
 
 (* new idea: we need to take into account arbitrary number of consumes (?) *)
 
-inductive_set ll3_consumes :: "(ll3 list * ll3 list) set" where
-"\<And> l . (l,l) \<in> ll3_consumes"
-| "\<And> p n l l' p' . ll3_consume_label p n l = Some (l', p') \<Longrightarrow> (l,l') \<in> ll3_consumes"
-| "\<And> l l' l'' . (l,l') \<in> ll3_consumes \<Longrightarrow> (l', l'') \<in> ll3_consumes \<Longrightarrow> (l,l'') \<in> ll3_consumes"
+inductive_set ll3_consumes :: "(ll3 list * childpath set * ll3 list) set" where
+"\<And> l . (l,{},l) \<in> ll3_consumes"
+| "\<And> p n l l' . ll3_consume_label p n l = Some (l', []) \<Longrightarrow> (l,{},l') \<in> ll3_consumes"
+| "\<And> p n l l' ph pt . ll3_consume_label p n l = Some (l', ph#pt) \<Longrightarrow> (l,{(ph#pt)}, l') \<in> ll3_consumes"
+| "\<And> l s l' s' l'' . (l,s,l') \<in> ll3_consumes \<Longrightarrow> (l',s', l'') \<in> ll3_consumes \<Longrightarrow> (s \<inter> s' = {})  
+     \<Longrightarrow> (l,s \<union> s',l'') \<in> ll3_consumes"
 
 lemma ll3_consume_label_length :
 "(! q e l . (t::ll3) = (q, LSeq e l) \<longrightarrow> 
@@ -885,22 +984,278 @@ proof(induction rule:my_ll_induct)
 qed
 
 lemma ll3_consumes_length :
-"(l1, l2) \<in> ll3_consumes \<Longrightarrow> length l1 = length l2"
+"(l1, s, l2) \<in> ll3_consumes \<Longrightarrow> length l1 = length l2"
   apply(induction rule:ll3_consumes.induct, auto)
-  apply(insert ll3_consume_label_length, blast)
+   apply(insert  ll3_consume_label_length, blast+)
+  done
+
+lemma set_diff_fact :
+"s \<inter> s' = {} \<Longrightarrow> (s \<union> s') - (s \<union> t) = s' - t"
+  apply(blast+)
+  done
+
+lemma set_diff_dist1 :
+"(s1 - ss1) \<union> (s2 - ss2) \<subseteq>
+(s1 \<union> s2) "
+  apply(blast)
+  done
+
+lemma set_diff_dist2:
+"? sk . (s1 - ss1) \<union> (s2 - ss2) = ((s1 \<union> s2) - sk)"
+  apply(insert set_diff_dist1)
+  apply(blast)
   done
 
 lemma ll3_consumes_split :
-"(l1, l2) \<in> ll3_consumes \<Longrightarrow> 
+"(l1, s, l2) \<in> ll3_consumes \<Longrightarrow> 
+(! q1 h1 t1 q2 h2 t2 . l1 = (q1, h1) # t1 \<longrightarrow> l2 = (q2, h2) # t2 \<longrightarrow> 
+  (q1 = q2 \<and> (? s' . s' \<subseteq> s \<and> (t1, s', t2) \<in> ll3_consumes \<and>
+           (h1 = h2 \<or> 
+              (? n . h1 = LLab False n \<and> h2 = LLab True n) \<or> 
+              (? e ls1 ls2 . h1 = LSeq e ls1 \<and> h2 = LSeq e ls2 \<and> 
+               (? s''.  s'' = s - s' \<and> (ls1, s'', ls2) \<in> ll3_consumes))))))"
+proof(induction rule:ll3_consumes.induct)
+  case (1 l) thus ?case
+    apply(auto simp add:ll3_consumes.intros) 
+    done next
+  case (2 p n l l')
+  then show ?case
+    apply(auto)
+      apply(case_tac h1, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+      apply(case_tac h1, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+          apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+     apply(frule_tac[1] ll3_consume_label_unch, auto)
+      apply(insert ll3_consumes.intros(1)) apply(blast)
+
+     apply(case_tac h1, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(case_tac [1] "x22 = length p", auto)
+    apply(case_tac [1] "\<not> x21", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+      apply(case_tac [1] boo, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+     apply(drule_tac [1] ll3_consume_label_unch, auto)
+    done next
+  case (3 p n l l' ph pt) thus ?case
+    apply(clarify)
+    apply(simp)
+
+    apply(rule conjI)
+     apply(drule_tac ll3_consume_label_hdq) apply(simp)
+
+    apply(rule conjI)
+     apply(drule_tac ll3_consume_label_hdq) apply(simp)
+
+    apply(case_tac h1) apply(simp)
+    apply(case_tac[1] "ll3_consume_label p (Suc n) t1")
+
+         apply(drule_tac [1] option.case_cong, simp)
+    apply(cut_tac [1] option.case_cong[of "ll3_consume_label p (Suc n) _"], simp)
+    apply(case_tac h2) apply(simp)
+    apply(case_tac[1] "ll3_consume_label p (Suc n) t1")
+  
+  
+    apply(clarify)
+        (*
+        apply(case_tac [1] "\<not>x21", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) ts", auto)
+       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+    apply(rename_tac [1] boo)
+*)
+
+    apply(rule conjI)
+     apply(drule_tac ll3_consume_label_hdq) apply(simp)
+
+     apply(case_tac [1] h1, clarify)
+    
+
+    apply(drule_tac ll3_consume_label_qvalid)
+
+    apply(case_tac [1] h1, clarify)
+    apply(simp)
+
+(*
+       apply(case_tac[1] h1, auto)
+        apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+               apply(case_tac [1] "x22 = length p", auto)
+                  apply(case_tac [1] "\<not>x21", auto)
+                    apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+*)
+        apply(case_tac[1] "ll3_consume_label p (Suc n) t1")         
+         apply(clarsimp)
+    apply(cut_tac [1] "ll3_consume_label p (Suc n) t1 = Some ab")
+        apply(rule_tac [1] conjI)
+    apply(clarsimp)
+    apply(rule_tac [1] x = "{ph#pt}" in exI)
+                  apply(case_tac[1] "ll3_consume_label p (Suc n) t1")         
+         apply(clarsimp)
+
+  
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+        apply(case_tac boo, auto)
+
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+       apply(case_tac boo, auto)
+
+       apply(case_tac[1] h1, auto)
+        apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+               apply(case_tac [1] "x22 = length p", auto)
+                  apply(case_tac [1] "\<not>x21", auto)
+                    apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+             apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+          
+        apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+  
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+        apply(case_tac boo, auto)
+
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+       apply(case_tac boo, auto)
+
+             apply(case_tac[1] h1, auto)
+        apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+         apply(rule_tac x = "{ph#pt}" in exI)
+         apply(drule_tac [1] ll3_consumes.intros(3), auto)
+
+               apply(case_tac [1] "x22 = length p", auto)
+         apply(case_tac [1] "\<not>x21", auto)
+         apply(rule_tac[1] x = "{}" in exI)
+    apply(rule_tac[1] ll3_consumes.intros)
+
+             apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+                   apply(rule_tac x = "{ph#pt}" in exI)
+        apply(drule_tac [1] ll3_consumes.intros(3), auto)
+
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+       apply(rule_tac x = "{ph#pt}" in exI)
+       apply(drule_tac [1] ll3_consumes.intros(3), auto)
+
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+       apply(rule_tac x = "{ph#pt}" in exI)
+      apply(drule_tac [1] ll3_consumes.intros(3), auto)
+  
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+        apply(case_tac boo, auto)
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+      apply(drule_tac [1] ll3_consume_label_unch, auto)
+              apply(rule_tac x = "{ph#pt}" in exI)
+      apply(drule_tac [1] ll3_consumes.intros(3), auto)
+
+         apply(rule_tac[1] x = "{}" in exI)
+     apply(rule_tac[1] ll3_consumes.intros)
+
+
+    apply(case_tac[1] h1, auto)
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+         apply(case_tac [1] "x22 = length p", auto)         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+apply(case_tac [1] "x22 = length p", auto)
+        apply(case_tac [1] "\<not>x21", auto)
+
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+        
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+         apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+    apply(case_tac boo, auto)
+     apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+     apply(drule_tac [1] ll3_consume_label_unch, auto)
+
+    apply(drule_tac[1] ll3_consumes.intros(3))
+    apply(drule_tac [1] x = "{}" in spec)
+    apply(auto)
+    done next
+   
+  case (4 l s l' s' l'') thus ?case
+    apply(clarify)
+    apply(simp)
+    apply(auto)
+
+    apply(case_tac l', auto)
+       apply(drule_tac[1] ll3_consumes_length, auto)
+
+    apply(case_tac l', auto)
+      apply(drule_tac[1] ll3_consumes_length, auto)
+
+    apply(case_tac l', auto)
+       apply(drule_tac[1] ll3_consumes_length, auto)
+    apply(auto)
+            apply(drule_tac[1] ll3_consumes_length, auto)
+           apply(drule_tac[1] ll3_consumes_length, auto)
+          apply(drule_tac[1] ll3_consumes_length, auto)
+            apply(rule_tac[1] x = "s'a \<union> s'aa" in exI)
+    apply(rule_tac[1] ll3_consumes.intros(4), auto)
+         apply(subgoal_tac[1] "(ls1, s \<union> s' - (s \<union> s'aa), ls2) \<in> ll3_consumes") apply(auto)
+         apply(subgoal_tac[1] "s \<union> s' - (s \<union> s'aa) = s' - s'aa", auto)
+
+         apply(drule_tac[1] x = "s' \<union> s'aa" in spec)
+               apply(subgoal_tac[1] "(ls1, s \<union> s' - (s' \<union> s'aa), ls2) \<in> ll3_consumes") apply(auto)
+        apply(subgoal_tac[1] "s \<union> s' - (s' \<union> s'aa) = s - s'aa", auto)
+
+    
+    apply(subgoal_tac [1] "(ls1, (s - s'aa) \<union> (s' - s'c), ls2a) \<in> ll3_consumes")
+        apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+
+       apply(subgoal_tac [1] "? sk . s - s'aa \<union> (s' - s'c) = ((s \<union> s') - sk)")
+        apply(clarsimp)
+       apply(rule_tac[1] set_diff_dist2) 
+
+      (* i think i'm stuck here *)
+
+lemma ll3_consumes_split :
+"(l1, s, l2) \<in> ll3_consumes \<Longrightarrow> 
 (! q1 h1 t1 q2 h2 t2 . l1 = (q1, h1) # t1 \<longrightarrow> l2 = (q2, h2) # t2 \<longrightarrow> 
   (q1 = q2 \<and> (h1 = h2 \<or> 
               (? n . h1 = LLab False n \<and> h2 = LLab True n) \<or> 
-              (? e ls1 ls2 . h1 = LSeq e ls1 \<and> h2 = LSeq e ls2 \<and> (ls1, ls2) \<in> ll3_consumes))
-\<and> (t1, t2) \<in> ll3_consumes))"
+              (? e ls1 ls2 . h1 = LSeq e ls1 \<and> h2 = LSeq e ls2 \<and> 
+               (? s' . (ls1, (s - s'), ls2) \<in> ll3_consumes))
+\<and> (? s' . (t1, (s - s'), t2) \<in> ll3_consumes))))"
 proof(induction rule:ll3_consumes.induct)
   case (1 l) thus ?case
     apply(auto simp add:ll3_consumes.intros) done next
-  case (2 p n l l' p')
+  case (2 p n l l')
   then show ?case
     apply(auto)
       apply(case_tac h1, auto)
@@ -941,67 +1296,152 @@ proof(induction rule:ll3_consumes.induct)
     apply(rename_tac [1] boo)
       apply(case_tac [1] boo, auto)
       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
-      apply(drule_tac [1] ll3_consume_label_unch, auto)
-    apply(subgoal_tac [1] "(x52, ab) \<in> ll3_consumes")
-      apply(drule_tac [2] ll3_consumes.intros, auto)
-
-    apply(case_tac h1, auto)
-        apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
-        apply(rule_tac [1] ll3_consumes.intros(2), auto)
-
-         apply(case_tac [1] "x22 = length p", auto)
-        apply(case_tac [1] "\<not> x21", auto)
-        apply(rule_tac [1] ll3_consumes.intros(1))
-
-       
-       apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
-    apply(drule_tac [1] ll3_consumes.intros, auto)
-
-      apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
-    apply(drule_tac [1] ll3_consumes.intros, auto)
-
-          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
-     apply(drule_tac [1] ll3_consumes.intros, auto)
-
-       apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
-    apply(rename_tac [1] boo)
-      apply(case_tac [1] boo, auto)
-     apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
-     apply(drule_tac [1] ll3_consumes.intros, auto)
-
-        apply(rule_tac [1] ll3_consumes.intros(1))
+     apply(drule_tac [1] ll3_consume_label_unch, auto)
+    apply(drule_tac [1] ll3_consume_label_unch, auto)
     done next
-
-  case (3 l l' l'') thus ?case
+  case (3 p n l l' ph pt) thus ?case
     apply(clarify)
-    apply(case_tac l', clarify)
-     apply(drule_tac [1] ll3_consumes_length)
-     apply(simp)
-    apply(case_tac h1, clarsimp)
-        apply(rule_tac[1] ll3_consumes.intros(3)) apply(simp)
-        apply(simp)
+       apply(case_tac h1, auto)
+                    apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+                    apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+                    apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+               apply(case_tac [1] "x22 = length p", auto)
+                  apply(case_tac [1] "\<not>x21", auto)
+                    apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+  
+               apply(case_tac [1] "x22 = length p", auto)
+                  apply(case_tac [1] "\<not>x21", auto)
+                    apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+               apply(case_tac [1] "x22 = length p", auto)
+                  apply(case_tac [1] "\<not>x21", auto)
+               apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+               apply(case_tac [1] "x22 = length p", auto)
+                  apply(case_tac [1] "\<not>x21", auto)
+              apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+             apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+              apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+           apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+              apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+              apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+              apply(case_tac "ll3_consume_label p (Suc n) t1", auto)
+
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+    apply(case_tac boo, auto)
+          apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+    apply(case_tac boo, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+
+         apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+    apply(case_tac boo, auto)
+      apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+      apply(drule_tac [1] ll3_consume_label_unch, auto)
+     apply(drule_tac [1] ll3_consumes.intros(3)) 
+    apply(drule_tac [1] x = "{}" in spec, auto)
+
+    apply(case_tac "ll3_consume_label (n # p) 0 x52", auto)
+       apply(rename_tac[1] boo)
+    apply(case_tac boo, auto)
+     apply(case_tac[1] "ll3_consume_label p (Suc n) t1", auto)
+      apply(drule_tac [1] ll3_consume_label_unch, auto)
+
+    apply(drule_tac [1] x = "{ph#pt}" in spec, auto)
+    apply(subgoal_tac [1] "(t2, {}, t2) \<in> ll3_consumes")
+     apply(rule_tac [2] ll3_consumes.intros)
+    apply(auto)
+    done next
+  case (4 l s l' s' l'') thus ?case
+    apply(clarify)
+    apply(simp)
+    apply(case_tac l', auto)
+    apply(drule_tac[1] ll3_consumes_length, auto)
+            apply(drule_tac[1] ll3_consumes_length, auto)
+           apply(drule_tac[1] ll3_consumes_length, auto)
+          apply(drule_tac[1] ll3_consumes_length, auto)
+         apply(drule_tac[1] x = "s \<union> s'aa" in spec)
+         apply(subgoal_tac[1] "(ls1, s \<union> s' - (s \<union> s'aa), ls2) \<in> ll3_consumes") apply(auto)
+         apply(subgoal_tac[1] "s \<union> s' - (s \<union> s'aa) = s' - s'aa", auto)
+
+         apply(drule_tac[1] x = "s' \<union> s'aa" in spec)
+               apply(subgoal_tac[1] "(ls1, s \<union> s' - (s' \<union> s'aa), ls2) \<in> ll3_consumes") apply(auto)
+        apply(subgoal_tac[1] "s \<union> s' - (s' \<union> s'aa) = s - s'aa", auto)
+
+    
+    apply(subgoal_tac [1] "(ls1, (s - s'aa) \<union> (s' - s'c), ls2a) \<in> ll3_consumes")
+        apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+
+       apply(subgoal_tac [1] "? sk . s - s'aa \<union> (s' - s'c) = ((s \<union> s') - sk)")
+        apply(clarsimp)
+       apply(rule_tac[1] set_diff_dist2) 
+
+      (* i think i'm stuck here *)
+      apply(subgoal_tac [1] "(t1, (s - s'aa) \<union> (s' - s'aa), ls2) \<in> ll3_consumes")
+         apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+
+       apply(subgoal_tac [1] "? z . s - s'aa \<union> (s' - s'aa) =  ")
+
+       apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+
+
+       apply(clarsimp)
+
+       apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+
+    apply(
+
+         apply(drule_tac x = "s' \<union> s'aa" in spec)
+
+       apply(subgoal_tac[1] "(\<exists> sl . (ls1, s \<union> s' - sl, ls2a) \<in> ll3_consumes)") apply(simp)
+       apply(drule_tac [1] "ll3_consumes.intros")
+         apply(auto)
+       apply(drule_tac [1] x = "s \<union> (s'aa \<union> s'c)" in spec)
+
+       apply(frule_tac[1]set_diff_fact[of s s'])
+    apply(simp)
        apply(clarify)
-       apply(case_tac x21, simp)
-        apply(clarify)
-    apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-       apply(case_tac h2, simp)
-    apply(case_tac x21a)
-           apply(auto)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-        apply(subgoal_tac [1] "(x52, ls2a) \<in> ll3_consumes") apply(simp)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
+    apply(rule_tac [1] set_diff_dist2)
 
-    apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-      apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
+     (* we need to figure out if s'aa and s'c have an intersection *)
+     (* dealing with the set theory here is annoying and may end up being unnecessary
+        hopefully this proof technique works. *)
+       apply(subgoal_tac[1] "(ls1, (s - s'aa) \<union> (s' - s'c), ls2a) \<in> ll3_consumes") 
+    (* this case should be true because we can "distribute" the subtraction"
+       actually i don't think so *)
+    apply(rule_tac [1] ll3_consumes.intros(4))
+        
+        apply(auto)
+    apply(drule_tac [1] ll3_consumes.intros(4))
 
-          apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-          apply(rule_tac [1] ll3_consumes.intros(3)) apply(simp) apply(simp)
-    done
-qed
+    apply(drule_tac [1] 
+    apply(drule_tac x = "s' \<union> h")
+
+
+    apply(subgoal_tac[1] "(ls1, s \<union> s' - (s \<union> {s'a}), ls2) \<in> ll3_consumes"
+, simp)    
+    apply(rule_tac [2] set_diff_fact, simp)
+    apply(drule_tac[1] set_diff_fact[of "{s'a}"])
+
+      
+  
+    apply(auto)
+  
+
+    apply(auto)
+    
+    
 
 
 (*
@@ -1087,10 +1527,12 @@ lemma ll3_consumes_char' :
 "
 *)
 lemma ll3_assign_label_qvalid' :
-"((q,t) \<in> ll_valid_q \<longrightarrow> (! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> q = q' \<and> (q',t') \<in> ll_valid_q))
+"((q,t) \<in> ll_valid_q \<longrightarrow> ((! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> q = q' \<and> (q',t') \<in> ll_valid_q) \<and>
+    ((! e l . t = LSeq e l \<longrightarrow> (!p n  s l' . (l,s,l') \<in> ll3_consumes \<longrightarrow>
+                     (! l'' . ll3_assign_label_list l' = Some l'' \<longrightarrow> (q,l'') \<in> ll_validl_q))))))
 \<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
     ((! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q ))
-     \<and> (!p n  ls' p'. (ls,ls') \<in> ll3_consumes \<longrightarrow>
+     \<and> (!p n  s ls' . (ls,s,ls') \<in> ll3_consumes \<longrightarrow>
                      (! ls'' . ll3_assign_label_list ls' = Some ls'' \<longrightarrow> ((x,x'),ls'') \<in> ll_validl_q)))"
   apply(induction rule:ll_valid_q_ll_validl_q.induct, auto simp add:ll_valid_q_ll_validl_q.intros)
     apply(case_tac e, auto simp add:ll_valid_q_ll_validl_q.intros)
@@ -1105,14 +1547,177 @@ lemma ll3_assign_label_qvalid' :
 
   apply(case_tac "ll3_consume_label [] 0 l", auto)
      apply(case_tac "ll3_assign_label_list aa", auto)
-  apply(rule_tac [1] ll_valid_q_ll_validl_q.intros)
-     apply(subgoal_tac [1] "(l,aa) \<in> ll3_consumes") apply(blast)
+     apply(rule_tac [1] ll_valid_q_ll_validl_q.intros)
+     apply(case_tac ba, auto)
+      apply(drule_tac "ll3_consume_label_unch", auto)
+      
+     apply(subgoal_tac [1] "(l,{ac#list}, aa) \<in> ll3_consumes")
+      apply(blast)
+
      apply(rule_tac [1] ll3_consumes.intros, auto)
 
-     apply(case_tac [2] "ll3_assign_label ((n, n'), h)", auto)
-    apply(case_tac [2] "ll3_assign_label_list t", auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(drule_tac [1] ll3_consumes_length, auto simp add:ll_valid_q_ll_validl_q.intros)
 
-  apply(case_tac [2] ls', auto simp add:ll_valid_q_ll_validl_q.intros)
+   apply(case_tac [1] "ll3_assign_label ((n, n'), h)", auto)
+ apply(case_tac [1] "ll3_assign_label_list t", auto)
+   apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+  apply(case_tac[1] ls', auto)
+   apply(drule_tac[1] ll3_consumes_length, auto)
+  apply(case_tac[1] "ll3_assign_label ((a, b), ba)", auto)
+  apply(case_tac [1] "ll3_assign_label_list list", auto)
+
+  apply(frule_tac "ll3_assign_label_unch1", auto)
+
+  (* this will be a lemma, consumes_split *)
+  apply(subgoal_tac "aa = n \<and> bb = n' \<and>
+      (? s' .( t,s',list) \<in> ll3_consumes) \<and>
+      (! e1 l1 e2 l2 . h = LSeq e1 l1 \<longrightarrow> ba = LSeq e2 l2 \<longrightarrow> (? s' . (l1, s', l2) \<in> ll3_consumes))"
+, auto)
+      apply(rule_tac [1] ll_valid_q_ll_validl_q.intros, auto)
+      apply(case_tac h, auto)
+       
+
+      apply(drule_tac [1] ll3_consumes.cases, auto)
+        apply(drule_tac [1] ll3_consume_label_unch, auto)
+    
+
+  apply(case_tac [1] "ba", auto)
+  apply(drule_tac [1] ll3_consumes.cases, auto)
+
+  apply(blast)
+
+(* very likely we need an inner induction here *)
+  apply(drule_tac ll3_consumes.cases, auto)
+     apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+    apply(drule_tac [1] ll3_consume_label_unch, auto)
+         apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+
+  apply(case_tac[1] h, auto)
+       apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+        apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+       apply(subgoal_tac [1] "(t,{ph#pt},list) \<in> ll3_consumes") apply(blast)
+       apply(rule_tac [1] ll3_consumes.intros, auto)
+
+      apply(case_tac [1] "x22 = length p", auto)
+       apply(case_tac [1] "\<not>x21", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+       apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+     apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+  apply(subgoal_tac [1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+       apply(rule_tac [1] ll3_consumes.intros, auto)
+
+  apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+      apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+  apply(subgoal_tac [1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+     apply(rule_tac [1] ll3_consumes.intros, auto)
+
+  apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+      apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+  apply(subgoal_tac [1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+    apply(rule_tac [1] ll3_consumes.intros, auto)
+
+   apply(case_tac [1] "ll3_consume_label (na # p) 0 x52", auto)
+   apply(rename_tac [1] boo)
+   apply(case_tac [1] boo, auto)
+  apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+    apply(case_tac [1] "ll3_consume_label [] 0 ac", auto)
+   apply(rename_tac [1] boo2)
+    apply(case_tac [1] "ll3_assign_label_list ad", auto)
+    apply(drule_tac [1] ll3_consume_label_unch, auto)
+    apply(drule_tac [1] ll_valid_q.cases, auto)
+    apply(drule_tac [1] ll_valid_q.cases, auto)
+
+    apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+     apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+  apply(subgoal_tac [1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+    apply(rule_tac [1] ll3_consumes.intros, auto)
+
+    apply(case_tac [1] "ll3_consume_label [] 0 ac", auto)
+   apply(rename_tac [1] boo3)
+   apply(case_tac [1] "ll3_assign_label_list ad", auto)
+    apply(drule_tac [1] ll_valid_q.cases, auto)
+  
+    apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+    apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+    apply(case_tac[1] boo3, auto)
+    apply(drule_tac [1] ll3_consume_label_unch, auto)
+  apply(subgoal_tac [1] "(l, {ph#pt}, ad) \<in> ll3_consumes") apply(blast)
+    apply(rule_tac [1] ll3_consumes.intros, auto)
+
+  apply(frule_tac [2] ll3_assign_label_unch1, auto)
+  apply(rule_tac [2] ll_valid_q_ll_validl_q.intros)
+
+   apply(subgoal_tac [1] "(l, {ph#pt} \<union> {a#lista}, ad) \<in> ll3_consumes") apply(blast)
+  
+    apply(rule_tac [1] ll3_consumes.intros(4), auto)
+
+  apply(subgoal_tac [1]
+
+  apply(auto)
+
+  apply(case_tac [1] "ll3_assign_label ((n, n'), h)", auto)
+     apply(case_tac [1] "ll3_assign_label_list t", auto)
+     apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac [1] "ll3_assign_label ((a, b), ba)", auto)
+    apply(case_tac [1] "ll3_assign_label_list list", auto)
+  apply(drule_tac [1] "ll3_consume_label_unch", auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac [1] "ll3_assign_label ((a, b), ba)", auto)
+    apply(case_tac [1] "ll3_assign_label_list list", auto)
+
+   apply(case_tac [1] h, auto)
+  apply(case_tac [1] "ll3_consume_label p (Suc na) t", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+       apply(subgoal_tac[1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+       apply(rule_tac [1] ll3_consumes.intros(3), auto)
+
+      apply(case_tac [1] "x22 = length p", auto)
+       apply(case_tac [1] "\<not>x21", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+       apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+         apply(subgoal_tac[1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+       apply(rule_tac [1] ll3_consumes.intros(3), auto)
+
+  apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+       apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+         apply(subgoal_tac[1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+     apply(rule_tac [1] ll3_consumes.intros(3), auto)
+
+  apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+    apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+  apply(drule_tac [1] ll_valid_q.cases, auto)
+         apply(subgoal_tac[1] "(t, {ph#pt}, list) \<in> ll3_consumes") apply(blast)
+     apply(rule_tac [1] ll3_consumes.intros(3), auto)
+
+   apply(case_tac [1] "ll3_consume_label (na # p) 0 x52", auto)
+   apply(rename_tac [1] boo)
+   apply(case_tac boo, auto)
+    apply(case_tac "ll3_consume_label p (Suc na) t", auto)
+    apply(case_tac "ll3_consume_label [] 0 ac", auto)
+  apply(rename_tac [1] boo)
+    apply(case_tac [1] "ll3_assign_label_list ad", auto)
+    apply(drule_tac [1] ll_valid_q.cases, auto)
+  apply(frule_tac [1] ll3_consume_label_unch, auto)
+    apply(rule_tac[1] ll_valid_q_ll_validl_q.intros, auto)
+    apply(drule_tac [1] ll_valid_q.cases, auto)
+  
 
   apply(case_tac [3] "ll3_assign_label ((a, b), ba)", auto)
     apply(case_tac [3] "ll3_assign_label_list list", auto)
@@ -2054,7 +2659,7 @@ definition bytes_of_nat :: "nat \<Rightarrow> 8 word list" where
 
 fun codegen' :: "ll4 \<Rightarrow> inst list" where
     "codegen' (_, (L _ i)) = [i]"
-  | "codegen' (_, (LLab _ _)) = []"
+  | "codegen' (_, (LLab _ _)) = [Pc JUMPDEST]"
   | "codegen' (_, (LJmp a _ s)) =
      (Evm.inst.Stack (PUSH_N (output_address a))) #[Pc JUMP]"
   | "codegen' (_, (LJmpI a _ _)) =
