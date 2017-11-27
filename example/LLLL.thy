@@ -578,7 +578,7 @@ inductive cp_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" wher
 inductive cp_rev_less' :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
 "\<And> n t . cp_rev_less' [] (n#t)"
 | "\<And> n n' t . n < n' \<Longrightarrow> cp_rev_less' (n#t) (n'#t)"
-| "\<And> t t' n n' . cp_rev_less t t' \<Longrightarrow> cp_rev_less' (n#t) (n'#t')"
+| "\<And> t t' n n' . cp_rev_less' t t' \<Longrightarrow> cp_rev_less' (n#t) (n'#t')"
 
 (* we need to capture incrementing a childpath *)
 fun cp_next :: "childpath \<Rightarrow> childpath" where
@@ -589,17 +589,20 @@ fun cp_next :: "childpath \<Rightarrow> childpath" where
 
 (* this should be "plus anything"? *)
 lemma cp_rev_less'_suc1 :
-"cp_rev_less' (Suc n # t) p \<Longrightarrow> cp_rev_less' (n#t) p"
-  apply(induction rule:cp_rev_less'.induct)
+"cp_rev_less' k p \<Longrightarrow>
+  (! n t . k = Suc n # t \<longrightarrow>
+   cp_rev_less' (n#t) p)"
+  apply(induction rule: cp_rev_less'.induct)
     apply(auto simp add:cp_rev_less'.intros)
   done
 
 (* i should not do it this way *)
+(*
 inductive cp_rev_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
 "\<And> n t . cp_rev_less [] (n#t)"
 | "\<And> n n' t t' . n < n' \<Longrightarrow> cp_rev_less (t@[n]) (t'@[n'])"
 | "\<And> n t t' . cp_rev_less t t' \<Longrightarrow> cp_rev_less (t@[n]) (t'@[n])"
-
+*)
 
 type_synonym consume_label_result = "(ll3 list * childpath) option"
 
@@ -832,6 +835,31 @@ inductive_set ll3_consumes :: "(ll3 list * childpath set * ll3 list) set" where
 | "\<And> l s l' s' l'' . (l,s,l') \<in> ll3_consumes \<Longrightarrow> (l',s', l'') \<in> ll3_consumes \<Longrightarrow> (s \<inter> s' = {})  
      \<Longrightarrow> (l,s \<union> s',l'') \<in> ll3_consumes"
 
+lemma ll3_consume_label_unch' :
+"(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
+\<and> (! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow> ls = ls')"
+  
+  apply(induction rule:my_ll_induct)
+        apply(auto)
+  apply(case_tac ba, auto)
+      apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+     apply(case_tac [1] "x22 = length p", auto)
+      apply(case_tac [1] "\<not>x21", auto)
+     apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+    apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+   apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
+  apply(case_tac "ll3_consume_label (n#p) 0 x52", auto)
+  apply(case_tac ba, auto)
+  apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+  done
+
+lemma ll3_consume_label_unch :
+"\<And> p n ls ls' . ll3_consume_label p n ls = Some (ls', []) \<Longrightarrow> ls = ls'"
+  apply(insert ll3_consume_label_unch')
+  apply(blast)
+  done
+
+
 (*
 New idea: either p' is nil, or
 the path we return has p plus a prefix
@@ -840,8 +868,8 @@ to [n] (that is, p is not less than [n]))
 *)
 lemma ll3_consume_label_char [rule_format] :
 "
-  (! e l . (t :: ll3) = (q, LSeq e l) \<longrightarrow> 
-  (! p n p' . ll3_consume_label p n l = Some (l',p') \<longrightarrow> 
+  (! e l q . (t :: ll3) = (q, LSeq e l) \<longrightarrow> 
+  (! l' p n p' . ll3_consume_label p n l = Some (l',p') \<longrightarrow> 
   (p' = [] \<or>
    p' = n#p \<or>
    (? pp . p' = pp@p \<and>
@@ -874,6 +902,7 @@ proof(induction rule:my_ll_induct)
           apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
           apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
 
+
      apply(case_tac [1] "x22 = length p", auto)
       apply(case_tac [1] "\<not>x21", auto)
         apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
@@ -881,30 +910,58 @@ proof(induction rule:my_ll_induct)
         apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
     apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-    apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
 
        apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
           apply(drule_tac[1] x = p in spec)
        apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
     apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
 
       apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
           apply(drule_tac[1] x = p in spec)
       apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
     apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+     apply(case_tac [1] pp, auto)
+    apply(drule_tac [1] cp_rev_less'.cases, auto)
+       apply(subgoal_tac "cp_rev_less' [n] (ab#list)")
+                apply(drule_tac [2] cp_rev_less'_suc1) apply(auto)
+
+       apply(subgoal_tac "cp_rev_less' [n] (ab#list)")
+      apply(drule_tac [2] cp_rev_less'_suc1) apply(auto)
 
   apply(case_tac "ll3_consume_label (n#p) 0 x52", auto)
   apply(case_tac ba, auto)
-       apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+      apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+    apply(drule_tac [1] ll3_consume_label_unch, auto)
           apply(drule_tac[1] x = p in spec)
        apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
          apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-       apply(drule_tac [1] cp_rev_less'_suc1) apply(auto) 
+        apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+        apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+
+    apply(thin_tac [1] " \<forall>p n l' p'.
+          ll3_consume_label p n l = Some (l', p') \<longrightarrow>
+          p' = [] \<or>
+          p' = n # p \<or>
+          (\<exists>pp. p' = pp @ p \<and> cp_rev_less' [n] pp)")
+
+     apply(drule_tac [1] x = aa in spec)
+    apply(rotate_tac [1] 2)
+    apply(drule_tac [1] x = "n#p" in spec) 
+     apply(drule_tac [1] x = 0 in spec) apply(auto)
+    apply(subgoal_tac[1] "cp_rev_less' [n] [0,n]") apply(auto simp add:cp_rev_less'.intros)
+     apply(case_tac [1] pp, auto) 
+    (* we can solve this one but need a lemma governing "[n] < ab@[n]"
+     apply(subgoal_tac [1] "cp_rev_less' [n] (ac # lista @ [n])")
+      apply(drule_tac [2] cp_rev_less'.intros(3)) apply(auto)
+    apply(auto simp add: cp_rev_less'.intros)
+     apply(case_tac [1] pp) apply(auto)
+  
+    apply(drule_tac [1] x = "[ab]" in spec) apply(auto)
+
     (* i am unsure if this is provable. *)
     apply(case_tac [1] x52, auto)
       apply(case_tac[1] bb, auto)
@@ -925,29 +982,6 @@ proof(induction rule:my_ll_induct)
    THEN we have returned the label with "smallest" path
 *)
 
-lemma ll3_consume_label_unch' :
-"(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
-\<and> (! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow> ls = ls')"
-  
-  apply(induction rule:my_ll_induct)
-        apply(auto)
-  apply(case_tac ba, auto)
-      apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
-     apply(case_tac [1] "x22 = length p", auto)
-      apply(case_tac [1] "\<not>x21", auto)
-     apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
-    apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
-   apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
-  apply(case_tac "ll3_consume_label (n#p) 0 x52", auto)
-  apply(case_tac ba, auto)
-  apply(case_tac "ll3_consume_label p (Suc n) l", auto)
-  done
-
-lemma ll3_consume_label_unch :
-"\<And> p n ls ls' . ll3_consume_label p n ls = Some (ls', []) \<Longrightarrow> ls = ls'"
-  apply(insert ll3_consume_label_unch')
-  apply(blast)
-  done
 
 function (sequential) ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_assign_label_list :: "ll3 list \<Rightarrow> ll3 list option" where
