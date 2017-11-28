@@ -11,7 +11,7 @@ definition hexread1_dom :: "char \<Rightarrow> bool" where
 "hexread1_dom c = (c = CHR ''0'' \<or> c = CHR ''1'' \<or> c = CHR ''2'' \<or>
                    c = CHR ''3'' \<or> c = CHR ''4'' \<or> c = CHR ''5'' \<or>
                    c = CHR ''6'' \<or> c = CHR ''7'' \<or> c = CHR ''8'' \<or>
-                   c = CHR ''9'' \<or> c = CHR ''A'' \<or> c = CHR 'pr'B'' \<or>
+                   c = CHR ''9'' \<or> c = CHR ''A'' \<or> c = CHR ''B'' \<or>
                    c = CHR ''D'' \<or> c = CHR ''E'' \<or> c = CHR ''F'')"
 
 definition hexread1 :: "char \<Rightarrow> nat" where
@@ -570,15 +570,24 @@ datatype consume_label_result =
   | CFail
 *)
 
+(* this one is not the one we are using for consumes *)
 inductive cp_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
 "\<And> n t . cp_less [] (n#t)"
 | "\<And> n n' t t' . n < n' \<Longrightarrow> cp_less (n#t) (n'#t')"
 | "\<And> n t t' . cp_less t t' \<Longrightarrow> cp_less (n#t) (n#t')"
 
+(* i'm worried this is not correctly capturing preorder traversal
+   it seems like it might be DFS instead...*)
 inductive cp_rev_less' :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
 "\<And> n t . cp_rev_less' [] (n#t)"
 | "\<And> n n' t . n < n' \<Longrightarrow> cp_rev_less' (n#t) (n'#t)"
 | "\<And> t t' n n' . cp_rev_less' t t' \<Longrightarrow> cp_rev_less' (n#t) (n'#t')"
+
+(* i think this is what we want *)
+inductive cp_rev_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
+"\<And> (n::nat) (t::childpath) . cp_rev_less [] (n#t)"
+| "\<And> n n' t t' . n < n' \<Longrightarrow> cp_rev_less (t@[n]) (t'@[n'])"
+| "\<And> (t :: childpath) (t' :: childpath) l. cp_rev_less t t' \<Longrightarrow> cp_rev_less (t@l) (t'@l)"
 
 (* we need to capture incrementing a childpath *)
 fun cp_next :: "childpath \<Rightarrow> childpath" where
@@ -596,6 +605,166 @@ lemma cp_rev_less'_suc1 :
     apply(auto simp add:cp_rev_less'.intros)
   done
 
+lemma cp_rev_less_sing' :
+"n < n' \<Longrightarrow> cp_rev_less ([]@[n]) ([]@[n'])"
+  apply(rule_tac cp_rev_less.intros) apply(auto)
+  done
+
+lemma cp_rev_less_sing :
+"n < n' \<Longrightarrow> cp_rev_less [n] [n']"
+  apply(insert cp_rev_less_sing') apply(auto)
+  done
+
+lemma cp_rev_less_suc1 :
+"cp_rev_less k p \<Longrightarrow>
+  (! n t . k = Suc n # t \<longrightarrow>
+   cp_rev_less (n#t) p)"
+  apply(induction rule: cp_rev_less.induct)
+    apply(auto simp add:cp_rev_less.intros)
+   apply(case_tac t, auto simp add:cp_rev_less.intros)
+    apply(subgoal_tac "cp_rev_less ([]@[na]) (t'@[n'])")
+     apply(rule_tac [2] cp_rev_less.intros) apply(auto)
+
+   apply(subgoal_tac "cp_rev_less ((na#list)@[n]) (t'@[n'])")
+    apply(rule_tac [2] cp_rev_less.intros) apply(auto)
+  apply(case_tac [1] t, auto)
+   apply(subgoal_tac "cp_rev_less ([n]@ta) ((t' @ [Suc n])@ta)")
+    apply(rule_tac [2] cp_rev_less.intros) apply(auto)
+   apply(subgoal_tac "cp_rev_less ([]@[n]) ((t' @ [Suc n]))")
+    apply(rule_tac [2] cp_rev_less.intros) apply(auto)
+
+  apply(subgoal_tac "cp_rev_less ((n#list)@l) (t'@l)")
+   apply(rule_tac [2] cp_rev_less.intros) apply(auto)
+  done
+
+lemma cp_rev_less_least :
+"cp_rev_less p k \<Longrightarrow> k \<noteq> []"
+  apply(induction rule:cp_rev_less.induct)
+    apply(auto)
+  done
+
+lemma cp_rev_less_prefix1 :
+"\<And> l h pre .cp_rev_less l ((h#pre)@l)"
+  apply(subgoal_tac "cp_rev_less ([]@l) ((h#pre)@l)")
+   apply(rule_tac [2] cp_rev_less.intros(3))
+   apply(rule_tac [2] cp_rev_less.intros(1))
+  apply(auto)
+  done
+
+lemma cp_rev_less_app :
+"cp_rev_less k p \<Longrightarrow>
+ (! kpre kpost . k = kpre @ kpost \<longrightarrow>
+  (! ppre ppost . p = ppre @ ppost \<longrightarrow>
+   cp_rev_less kpost ppost \<or>
+   (kpost = ppost \<and> cp_rev_less kpre ppre)))"
+  apply(induction rule:cp_rev_less.induct)
+    apply(auto simp add:cp_rev_less.intros)
+       apply(case_tac [1] ppost, auto)
+       apply(subgoal_tac "cp_rev_less [] (a#list)")
+        apply(rule_tac [2]cp_rev_less.intros(1)) apply(auto)
+
+       apply(case_tac [1] ppost, auto)
+       apply(rule_tac [1]cp_rev_less.intros(1))
+             apply(subgoal_tac "cp_rev_less [] (a#list)")
+       apply(rule_tac [2]cp_rev_less.intros(1)) apply(auto)
+     apply(case_tac kpost, auto)
+  apply(case_tac ppost, auto)
+             apply(subgoal_tac "cp_rev_less [] (a#list)")
+       apply(rule_tac [2]cp_rev_less.intros(1)) apply(auto)
+
+(* we need a lemma here *)
+  apply(subgoal_tac[1] "cp_rev_less (a#list) ppost") apply(clarify)
+    apply(case_tac ppost, auto)
+
+      apply(auto)
+     apply
+  apply(drule_tac cp_rev_less_least) apply(auto)
+
+lemma cp_rev_less_sucs :
+"cp_rev_less k p \<Longrightarrow>
+  (! kp m  . k = (kp @ [m]) \<longrightarrow>
+    (! pp n . p = pp @ [n] \<longrightarrow>
+      (cp_rev_less (kp@[Suc m]) (pp@[Suc n]))))"
+  apply(induction rule:cp_rev_less.induct)
+    apply(auto simp add:cp_rev_less.intros)
+  apply(case_tac t, auto) 
+   apply(subgoal_tac [1] "cp_rev_less (kp @ [Suc n]) ((t' @ kp) @[Suc n])")
+    apply(rule_tac [2] cp_rev_less.intros(3))
+    apply(subgoal_tac [2] "cp_rev_less ([]@kp) (t'@kp)")
+     apply(rule_tac [3] cp_rev_less.intros(3)) apply(auto)
+
+  apply(case_tac t', auto)
+   apply(drule_tac cp_rev_less_least) apply(auto)
+
+  apply(case_tac l, auto)
+
+  apply(subgoal_tac "? kp' m' . a # list = kp' @ [m']")
+   apply(clarsimp)
+   apply(subgoal_tac[1] "? pp' n' . aa # lista = pp' @ [n']")
+    apply(clarsimp) apply(case_tac[2] lista, auto)
+  apply(rotate_tac [1] 1)
+  apply(drule_tac[1] cp_rev_less.cases) apply(auto)
+  apply(rule_tac [2] cp_rev_less_prefix1)
+   apply(rule_tac [2] cp_rev_less.intros(1))
+  apply(auto)
+
+  apply(rule_tac [2] cp_rev_less_prefix1)
+  apply(
+  apply(case_tac list, auto) 
+  
+
+(*
+lemma cp_rev_less_less :
+"cp_rev_less k p \<Longrightarrow>
+  (! pre suf . k = pre @ suf \<longrightarrow>
+   (! suf' . cp_rev_less suf' suf \<longrightarrow> cp_rev_less (pre@suf') p))"
+
+  apply(induction rule: cp_rev_less.induct)
+    apply(auto simp add:cp_rev_less.intros)
+    apply(drule_tac cp_rev_less.cases) apply(auto)
+  apply(drule_tac cp_rev_less_least) apply(auto)
+    apply(case_tac suf', auto simp add:cp_rev_less'.intros)
+
+    apply(drule_tac cp_rev_less'.cases) apply(auto)
+   apply(case_tac pre, auto simp add:cp_rev_less'.intros)
+    apply(case_tac suf', auto simp add:cp_rev_less'.intros)
+  apply(drule_tac [1] cp_rev_less'.cases, auto simp add:cp_rev_less'.intros)
+   apply(case_tac list, auto simp add:cp_rev_less'.intros)
+   apply(rule_tac [1] cp_rev_less'.intros)
+   apply(rule_tac [1] cp_rev_less'.intros)
+   
+   apply(rule_tac [1] cp_rev_less'.intros(3))
+    
+  done
+*)
+lemma cp_rev_less_n :
+"cp_rev_less [n] (h#t@[n])"
+  apply(induction t)
+   apply(auto simp add:cp_rev_less.intros)
+  apply(subgoal_tac "cp_rev_less ([]@[n]) ([h]@[n])")
+    apply(rule_tac [2] cp_rev_less.intros(3))
+    apply(auto  simp add:cp_rev_less.intros)
+  apply(subgoal_tac "cp_rev_less ([]@[n]) ((h#a#t)@[n])")
+      apply(rule_tac [2] cp_rev_less.intros(3))
+    apply(auto  simp add:cp_rev_less.intros)
+  done
+
+(*
+ cp_rev_less' (pp @ [k - Suc n])
+        (pp2 @ [k2 - Suc n2]) \<Longrightarrow>
+       cp_rev_less' (pp @ [k - n])
+        (pp2 @ [k2 - n2])
+*)
+(*
+lemma cp_rev_less_sub :
+"cp_rev_less p1 p2 \<Longrightarrow>
+ (! pp1 a1 . p1 = pp1 @ [a1] \<longrightarrow> 
+ (! pp2 a2 . p2 = pp2 @ [a2] \<longrightarrow>
+ (! a1' a2' . a1' < a1 \<longrightarrow> a2' < a2 \<longrightarrow> cp_rev_less (pp1 @ [a1']) (pp2 @ [a2']))))"
+  apply(induction rule: cp_rev_less.induct) apply(auto)
+  apply(rule_tac [1] cp_rev_less.intros) apply(auto)
+  apply(auto simp add:cp_rev_less'.intros)
+*)
 (* i should not do it this way *)
 (*
 inductive cp_rev_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
@@ -828,12 +997,22 @@ lemma ll3_consume_label_hdq :
 (* crucially we need to properly track where in the list the change happened as a childpath *)
 (* this means we need to track only the suffix.
 *)
+(*
 inductive_set ll3_consumes :: "(ll3 list * childpath set * ll3 list) set" where
 "\<And> l . (l,{},l) \<in> ll3_consumes"
 | "\<And> p n l l' . ll3_consume_label p n l = Some (l', []) \<Longrightarrow> (l,{},l') \<in> ll3_consumes"
 | "\<And> p n l l' ph pt . ll3_consume_label p n l = Some (l', ph#pt) \<Longrightarrow> (l,{(ph#pt)}, l') \<in> ll3_consumes"
 | "\<And> l s l' s' l'' . (l,s,l') \<in> ll3_consumes \<Longrightarrow> (l',s', l'') \<in> ll3_consumes \<Longrightarrow> (s \<inter> s' = {})  
      \<Longrightarrow> (l,s \<union> s',l'') \<in> ll3_consumes"
+*)
+(* we need to fix this so it appropriately adjusts for values of n and path *)
+inductive_set ll3_consumes :: "(ll3 list * childpath set * ll3 list) set" where
+"\<And> l . (l,{},l) \<in> ll3_consumes"
+| "\<And> p n l l' . ll3_consume_label p n l = Some (l', []) \<Longrightarrow> (l,{},l') \<in> ll3_consumes"
+| "\<And> p n l l' k pp . ll3_consume_label p n l = Some (l', pp@(k#p)) \<Longrightarrow> (l,{pp@[k - n]}, l') \<in> ll3_consumes"
+| "\<And> l s l' s' l'' . (l,s,l') \<in> ll3_consumes \<Longrightarrow> (l',s', l'') \<in> ll3_consumes \<Longrightarrow> (s \<inter> s' = {})  
+     \<Longrightarrow> (l,s \<union> s',l'') \<in> ll3_consumes"
+
 
 lemma ll3_consume_label_unch' :
 "(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
@@ -859,27 +1038,26 @@ lemma ll3_consume_label_unch :
   apply(blast)
   done
 
-
 (*
 New idea: either p' is nil, or
 the path we return has p plus a prefix
 this prefix will be greater than or equal
 to [n] (that is, p is not less than [n]))
 *)
-lemma ll3_consume_label_char [rule_format] :
+lemma ll3_consume_label_char' [rule_format] :
 "
   (! e l q . (t :: ll3) = (q, LSeq e l) \<longrightarrow> 
   (! l' p n p' . ll3_consume_label p n l = Some (l',p') \<longrightarrow> 
   (p' = [] \<or>
    p' = n#p \<or>
    (? pp . p' = pp@p \<and>
-    cp_rev_less' [n] pp))))
+    cp_rev_less [n] pp))))
 \<and>
   (! p n l' p' . ll3_consume_label p n (l :: ll3 list) = Some (l', p') \<longrightarrow>
   (p' = [] \<or>
    p' = n#p \<or>
    (? pp . p' = pp@p \<and>
-    cp_rev_less' [n] pp)))
+    cp_rev_less [n] pp)))
 "
 
 proof(induction rule:my_ll_induct)
@@ -898,9 +1076,11 @@ proof(induction rule:my_ll_induct)
           apply(drule_tac[1] x = p in spec)
           apply(drule_tac[1] x = "Suc n" in spec)
          apply(auto)
-    apply(subgoal_tac "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
-          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+          apply(subgoal_tac "cp_rev_less [n] [Suc n]") 
+    apply(rule_tac[2] cp_rev_less_sing) apply(auto)
+           
+          apply(drule_tac [1] cp_rev_less_suc1) apply(auto)
+          apply(drule_tac [1] cp_rev_less_suc1) apply(auto)
 
 
      apply(case_tac [1] "x22 = length p", auto)
@@ -908,80 +1088,183 @@ proof(induction rule:my_ll_induct)
         apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
           apply(drule_tac[1] x = p in spec)
         apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
-    apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+         apply(subgoal_tac[1] "cp_rev_less [n] [Suc n]")
+             apply(rule_tac[2] cp_rev_less_sing) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+         apply(drule_tac cp_rev_less_suc1) apply(auto)
+apply(drule_tac cp_rev_less_suc1) apply(auto)
+          apply(drule_tac [1] cp_rev_less_suc1) apply(auto)
 
        apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
           apply(drule_tac[1] x = p in spec)
        apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
-    apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-          apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+        apply(subgoal_tac[1] "cp_rev_less [n] [Suc n]") 
+             apply(rule_tac[2] cp_rev_less_sing) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+        apply(drule_tac[2] cp_rev_less_suc1) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+         apply(drule_tac[2] cp_rev_less_suc1) apply(auto)
 
-      apply(case_tac [1] "ll3_consume_label p (Suc n) l", auto)
-          apply(drule_tac[1] x = p in spec)
-      apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
-    apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-     apply(case_tac [1] pp, auto)
-    apply(drule_tac [1] cp_rev_less'.cases, auto)
-       apply(subgoal_tac "cp_rev_less' [n] (ab#list)")
-                apply(drule_tac [2] cp_rev_less'_suc1) apply(auto)
 
-       apply(subgoal_tac "cp_rev_less' [n] (ab#list)")
-      apply(drule_tac [2] cp_rev_less'_suc1) apply(auto)
-
-  apply(case_tac "ll3_consume_label (n#p) 0 x52", auto)
-  apply(case_tac ba, auto)
       apply(case_tac "ll3_consume_label p (Suc n) l", auto)
-    apply(drule_tac [1] ll3_consume_label_unch, auto)
           apply(drule_tac[1] x = p in spec)
        apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
-         apply(subgoal_tac[1] "cp_rev_less' [n] [Suc n]") apply(auto simp add:cp_rev_less'.intros)
-        apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-        apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
+       apply(subgoal_tac[1] "cp_rev_less [n] [Suc n]") 
+             apply(rule_tac[2] cp_rev_less_sing) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+       apply(drule_tac[2] cp_rev_less_suc1) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+        apply(drule_tac[2] cp_rev_less_suc1) apply(auto)
 
-    apply(thin_tac [1] " \<forall>p n l' p'.
-          ll3_consume_label p n l = Some (l', p') \<longrightarrow>
+    apply(case_tac "ll3_consume_label (n # p) 0
+              x52") apply(auto)
+    apply(case_tac ba, auto)
+      apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+    apply(drule_tac ll3_consume_label_unch, auto)
+    apply(thin_tac [1] " \<forall>l' p n p'.
+          ll3_consume_label p n aa =
+          Some (l', p') \<longrightarrow>
           p' = [] \<or>
           p' = n # p \<or>
-          (\<exists>pp. p' = pp @ p \<and> cp_rev_less' [n] pp)")
+          (\<exists>pp. p' = pp @ p \<and>
+                cp_rev_less [n] pp)")
 
-     apply(drule_tac [1] x = aa in spec)
+      apply(drule_tac [1] x = p in spec)
+      apply(drule_tac [1] x = "Suc n" in spec) apply(auto)
+       apply(subgoal_tac[1] "cp_rev_less [n] [Suc n]") 
+         apply(rule_tac[2] cp_rev_less_sing) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+       apply(drule_tac[2] cp_rev_less_suc1) apply(auto)
+        apply(subgoal_tac "cp_rev_less [n] pp") 
+       apply(drule_tac[2] cp_rev_less_suc1) apply(auto)
+
+    apply(thin_tac [1] "\<forall>p n l' p'.
+          ll3_consume_label p n l =
+          Some (l', p') \<longrightarrow>
+          p' = [] \<or>
+          p' = n # p \<or>
+          (\<exists>pp. p' = pp @ p \<and>
+                cp_rev_less [n] pp)")
+
+     apply(drule_tac [1] x = "aa" in spec) 
     apply(rotate_tac [1] 2)
-    apply(drule_tac [1] x = "n#p" in spec) 
+     apply(drule_tac [1] x = "n#p" in spec) 
      apply(drule_tac [1] x = 0 in spec) apply(auto)
-    apply(subgoal_tac[1] "cp_rev_less' [n] [0,n]") apply(auto simp add:cp_rev_less'.intros)
-     apply(case_tac [1] pp, auto) 
-    (* we can solve this one but need a lemma governing "[n] < ab@[n]"
-     apply(subgoal_tac [1] "cp_rev_less' [n] (ac # lista @ [n])")
-      apply(drule_tac [2] cp_rev_less'.intros(3)) apply(auto)
-    apply(auto simp add: cp_rev_less'.intros)
-     apply(case_tac [1] pp) apply(auto)
-  
-    apply(drule_tac [1] x = "[ab]" in spec) apply(auto)
+      apply(subgoal_tac[1] "cp_rev_less ([]@[n]) ([0]@[n])") 
+       apply(rule_tac [2] cp_rev_less.intros(3)) apply(rule_tac [2] cp_rev_less.intros(1))
+      apply(auto)
+     apply(case_tac pp) apply(auto)
+     apply(subgoal_tac [1] "cp_rev_less ([]@[n]) ((ac#lista)@[n])")
+       apply(rule_tac [2] cp_rev_less.intros(3)) apply(rule_tac [2] cp_rev_less.intros(1))
+     apply(auto)
 
-    (* i am unsure if this is provable. *)
-    apply(case_tac [1] x52, auto)
-      apply(case_tac[1] bb, auto)
-    apply(case_tac [1] "ll3_consume_label (n # p)
-              (Suc 0) lista", auto)
-    apply(case_tac [1] list, auto)  
-
-    apply(case_tac [1]
+  apply(thin_tac [1] "\<forall>p n l' p'.
+          ll3_consume_label p n l =
+          Some (l', p') \<longrightarrow>
+          p' = [] \<or>
+          p' = n # p \<or>
+          (\<exists>pp. p' = pp @ p \<and>
+                cp_rev_less [n] pp)")
+     apply(drule_tac [1] x = "aa" in spec) 
     apply(rotate_tac [1] 2)
-                apply(drule_tac[1] x = "[]" in spec)
-       apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
-         apply(drule_tac [1] cp_rev_less'_suc1) apply(auto)
-    sorry
+     apply(drule_tac [1] x = "n#p" in spec) 
+     apply(drule_tac [1] x = 0 in spec) apply(auto)
+      apply(subgoal_tac[1] "cp_rev_less ([]@[n]) ([0]@[n])") 
+      apply(rule_tac [2] cp_rev_less.intros(3)) apply(rule_tac [2] cp_rev_less.intros(1))
+     apply(auto)
+
+    apply(case_tac pp) apply(auto)
+    apply(subgoal_tac [1] "cp_rev_less ([]@[n])
+           ((ac # lista) @ [n])")
+     apply(rule_tac [2] cp_rev_less.intros(3)) 
+apply(rule_tac [2] cp_rev_less.intros(1))
+    apply(auto)
+    done
+  
+qed
+
+
+lemma ll3_consume_label_char :
+" ll3_consume_label p n (l :: ll3 list) = Some (l', p') \<Longrightarrow>
+  (p' = [] \<or>
+   p' = n#p \<or>
+   (? pp . p' = pp@p \<and>
+    cp_rev_less [n] pp))"
+  apply(insert ll3_consume_label_char')
+  apply(blast)
+  done
+
+(* generalize with a longer prefix? *)
+(* use "cp_less" predicate? *)
+lemma ll3_consume_label_twice' :
+"
+  (! e l q . (t :: ll3) = (q, LSeq e l) \<longrightarrow> 
+  (! l' p n pp k . ll3_consume_label p n l = Some (l',pp@(k#p)) \<longrightarrow>
+   (! l'' p2 n2 pp2 k2  . ll3_consume_label p2 n2 l' = Some (l'', pp2@(k2#p2)) \<longrightarrow>
+    (cp_rev_less (pp@[k-n]) (pp2@[k2-n2])))))
+\<and>
+  (! p n l' pp k . ll3_consume_label p n (l :: ll3 list) = Some (l',pp@(k#p)) \<longrightarrow>
+  (! l'' p2 n2 pp2 k2  . ll3_consume_label p2 n2 l' = Some (l'', pp2@(k2#p2)) \<longrightarrow>
+    (cp_rev_less (pp@[k-n]) (pp2@[k2-n2]))))
+"
+  apply(induction rule:my_ll_induct)
+        apply(auto)
+  apply(case_tac ba, auto)
+  apply(case_tac "ll3_consume_label p (Suc n)
+              l", auto)
+  apply(case_tac "ll3_consume_label p2 (Suc n2) 
+              aa", auto) 
+  apply(drule_tac [1] x = p in spec)
+      apply(drule_tac [1] x = "Suc n" in spec) 
+      apply(drule_tac [1] x = "aa" in spec)  apply(auto)
+      apply(drule_tac [1] x = "ab" in spec)
+
+  apply(drule_tac [1] x = p2 in spec)
+      apply(drule_tac [1] x = "Suc n2" in spec) 
+      apply(drule_tac [1] x = "pp2" in spec) apply(auto)
+      apply(drule_tac [1] cp_rev_less.cases, auto)
+       apply(rule_tac[1] cp_rev_less.intros) apply(auto)
+      apply(subgoal_tac[1] "cp_rev_less (t @ la) (t' @ la)")
+  apply(rule_tac[2] cp_rev_less.intros) apply(auto)
+
+      apply(subgoal_tac[1] "cp_rev_less (pp @ [k - Suc n]) (pp2 @ [k2 - Suc n2])")
+  apply(auto)
+       apply(clarsimp)
+  apply(simp)
+      apply(case_tac la, auto)
+      apply(drule_tac [1] cp_rev_less.cases, auto)
+        apply(rule_tac[1] cp_rev_less.intros) apply(auto)
+      apply(case_tac la, auto)
+      apply(drule_tac [1] cp_rev_less.cases, auto)
+        apply(rule_tac[1] cp_rev_less.intros) apply(auto)
+
+      apply(drule_tac [1] cp_rev_less.cases, auto)
+
+  apply(case_tac t, auto)
+  apply(rule_tac [1] cp_rev_less_sing)
+      apply(drule_tac [1] x = "k2" in spec)  apply(auto)
+
+         apply(case_tac [1] "x22 = length p", auto)
+        apply(case_tac [1] "\<not>x21", auto)
+      apply(case_tac [1] "length p = length p2", auto)
+      apply(case_tac "ll3_consume_label p2 (Suc n2)
+              l", auto) 
+      apply(drule_tac [1] x = p2 in spec)
+      apply(drule_tac [1] x = "Suc n2" in spec)
+apply(drule_tac [1] x = aa in spec) apply(auto)
+      apply(frule_tac [1] ll3_consume_label_char, auto)
+      apply(case_tac pp, auto) apply(drule_tac cp_rev_less'.cases, auto)
+    apply(drule_tac cp_rev_less'.cases, auto)
+  sorry
+(*
+lemma ll3_consume_label_twice :
 
 (* idea: have a neater characterization of ll3 correctness. 
    IF we return something for a particular n and path
    AND we didn't return anything for the prefix
    THEN we have returned the label with "smallest" path
 *)
-
+*)
 
 function (sequential) ll3_assign_label :: "ll3 \<Rightarrow> ll3 option" and
     ll3_assign_label_list :: "ll3 list \<Rightarrow> ll3 list option" where
@@ -1099,15 +1382,7 @@ lemma ll3_assign_label_consume_label2' :
 "
 *)
 
-
-
-inductive_set ll3_consumes :: "(ll3 list * childpath set * ll3 list) set" where
-"\<And> l . (l,{},l) \<in> ll3_consumes"
-| "\<And> p n l l' . ll3_consume_label p n l = Some (l', []) \<Longrightarrow> (l,{},l') \<in> ll3_consumes"
-| "\<And> p n l l' ph pt . ll3_consume_label p n l = Some (l', ph#pt) \<Longrightarrow> (l,{(ph#pt)}, l') \<in> ll3_consumes"
-| "\<And> l s l' s' l'' . (l,s,l') \<in> ll3_consumes \<Longrightarrow> (l',s', l'') \<in> ll3_consumes \<Longrightarrow> (s \<inter> s' = {})  
-     \<Longrightarrow> (l,s \<union> s',l'') \<in> ll3_consumes"
-
+(*
 lemma ll3_consume_label_prefix :
 "(! q e l . (t::ll3) = (q, LSeq e l) \<longrightarrow> 
    (! p n l' p'. (ll3_consume_label p n l = Some (l', p')) \<longrightarrow> 
@@ -1130,6 +1405,7 @@ lemma ll3_consume_label_prefix :
   apply(case_tac x52, auto)
   apply(case_tac ba, auto)
       apply(case_tac " ll3_consume_label (n # p) (Suc 0) lista", auto) 
+*)
 (*
 lemma ll3_consume_label_diff :
 
@@ -1142,6 +1418,7 @@ lemma ll3_consume_label_diff :
 \<and> (! p n ls' . ll3_consume_label p n ls = Some (ls', (ph#pt)) \<longrightarrow> ls = ls')
 "
 *)
+
 lemma ll3_consumes_extend :
 "(l, s, l') \<in> ll3_consumes \<Longrightarrow> ll3_consume_label p n l' = Some (l'', ph#pt) \<Longrightarrow> (l,s\<union>{ph#pt},l'')\<in>ll3_consumes"
   apply(induction rule:ll3_consumes.induct)
@@ -1154,7 +1431,10 @@ lemma ll3_consumes_extend :
 
    apply(subgoal_tac "(l,{pha # pta} \<union> {ph # pt}, l'') \<in> ll3_consumes") 
     apply(rule_tac[2] ll3_consumes.intros(4), auto)
-     apply(auto simp add:ll3_consumes.intros)
+   apply(auto simp add:ll3_consumes.intros)
+  apply(rotate_tac [1] 1)
+   apply(drule_tac ll3_consume_label_char)
+  apply(auto)
   sorry (* this lemma fails because we aren't properly tracking paths *)
 
 lemma ll3_consume_label_length :
