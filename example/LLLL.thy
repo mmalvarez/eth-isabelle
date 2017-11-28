@@ -576,6 +576,7 @@ inductive cp_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" wher
 | "\<And> n n' t t' . n < n' \<Longrightarrow> cp_less (n#t) (n'#t')"
 | "\<And> n t t' . cp_less t t' \<Longrightarrow> cp_less (n#t) (n#t')"
 
+
 (* i'm worried this is not correctly capturing preorder traversal
    it seems like it might be DFS instead...*)
 inductive cp_rev_less' :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
@@ -584,10 +585,20 @@ inductive cp_rev_less' :: "childpath \<Rightarrow> childpath \<Rightarrow> bool"
 | "\<And> t t' n n' . cp_rev_less' t t' \<Longrightarrow> cp_rev_less' (n#t) (n'#t')"
 
 (* i think this is what we want *)
+(*
 inductive cp_rev_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
 "\<And> (n::nat) (t::childpath) . cp_rev_less [] (n#t)"
 | "\<And> n n' t t' . n < n' \<Longrightarrow> cp_rev_less (t@[n]) (t'@[n'])"
 | "\<And> (t :: childpath) (t' :: childpath) l. cp_rev_less t t' \<Longrightarrow> cp_rev_less (t@l) (t'@l)"
+*)
+
+inductive cp_rev_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
+"\<And> (n::nat) (t::childpath) . cp_rev_less [] (n#t)"
+| "\<And> n n' . n < n' \<Longrightarrow> cp_rev_less [n] [n']"
+| "\<And> pre1 pre2 suf . cp_rev_less pre1 pre2 \<Longrightarrow> cp_rev_less (pre1@suf) (pre2@suf)"
+| "\<And> pre suf1 suf2 . cp_rev_less suf1 suf2 \<Longrightarrow> cp_rev_less (pre@suf1) (pre@suf2)"
+| "\<And> pre1 pre2 suf1 suf2 .
+      cp_rev_less pre1 pre2 \<Longrightarrow> cp_rev_less suf1 suf2 \<Longrightarrow> cp_rev_less (pre1@suf1) (pre2@suf2)"
 
 (* we need to capture incrementing a childpath *)
 fun cp_next :: "childpath \<Rightarrow> childpath" where
@@ -607,7 +618,8 @@ lemma cp_rev_less'_suc1 :
 
 lemma cp_rev_less_sing' :
 "n < n' \<Longrightarrow> cp_rev_less ([]@[n]) ([]@[n'])"
-  apply(rule_tac cp_rev_less.intros) apply(auto)
+  apply(rule_tac cp_rev_less.intros) 
+  apply(rule_tac cp_rev_less.intros)  apply(auto)
   done
 
 lemma cp_rev_less_sing :
