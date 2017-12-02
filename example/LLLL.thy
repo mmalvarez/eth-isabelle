@@ -1,6 +1,6 @@
 theory LLLL
   
-  imports Main Nat "../ContractSem" "../RelationalSem" "../ProgramInAvl" "../Hoare/Hoare" "../lem/Evm" 
+  imports Main Nat "~~/src/HOL/ex/MergeSort" "../ContractSem" "../RelationalSem" "../ProgramInAvl" "../Hoare/Hoare" "../lem/Evm" 
 begin
 
 value "CHR''0'' :: char"
@@ -902,7 +902,7 @@ lemma cp_rev_less_prefix1 :
 lemma cp_rev_less_app :
 "cp_rev_less k p \<Longrightarrow>
  (! kpre kpost . k = kpre @ kpost \<longrightarrow>
-  (! ppre ppost . p = ppre @ ppost \<longrightarrow>
+ll  (! ppre ppost . p = ppre @ ppost \<longrightarrow>
    cp_rev_less kpost ppost \<or>
    (kpost = ppost \<and> cp_rev_less kpre ppre)))"
   apply(induction rule:cp_rev_less.induct)
@@ -1282,13 +1282,18 @@ inductive_set ll3_consumes :: "(ll3 list * childpath set * ll3 list) set" where
       (l',s', l'') \<in> ll3_consumes \<Longrightarrow> 
       (l,s \<union> s',l'') \<in> ll3_consumes"
 *)
-inductive_set ll3_consumes :: "(ll3 list * (childpath * nat) set * ll3 list) set" where
-"\<And> l . (l,{},l) \<in> ll3_consumes"
-| "\<And> p n l l' . ll3_consume_label p n l = Some (l', []) \<Longrightarrow> (l,{},l') \<in> ll3_consumes"
-| "\<And> p n l l' k pp . ll3_consume_label p n l = Some (l', pp@(k#p))  \<Longrightarrow> (l,{(pp@[k - n], length p)}, l') \<in> ll3_consumes"
+
+(* Q: should we still conflate different consumes on parent paths?  *)
+(* Another option: store lists rather than sets, but make assertions about sets of childpath * nat *)
+inductive_set ll3_consumes :: "(ll3 list * (childpath * nat) list * ll3 list) set" where
+"\<And> l . (l,[],l) \<in> ll3_consumes"
+| "\<And> p n l l' . ll3_consume_label p n l = Some (l', []) \<Longrightarrow> (l,[],l') \<in> ll3_consumes"
+| "\<And> p n l l' k pp . ll3_consume_label p n l = Some (l', pp@(k#p))  \<Longrightarrow> (l,[(pp@[k - n], length p)], l') \<in> ll3_consumes"
 | "\<And> l s l' s' l'' . (l,s,l') \<in> ll3_consumes \<Longrightarrow>
       (l',s', l'') \<in> ll3_consumes \<Longrightarrow> 
-      (l,s \<union> s',l'') \<in> ll3_consumes"
+      (l,s @ s',l'') \<in> ll3_consumes"
+
+(* new idea: a version of consumes that uses a sorted list of childpath * nat *)
 
 lemma ll3_consume_label_unch' :
 "(! e l l' p n q. (t :: ll3) = (q, LSeq e l) \<longrightarrow> (ll3_consume_label p n l = Some(l', []) \<longrightarrow> l = l'))
@@ -1783,14 +1788,29 @@ lemma quick_opt_split :
   apply(case_tac opt, auto)
   done
 
+(* this approach is extremely inefficient *)
 fun setmap :: "('a \<Rightarrow> 'b) \<Rightarrow> ('a set) \<Rightarrow> ('b set)" where
 "setmap f s = {x . ? y . y \<in> s \<and> x = f y}"
 
-fun consumes_deepen :: "(childpath * nat) set \<Rightarrow> (childpath * nat) set" where
-"consumes_deepen s = {x . ? y ln . (y,ln) \<in> s \<and> x = (y, ln+1)}"
 
-fun consumes_incr :: "childpath set \<Rightarrow> childpath set" where
-"consumes_incr s = { x . ? y n ln. (y@[n],ln) \<in> s \<and> x = (y@[n+1], ln)}"
+fun consumes_deepen :: "(childpath * nat) list \<Rightarrow> (childpath * nat) list" where
+"consumes_deepen [] = []"
+|"consumes_deepen ((_,0)#t) = consumes_deepen t" (* what should behavior be in this case *)
+|"consumes_deepen ((p, Suc n)#t) = (p@[0], n)#consumes_deepen t"
+
+fun consumes_incr :: "(childpath * nat) list \<Rightarrow> (childpath * nat) list" where
+"consumes_incr [] = []"
+| "consumes_incr (([],_)#t) = consumes_incr t" (* bogus case (?) *)
+| "consumes_incr ((h#[],n)#t) = (((h+1)#[]),n)# consumes_incr t"
+| "consumes_incr ((h#(h2#tp)),n)#t) = "
+
+(* idea: for efficiency, make these functional
+using linorder_class and List.set *)
+fun consumes_deepen' :: "(childpath * nat) set \<Rightarrow> (childpath * nat) set" where
+"consumes_deepen' s = {x . ? y ln . ln > 0 \<and> (y,ln) \<in> s \<and> x = (y@[0], ln-1)}"
+
+fun consumes_incr' :: "(childpath * nat) set \<Rightarrow> (childpath * nat) set" where
+"consumes_incr' s = { x . ? y n ln. (y@[n],ln) \<in> s \<and> x = (y@[n+1], ln)}"
 
 lemma ll3_consume_label_sane1' :
 "(! q e l . (t::ll3) = (q, LSeq e l) \<longrightarrow> 
@@ -1844,6 +1864,9 @@ lemma ll3_consume_label_sane1 :
   apply(blast)
   done
 
+lemma consumes_incr_emp : "consumes_incr {} = {}"
+  apply(auto)
+  done  
 
 (* do we need an analogous consumes_decr? *)
 (* Q: how to deal with current node's location? Just use zero? *)
@@ -1854,18 +1877,39 @@ lemma ll3_consume_label_sane1 :
 do we need @[0]?*)
 (* TODO: restate this lemma for new "consumes" predicate and see
 if we can get it to go through *)
+(* we used to require p != nil in the lab case *)
+(* How does Deepen work? Maybe we should reverse role of s'' and deepen (s'') *)
+(* maybe we should use disjoint union? *)
+(* I think the issue might be that llab uselessly quantifies over p? *)
+(*
 lemma ll3_consumes_split :
 "(l1, s, l2) \<in> ll3_consumes \<Longrightarrow> 
 (! q1 h1 t1 q2 h2 t2 . l1 = (q1, h1) # t1 \<longrightarrow> l2 = (q2, h2) # t2 \<longrightarrow> 
   (q1 = q2 \<and> (? s' . consumes_incr s' \<subseteq> s \<and> (t1, s', t2) \<in> ll3_consumes \<and>
            ((h1 = h2 \<and> s = consumes_incr s') \<or> 
-              (? p suf . p \<noteq> [] \<and> h1 = LLab False (length (p@suf) - 1) \<and> h2 = LLab True (length (p@suf) - 1) \<and> ({p@[0]} \<subseteq> s \<and> consumes_incr s' = s - {p@[0]})) \<or> 
+              (? p n . h1 = LLab False ((length p) + n) \<and> h2 = LLab True ((length p) + n) \<and> ({(p@[0], n)} \<subseteq> s \<and> consumes_incr s' = s - {(p@[0], n)})) \<or> 
+              (? e  ls1 ls2 . h1 = LSeq e ls1 \<and> h2 = LSeq e ls2 \<and> 
+               (? s''.  (ls1, s'', ls2) \<in> ll3_consumes \<and>
+                        (consumes_deepen s'' \<subseteq> s \<and> consumes_incr s' = s - (consumes_deepen s'')  )))))))"
+*)
+
+(* Q: use sorted lists rather than sets for efficiency? *)
+(* use a functional version of cp_rev_less for lesser metric,
+   and implement "less" typeclass? *)
+(* should we add a hypothesis about how either s'' is {} or else consumes_deepen isn't *)
+lemma ll3_consumes_split :
+"(l1, s, l2) \<in> ll3_consumes \<Longrightarrow> 
+(! q1 h1 t1 q2 h2 t2 . l1 = (q1, h1) # t1 \<longrightarrow> l2 = (q2, h2) # t2 \<longrightarrow> 
+  (q1 = q2 \<and> (? s' . consumes_incr s' \<subseteq> s \<and> (t1, s', t2) \<in> ll3_consumes \<and>
+           ((h1 = h2 \<and> s = consumes_incr s') \<or> 
+              (? n . h1 = LLab False n \<and> h2 = LLab True n \<and> ({([0], n)} \<subseteq> s \<and> consumes_incr s' = s - {([0], n)})) \<or> 
               (? e  ls1 ls2 . h1 = LSeq e ls1 \<and> h2 = LSeq e ls2 \<and> 
                (? s''.  (ls1, s'', ls2) \<in> ll3_consumes \<and>
                         (consumes_deepen s'' \<subseteq> s \<and> consumes_incr s' = s - (consumes_deepen s'')  )))))))"
 proof(induction rule:ll3_consumes.induct)
   case (1 l) thus ?case
-    apply(auto 2 2 simp add:ll3_consumes.intros) 
+    apply(auto 2 2 simp add:ll3_consumes.intros)  
+
     done next
   case (2 p n l l')
   then show ?case
@@ -1918,7 +1962,7 @@ proof(induction rule:ll3_consumes.induct)
         apply(auto 2 1)
     apply(frule_tac[1] ll3_consume_label_sane1)
     apply( auto 3 1)
-        apply(rule_tac [1] x = "{pt @ [ph - Suc n]}" in exI)
+        apply(rule_tac [1] x = "({(pt @ [ph - Suc n], length p)})" in exI)
     apply(frule_tac ll3_consume_label_sane1, auto 3 1)
 
         apply(drule_tac [1] "ll3_consumes.intros") apply(auto 3 1)
@@ -1933,63 +1977,41 @@ proof(induction rule:ll3_consumes.induct)
        apply(frule_tac ll3_consume_label_sane1, auto 3 1)
         
 
-                  apply(rule_tac [1] x = "{[ph - Suc n]}" in exI) apply(auto 2 1)
-
-        apply(auto 2 1)
-
-        apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(simp)
-        apply(auto 2 1)
-       apply(drule_tac [1] "ll3_consumes.intros") apply(auto 2 1)
-
-        apply(simp)
-        apply(auto 3 1)
-
-    apply(frule_tac [1] ll3_consumes.cases, auto 3 1)
-          apply(drule_tac [1] ll3_consume_label_sane1) apply(simp) 
-          apply(clarify)
-    apply(subgoal_tac "k = ka", auto 3 1)
-          apply(drule_tac [1] ll3_consumes.cases) apply(simp) 
-apply(auto 3 1) 
-    apply(subgoal_tac [1] "Suc (ph - Suc n) = ph - n")
-    apply(simp) apply(auto 2 1)
-    apply(blast)
-          apply(drule_tac [1] Nat.Suc_diff_le) apply(auto 3 1)
-
-               apply(case_tac [1] "x22 = length p", auto 2 1)
-          apply(case_tac [1] "\<not>x21", auto 2 1)
-          apply(rule_tac [1] x = "{}" in exI)
-    apply(auto 2 1)
+                  apply(rule_tac [1] x = "{(pt@[ph - Suc n], length p)}" in exI) apply(auto 2 1)
         apply(rule_tac [1] "ll3_consumes.intros")
+        apply(auto 2 1)
 
         apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(simp)
-        apply(auto 2 1)
-       apply(drule_tac [1] "ll3_consumes.intros") apply(auto 2 1)
-      
-        apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(simp)
-        apply(auto 2 1)
-       apply(drule_tac [1] "ll3_consumes.intros") apply(auto 2 1)
+      apply(auto 2 1)
+      apply(frule_tac ll3_consume_label_sane1)
+      apply(auto 2 1)
 
-        apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(simp)
-       apply(auto 2 1)
+       apply(drule_tac [1] "ll3_consumes.intros") 
+      apply(rule_tac [1] x = "{(pt@[ph - Suc n], length p)}" in exI) apply(auto 2 1)
 
-      apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(simp)
-        apply(auto 2 1)
-      apply(drule_tac [1] "ll3_consumes.intros") apply(auto 2 1)
+       apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(auto 2 1)
+       apply(frule_tac ll3_consume_label_sane1, auto 3 1)
+       apply(rule_tac [1] x = "{(pt@[ph - Suc n], length p)}" in exI) apply(auto 2 1)
+        apply(rule_tac [1] "ll3_consumes.intros") apply(auto 2 1)
 
-      apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(auto 2 1)
-
-    apply(case_tac [1] "ll3_consume_label (n # p) 0 x52", auto 2 1)
+        apply(case_tac [1] "ll3_consume_label
+              (n # p) 0 x52", auto 2 1)
     apply(rename_tac [1] "boo")
 apply(case_tac [1] "boo", auto 2 1)
 
      apply(case_tac[1] "ll3_consume_label p (Suc n) t1") apply(auto 2 0)
      apply(drule_tac [1] "ll3_consume_label_unch", auto 2 0)
-     apply(drule_tac [1] "ll3_consumes.intros") 
-     apply(auto 2 1)
+            apply(frule_tac ll3_consume_label_sane1, auto 3 1)
+     apply(drule_tac [1] "ll3_consumes.intros")
+     apply(rule_tac [1] x = "{(pt@[ph - Suc n], length p)}" in exI) apply(auto 2 1)
 
-    apply(rule_tac [1] x = "{}" in exI, auto 2 0)
-     apply(rule_tac [1] "ll3_consumes.intros")
-    apply(drule_tac [1] "ll3_consumes.intros", auto 2 0 )
+
+            apply(frule_tac ll3_consume_label_sane1, auto 3 1)
+     apply(drule_tac [1] "ll3_consumes.intros")
+    apply(rule_tac [1] x = "{}" in exI) apply (auto 2 1)
+    apply(rule_tac[1] ll3_consumes.intros)
+    apply(rule_tac [1] x = "{((pp @ [k], Suc (length p)))}" in exI) apply (auto 2 1)
+
     done next
 
   case (4 l s l' s' l'') thus ?case
@@ -1999,8 +2021,105 @@ apply(case_tac [1] "boo", auto 2 1)
             apply(drule_tac[1] ll3_consumes_length, simp)
            apply(drule_tac[1] ll3_consumes_length, simp)
           apply(drule_tac[1] ll3_consumes_length, simp)
-               apply(rule_tac [1] x = "s \<union> s'" in exI)
-    apply(auto 2 1)
+  
+               apply(rule_tac [1] x = "s'a \<union> s'aa" in exI)
+         apply(auto 2 1)
+         apply(rule_tac [1] ll3_consumes.intros, auto 2 1)
+    
+               apply(rule_tac [1] x = "s'a \<union> s'aa" in exI)
+         apply(auto 2 1) apply(blast)
+         apply(rule_tac [1] ll3_consumes.intros, auto 2 1)
+          apply(blast)
+         apply(blast)
+    apply(blast)
+
+       apply(rule_tac [1] x = "s'a \<union> s'aa" in exI) apply(auto 2 1)
+             apply(blast) apply(rule_tac [1] ll3_consumes.intros, auto 2 1)
+
+       apply(drule_tac [1] x = "s''" in spec)
+
+         apply(auto 2 1) apply(blast)
+          apply(blast) 
+
+         apply(auto 2 1)
+(* do we need consumes_cases here? consumes_sane? *)
+
+    apply(thin_tac [1] "(((aa, ba), llt.LSeq e ls1) # t1,
+        {x. \<exists>y n ln. (y @ [n], ln) \<in> s'a \<and> x = (y @ [Suc n], ln)},
+        ((aa, ba), llt.LSeq e ls1) # list)
+       \<in> ll3_consumes")
+    apply(thin_tac [1] "(((aa, ba), llt.LSeq e ls1) # list, s',
+        ((aa, ba), llt.LSeq e ls2) # t2)
+       \<in> ll3_consumes")
+    apply(thin_tac [1] " l = ((aa, ba), llt.LSeq e ls1) # t1")
+              apply(thin_tac [1] "l'' = ((aa, ba), llt.LSeq e ls2) # t2")
+             apply(thin_tac [1] "l' = ((aa, ba), llt.LSeq e ls1) # list")
+             apply(thin_tac [1] "(t1, s'a, list) \<in> ll3_consumes")
+             apply(thin_tac [1] "(list, s'aa, t2) \<in> ll3_consumes")
+    apply(thin_tac [1] "(ls1, s'', ls2) \<in> ll3_consumes")
+    apply(thin_tac [1] "s' - {x. \<exists>y ln. 0 < ln \<and> (y, ln) \<in> s'' \<and> x = (y @ [0], ln - Suc 0)}
+       \<subseteq> s'")
+
+         apply(case_tac [1] "? y n  . a = y @ [n]")
+          
+              apply(auto 2 1) apply(rule_tac x = "n - 1" in exI)
+           apply(auto 2 1) apply(case_tac b, auto 2 1)
+            apply(subgoal_tac "(y @ [n], 0) \<in> {x. \<exists>y n ln. (y @ [n], ln) \<in> s'aa \<and> x = (y @ [Suc n], ln)}") 
+
+             apply(auto 2 1)
+
+ (* one option here: a subgoal saying that 
+(y @ [n], 0)
+is in
+{x. \<exists>y n ln. (y @ [n], ln) \<in> s'aa \<and> x = (y @ [Suc n], ln)}
+this should imply that (y @ [n - Suc 0], 0) \<in> s'aa
+hopefully...
+*)
+(*    apply(subogal_tac " *)
+    apply(blast)
+    apply(best)
+               apply(fast)
+
+              (* this takes way too long *)
+              apply(blast 2) 
+             apply(blast)
+
+    apply(simp) 
+
+(*
+    apply(blast)
+          apply(blast)   
+          (* use ll3_consumes_sane here? *)
+         apply(case_tac [1] "? y  . ab = y @ [0]")
+          
+          apply(auto 2 1) 
+    apply(drule_tac [1] ll3_consumes.cases)
+          
+        (* Case split on which subset it is in? *)
+          apply(case_tac [1] "(y @ [0], b) \<in> {x. \<exists>y ln. 0 < ln \<and> (y, ln) \<in> s'' \<and> x = (y @ [0], ln - Suc 0)}")
+
+           apply(auto 2 1) 
+          
+
+               apply(rule_tac [1] x = "s'a \<union> s'aa" in exI)
+         apply(auto 2 1) 
+         apply(rule_tac [1] ll3_consumes.intros, auto 2 1)
+               apply(drule_tac [1] x = "s''" in spec)
+         apply(auto 2 1) 
+
+         apply(case_tac [1] "? y  . a = y @ [0]") apply(auto 2 1)
+          apply(drule_tac x =  b in spec) apply(auto 2 1)  
+    apply(subgoal_tac [1] "{(y @ [0], b)} \<subseteq> s'")
+    apply(subgoal_tac [1] "{(y, b)} \<subseteq> s''") apply(simp) 
+ (* now link s'' to s' *)
+            
+          
+    
+
+
+apply(auto 2 1)
+         (* idea: we know *)
+
          apply(rule_tac [1] ll3_consumes.intros(4), simp) apply(auto 2 1)
         apply(rule_tac [1] x = "s \<union> (s' - s'')" in exI) apply(auto 2 1)
          apply(rule_tac [1] ll3_consumes.intros(4), simp) apply(auto 2 1)
@@ -2381,6 +2500,7 @@ lemma ll3_assign_label_qvalid' :
    apply(drule_tac[1] ll3_consumes_length, auto)
   apply(case_tac[1] "ll3_assign_label ((a, b), ba)", auto)
   apply(case_tac [1] "ll3_assign_label_list list", auto)
+metis
 
   apply(frule_tac "ll3_assign_label_unch1", auto)
 
