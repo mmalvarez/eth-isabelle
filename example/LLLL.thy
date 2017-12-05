@@ -2172,18 +2172,70 @@ the index of the child. the index of the child sounds promising
 i think all we need is a case analysis on ls (?)
 *)
 
+(* we need something here *)
+lemma ll3_consume_nil_gen :
+"(! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow>
+  (! p' n' . length p = length p' \<longrightarrow> ll3_consume_label p' n' ls = Some (ls, []))
+)"
+  apply(induction ls, auto)
+  apply(case_tac ba, auto)
+       apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+apply(case_tac [1] "ll3_consume_label p' (Suc n') ls", auto)
+         apply(drule_tac [1] x = p in spec) apply(auto)
+      apply(drule_tac [1] x = p in spec) apply(auto)
+       apply(drule_tac [1] x = p in spec) apply(auto)
+
+       apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+apply(case_tac [1] "ll3_consume_label p' (Suc n') ls", auto)
+      apply(drule_tac [1] x = p in spec) apply(auto)
+       apply(drule_tac [1] x = p in spec) apply(auto)
+      apply(drule_tac [1] x = p in spec) apply(auto)
+
+       apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+apply(case_tac [1] "ll3_consume_label p' (Suc n') ls", auto)
+
+       apply(drule_tac [1] x = p in spec) apply(auto)
+      apply(drule_tac [1] x = p in spec) apply(auto)
+
+       apply(drule_tac [1] x = p in spec) apply(auto)
+    apply(drule_tac [1] x = p in spec) apply(auto)
+
+
+    apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+apply(case_tac [1] "ll3_consume_label p' (Suc n') ls", auto)
+
+       apply(drule_tac [1] x = p in spec) apply(auto)
+      apply(drule_tac [1] x = p in spec) apply(auto)
+   apply(drule_tac [1] x = p in spec) apply(auto)
+
+  apply(case_tac [1] "ll3_consume_label (n # p) 0 x52") apply(auto)
+  apply(case_tac[1] ba, auto)
+  apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+  apply(case_tac [1] "ll3_consume_label (n' # p') 0 x52", auto)
+   apply(drule_tac [1] x = p in spec) apply(auto)
+
+       apply(drule_tac [1] x = "n'#p'" in spec) apply(auto)
+      apply(drule_tac [1] x = p in spec) apply(auto)
+   apply(drule_tac [1] x = p in spec) apply(auto)
 (* unsure  if this basic proof schema works *)
 lemma ll3_consume_label_child' :
 "
-(! ls aa bb e2 l2l . length ls > c \<longrightarrow> ls ! c =
- ((aa, bb), llt.LSeq e2 l2l) \<longrightarrow>
+(! c aa bb e2 l2l . length ls > c \<longrightarrow> ls ! c = ((aa, bb), llt.LSeq e2 l2l) \<longrightarrow>
  (! p n ls' . ll3_consume_label p n ls = Some (ls', []) \<longrightarrow>
-  (? nx . (? l2l' . ll3_consume_label (c#p) nx l2l = Some (l2l', [])))
+  (? nx . (ll3_consume_label (c#p) nx l2l = Some (l2l, [])))
 ))"
-  apply(induction c)
+  apply(induction ls)
    apply(auto)
-  apply(case_tac[1] ls, auto) 
-   apply(case_tac [1] "ll3_consume_label (n # p) 0 l2l", auto)
+  apply(case_tac ba, auto) 
+      apply(case_tac [1] "ll3_consume_label p (Suc n) ls", auto)
+      apply(case_tac c, auto)
+      apply(drule_tac [1] x=nat in spec) apply(auto)
+      apply(drule_tac [1] x = p in spec)
+      (* need a lemma about how if output is [], it is []
+         for any equal length path *)
+  apply(drule_tac [1] x = "Suc n" in exI) apply(auto)
+  
    apply(case_tac [1] b, auto)
    apply(case_tac [1] "ll3_consume_label p (Suc n) list", auto)
 
