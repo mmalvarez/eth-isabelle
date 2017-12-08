@@ -301,14 +301,15 @@ definition ll_valid_ql :: "(qan * idx) set" where
   "ll_valid_ql = {((n,n'),i) . n' = n+1}"
   
 declare ll_valid_ql_def [simp]  
-  
+
+(* +2 to account for the push instruction and the jump instruction *)
 definition ll_valid_qj :: "(qan * idx * nat) set" where
-  "ll_valid_qj = {((n,n'),d,s) . n' = n + 1 + s}"
+  "ll_valid_qj = {((n,n'),d,s) . n' = n + 2 + s}"
 
 declare ll_valid_qj_def [simp]  
   
 definition ll_valid_qji :: "(qan * idx * nat) set" where
-  "ll_valid_qji = {((n,n'),d,s) . n' = n + 1 + s}"
+  "ll_valid_qji = {((n,n'),d,s) . n' = n + 2 + s}"
 
 declare ll_valid_qji_def [simp]
   
@@ -368,8 +369,8 @@ fun ll1_size :: "ll1 \<Rightarrow> nat" and
     ll1_size_seq :: "ll1 list \<Rightarrow> nat" where
     "ll1_size (ll1.L inst) = nat (inst_size inst)"
   | "ll1_size (ll1.LLab idx) = 1"
-  | "ll1_size (ll1.LJmp idx) = 1"
-  | "ll1_size (ll1.LJmpI idx) = 1"
+  | "ll1_size (ll1.LJmp idx) = 2"
+  | "ll1_size (ll1.LJmpI idx) = 2"
   | "ll1_size (ll1.LSeq ls) = ll1_size_seq ls"
   | "ll1_size_seq [] = 0"
   | "ll1_size_seq (h # t) = ll1_size h + ll1_size_seq t"
@@ -380,8 +381,8 @@ fun ll_phase1 :: "ll1 \<Rightarrow> nat \<Rightarrow> (ll2 * nat)" and
   where
   "ll_phase1 (ll1.L inst) i = (((i, i + nat (inst_size inst)), L () inst ), i + nat (inst_size inst))"
 | "ll_phase1 (ll1.LLab idx) i = (((i, i+1), LLab () idx ), 1+i)" (* labels take 1 byte *)
-| "ll_phase1 (ll1.LJmp idx) i = (((i, 1 + i), LJmp () idx 0), 1 + i)" (* jumps take at least 1 bytes *)
-| "ll_phase1 (ll1.LJmpI idx) i = (((i, 1 + i), LJmpI () idx 0), 1 + i)"
+| "ll_phase1 (ll1.LJmp idx) i = (((i, 2 + i), LJmp () idx 0), 2 + i)" (* jumps take at least 2 bytes (jump plus push) *)
+| "ll_phase1 (ll1.LJmpI idx) i = (((i, 2 + i), LJmpI () idx 0), 2 + i)"
 | "ll_phase1 (ll1.LSeq ls) i =
    (let (ls', i') = ll_phase1_seq ls i in
    (((i, i'), LSeq () ls'), i'))"
@@ -401,7 +402,8 @@ lemma ll_phase1_correct :
 proof(induction rule:my_ll1_induct)
   case (1 i) thus ?case by (auto simp add:ll_valid_q.simps) next
   case (2 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
-  case (3 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
+  case (3 idx) thus ?case 
+    by (auto simp add:ll_valid_q.simps) next
   case (4 idx) thus ?case by (auto simp add:ll_valid_q.simps) next
   case (5 l) thus ?case
     apply(clarsimp)
@@ -2412,6 +2414,7 @@ lemma ll3_consume_label_none_descend :
 (* need a hypothesis: l2 = LLab ... *)
 (* I'm not convinced induction over descend will work.
 i think we need my_ll_induct *)
+
 lemma ll3_consume_label_find :
 "(l1, l2, k) \<in> ll3'_descend \<Longrightarrow>
  (! x1 e1 l1l . l1 = (x1, LSeq e1 l1l) \<longrightarrow>
@@ -2446,6 +2449,7 @@ lemma ll3_consume_label_find :
 it really seems like we need descendents as a premise also
 this one is closer to the answer
  *)
+(*
 lemma ll3_consume_label_nodesc :
 "
   (! e l l' p n . t = (x, LSeq e l) \<longrightarrow> 
@@ -2479,14 +2483,168 @@ lemma ll3_consume_label_nodesc :
       apply(drule_tac [1] x = bc in spec)
       apply(drule_tac [1] x =  "snd (ls!c)" in spec)
       apply(auto)
-
-
+sorry
+*)
     (* is it set vs l' ? *)
 
-(* note that the consumes predicate tells us which path we are looking for in the descendents,
-we need to look at the path that was just added since this will be the one most recently returned
-by consume
+lemma ll3_assign_label_length [rule_format]:
+" (! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> length ls = length ls')
+"
+proof (induction ls)
+  case Nil thus ?case by auto next
+  case (Cons h t) thus ?case
+    apply(auto)
+    apply(case_tac "ll3_assign_label h", auto)
+    apply(case_tac "ll3_assign_label_list t", auto)
+    done qed
+
+(* this one's more complicated? do we need to talk about consumes? 
+or do we just need to say that the output of running on l2l will be
+equal to the output of running assign_label on that node ?
+this means we probably need the full power of my_ll_induct
 *)
+
+lemma ll3_assign_label_preserve_child1' [rule_format] :
+"
+(! c aa bb e2 l2l . length ls > c \<longrightarrow> ls ! c = ((aa, bb), llt.LSeq e2 l2l) \<longrightarrow>
+ (! ls' . ll3_assign_label_list ls = Some (ls') \<longrightarrow>
+  (? ls'2 p . ll3_consume_label [] 0 ls = Some (ls2, p) \<and>
+    ( ? e3 l2l'. ls' ! c = ((aa, bb), llt.LSeq e2 l2l')
+)))"
+
+(*
+()
+\<and>
+()
+*)
+proof(induction ls)
+  case Nil thus ?case by auto
+  case (Cons h t) thus ?case
+  apply(auto)
+    apply(case_tac "ll3_assign_label h", auto)
+apply(case_tac "ll3_assign_label_list t", auto)
+    apply(case_tac c, auto)
+
+      apply(case_tac [1] "ll3_consume_label [] 0 l2l", auto) 
+    apply(rename_tac boo)
+      apply(case_tac [1] "ll3_assign_label_list ac", auto)
+
+      apply(case_tac [1] "ll3_consume_label [] 0 l2l", auto) 
+    apply(rename_tac boo)
+    apply(case_tac [1] "ll3_assign_label_list ac", auto)
+
+      apply(case_tac [1] "ll3_consume_label [] 0 l2l", auto) 
+    apply(rename_tac boo)
+    apply(case_tac [1] "ll3_assign_label_list ac", auto)
+
+      apply(case_tac [1] e2, auto)
+     apply(case_tac [1] e2, auto)
+    apply(case_tac [1] e2, auto)
+    done qed
+
+(* need another one for case where it is a seq node *)
+lemma ll3_assign_label_preserve_child2' [rule_format] :
+"
+(! c aa bb e2  . length ls > c \<longrightarrow> ls ! c = ((aa, bb), llt.LLab e2 0) \<longrightarrow>
+ (! p n ls' . ll3_assign_label_list ls = Some (ls') \<longrightarrow>
+  ls' ! c = ((aa, bb), llt.LLab e2 0)
+))"
+proof(induction ls)
+  case Nil thus ?case by auto
+  case (Cons h t) thus ?case
+    apply(auto)
+    apply(case_tac "ll3_assign_label h", auto)
+apply(case_tac "ll3_assign_label_list t", auto)
+    apply(case_tac c, auto)
+      apply(case_tac [1] e2, auto)
+     apply(case_tac [1] e2, auto)
+    apply(case_tac [1] e2, auto)
+    done qed
+
+lemma ll3_assign_label_preserve_child2 :
+"ll3_assign_label_list ls = Some (ls') \<Longrightarrow>
+ length ls > c \<Longrightarrow> ls ! c = ((aa, bb), llt.LLab e2 0) \<Longrightarrow>
+ ls' ! c = ((aa, bb), llt.LLab e2 0)"
+  apply(drule_tac ll3_assign_label_preserve_child2')
+    apply(auto)
+  done
+
+lemma ll3'_descend_relabel [rule_format] :
+" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+(! e' . ((q, LSeq e' ls), y, k) \<in> ll3'_descend))"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto simp add: ll3'_descend.intros)
+  apply(case_tac bc, auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+   apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(rule_tac [1] ll3'_descend.intros) apply(auto)
+  done
+
+(* do we need to take consume into account here also? *)
+(* we need a lemma for the base case about behavior in the
+case where a child is a label, kind of like for consume *)
+lemma ll3_assign_label_preserve_labels' :
+" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+(! q' e' . y = (q', LLab e' (length k - 1)) \<longrightarrow>
+(! ls' enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
+       ((q, LSeq enew ls'), (q', LLab e' (length k - 1)), k) \<in> ll3'_descend)))
+"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto  simp add:ll3'_descend.intros)
+
+  apply(frule_tac [1] ll3_assign_label_length)
+   apply(drule_tac [1] ll3_assign_label_preserve_child) apply(auto)
+   apply(rule_tac [1] ll3'_descend.intros) apply(auto)
+
+  apply(case_tac bc, auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+    apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+
+  (* we need a lemma for seq \<rightarrow> seq paths (like for consumes) *)
+
+   apply(subgoal_tac [1] "(((ac, bf), llt.LSeq enew ls), ((aa, bb), llt.LSeq x51 x52), n) \<in> ll3'_descend")
+    apply(rule_tac [2] ll3'_descend_relabel) apply(auto)
+  apply(rule_tac [1] ll3'_descend.intros) apply(auto)
+
+  (* we need a "relabeling" lemma for ll3'_descend, saying that we can
+     change the annotation on the root Seq node *)
+  
+
+    apply(rule_tac [2] ll3'_descend.intros)
+
+    apply(case_tac [1] "ll3_assign_label ((a, b), ba)", auto)
+  apply(case_tac [1] "ll3_assign_label_list list", auto)
+
+   apply(case_tac [1] enew, auto)
+  apply(case_tac [1] "ll3_assign_label
+              ((aa, ba), bb)", auto)
+  apply(case_tac [1] "ll3_assign_label_list
+              list", auto)
+    apply(case_tac [1] c, auto)
+    
+   apply(auto  simp add:ll3'_descend.intros)
+
+
+(* necessary sublemma for valid3' *)
+lemma ll3_assign_label_preserve_labels' :
+"
+  (! e l l' p n . t = (x, LSeq e l) \<longrightarrow> 
+   
+  ll3_consume_label p n l = Some (l',[]) \<longrightarrow> 
+    (\<not> (\<exists> k y e' . 
+        ((x, LSeq e l), (y, LLab e' ((List.length k) + (List.length p))), k) \<in> ll3'_descend))) \<and>
+  (! l' p  n . ll3_consume_label p n l = Some (l', []) \<longrightarrow> 
+      (! n . n < length l \<longrightarrow> (! x l2 e . l!n = (x,LSeq e l2) \<longrightarrow>
+      (\<not> (\<exists> k y e' .
+        (l!n, (y, LLab e' ((List.length k) + (List.length p) + 1)), k) \<in> ll3'_descend)))))"
+
 (* do we need to use descend instead of set? *)
 (* maybe not, but maaybe we can use "!" operator *)
 (* s'@p' ?*)
@@ -2555,11 +2713,13 @@ this is also noot quite right *)
     apply(auto)
        apply(drule_tac[1] ll3_consume_label_unch, auto)
        apply(drule_tac [1] ll3_assign_label_qvalid2, auto)
+       apply(drule_tac[1] ll3_consume_label_unch, auto)
 
     apply(drule_tac [1] ll3_consume_label_find, auto)
     (* we need a "assign_label_list_sane" lemma about how
  the only changes possible in calling assign label list are adding
-labels to seq nodes (?)*)
+labels to seq nodes, and changing labels of things with sufficiently small
+path specs (?)*)
     sorry
 next
   case (6 n)
@@ -2972,9 +3132,7 @@ definition pipeline :: "ll1 \<Rightarrow> nat \<Rightarrow> 8 word list option" 
 
 value "pipeline' src3 20"
 
-(* we need to give 1 more byte for jumps *)
-(* this showcases an interesting bug. our jump needs to point to the beginning of the "jump block" not the end *)
-(* actually no this is behaving properly i think  *)
+
 value "pipeline src3 20"
 (* idea: *)
 (* for final codegen pass, use stack_inst.PUSH_N
