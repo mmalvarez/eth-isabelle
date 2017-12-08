@@ -2442,6 +2442,17 @@ lemma ll3_consume_label_find :
   apply(drule_tac [1] x =  p in spec) apply(auto)
   apply(drule_tac [1] x =  "rev n @ p" in spec) apply(auto)
   done
+
+lemma ll3_consume_label_find2 :
+"(l1, l2, k) \<in> ll3'_descend \<Longrightarrow>
+ (! x1 e1 l1l . l1 = (x1, LSeq e1 l1l) \<longrightarrow>
+ (! x2 e2 d . l2 = (x2, LLab e2 d) \<longrightarrow>
+ (! p n l1l' . ll3_consume_label p n l1l = Some (l1l', []) \<longrightarrow>
+     (! l1l'' . ll3_assign_labels_list l1l = Some l1l'') \<longrightarrow>
+ d + 1 \<noteq> length k + length p)))
+"
+
+
 (* second attempt - we are going to talk about children of l now *)
 (* we need to re look at the last line probably *)
 (* new idea: instead of "\<in> set", use descendents as premise too for second part? first part too?  *)
@@ -2510,13 +2521,8 @@ lemma ll3_assign_label_preserve_child1' [rule_format] :
  (! ls' . ll3_assign_label_list ls = Some (ls') \<longrightarrow>
   (? ls'2 p . ll3_consume_label [] 0 ls = Some (ls2, p) \<and>
     ( ? e3 l2l'. ls' ! c = ((aa, bb), llt.LSeq e2 l2l')
-)))"
+))))"
 
-(*
-()
-\<and>
-()
-*)
 proof(induction ls)
   case Nil thus ?case by auto
   case (Cons h t) thus ?case
@@ -2586,6 +2592,7 @@ lemma ll3'_descend_relabel [rule_format] :
 (* do we need to take consume into account here also? *)
 (* we need a lemma for the base case about behavior in the
 case where a child is a label, kind of like for consume *)
+(* maybe not a necessary lemma *)
 lemma ll3_assign_label_preserve_labels' :
 " (x, y, k) \<in> ll3'_descend \<Longrightarrow>
 (! q e ls . x = (q, LSeq e ls) \<longrightarrow>
@@ -2597,7 +2604,7 @@ lemma ll3_assign_label_preserve_labels' :
    apply(auto  simp add:ll3'_descend.intros)
 
   apply(frule_tac [1] ll3_assign_label_length)
-   apply(drule_tac [1] ll3_assign_label_preserve_child) apply(auto)
+   apply(drule_tac [1] ll3_assign_label_preserve_child2) apply(auto)
    apply(rule_tac [1] ll3'_descend.intros) apply(auto)
 
   apply(case_tac bc, auto)
@@ -2612,10 +2619,12 @@ lemma ll3_assign_label_preserve_labels' :
    apply(subgoal_tac [1] "(((ac, bf), llt.LSeq enew ls), ((aa, bb), llt.LSeq x51 x52), n) \<in> ll3'_descend")
     apply(rule_tac [2] ll3'_descend_relabel) apply(auto)
   apply(rule_tac [1] ll3'_descend.intros) apply(auto)
-
+  apply(rotate_tac [1] 1)
   (* we need a "relabeling" lemma for ll3'_descend, saying that we can
      change the annotation on the root Seq node *)
-  
+  apply(drule_tac [1] 
+ "ll3'_descend_relabel"[of x]) apply(auto)  
+
 
     apply(rule_tac [2] ll3'_descend.intros)
 
@@ -2632,7 +2641,8 @@ lemma ll3_assign_label_preserve_labels' :
    apply(auto  simp add:ll3'_descend.intros)
 
 
-(* necessary sublemma for valid3' *)
+(* necessary sublemma for valid3' (?) *)
+(*
 lemma ll3_assign_label_preserve_labels' :
 "
   (! e l l' p n . t = (x, LSeq e l) \<longrightarrow> 
@@ -2644,7 +2654,7 @@ lemma ll3_assign_label_preserve_labels' :
       (! n . n < length l \<longrightarrow> (! x l2 e . l!n = (x,LSeq e l2) \<longrightarrow>
       (\<not> (\<exists> k y e' .
         (l!n, (y, LLab e' ((List.length k) + (List.length p) + 1)), k) \<in> ll3'_descend)))))"
-
+*)
 (* do we need to use descend instead of set? *)
 (* maybe not, but maaybe we can use "!" operator *)
 (* s'@p' ?*)
@@ -2713,7 +2723,6 @@ this is also noot quite right *)
     apply(auto)
        apply(drule_tac[1] ll3_consume_label_unch, auto)
        apply(drule_tac [1] ll3_assign_label_qvalid2, auto)
-       apply(drule_tac[1] ll3_consume_label_unch, auto)
 
     apply(drule_tac [1] ll3_consume_label_find, auto)
     (* we need a "assign_label_list_sane" lemma about how
