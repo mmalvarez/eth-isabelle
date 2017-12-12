@@ -2933,6 +2933,17 @@ fun ll3_resolve_jump :: "ll3 list \<Rightarrow> nat option \<Rightarrow> nat \<R
         else JFail (n#absol))
         else ll3_resolve_jump ls (Some addr) (n+1) rel absol)"
 
+|  "ll3_resolve_jump ((_, LJmpI e idx s)#ls) None n rel absol = 
+   (if idx + 1 = length rel then JFail (n#absol)
+    else ll3_resolve_jump ls None (n+1) rel absol)"
+
+| "ll3_resolve_jump ((_, LJmpI e idx s)#ls) (Some addr) n rel absol =
+     (if idx (*+ 1*) = length rel then
+        (if s < encode_size addr then JBump (n#absol) else
+         if s = encode_size addr then ll3_resolve_jump ls (Some addr) (n + 1) rel absol
+        else JFail (n#absol))
+        else ll3_resolve_jump ls (Some addr) (n+1) rel absol)"
+
  | "ll3_resolve_jump ((_, LSeq [] lsdec)#ls') oaddr n rel absol =
      (* first we resolve the descendents' labels relative to where we were *)
      (case ll3_resolve_jump lsdec oaddr 0 (n#rel) (n#absol) of
@@ -3013,6 +3024,11 @@ fun ll3_inc_jump :: "ll3 list \<Rightarrow> nat \<Rightarrow> childpath \<Righta
      (((x,x'+1), LJmp e idx (s+1))#(ll3_bump 1 ls), True)
        else (case ll3_inc_jump ls (n+1) [c] of
                   (ls', b) \<Rightarrow> (((x,x'), LJmp e idx s)#(ls'), b)))"
+  | "ll3_inc_jump (((x,x'), LJmpI e idx s)#ls) n [c] = 
+     (if n = c then
+     (((x,x'+1), LJmpI e idx (s+1))#(ll3_bump 1 ls), True)
+       else (case ll3_inc_jump ls (n+1) [c] of
+                  (ls', b) \<Rightarrow> (((x,x'), LJmpI e idx s)#(ls'), b)))"
   (* TODO: should we use computed lsdec' or old lsdec in failure to find case *)
   | "ll3_inc_jump (((x,x'), LSeq e lsdec)#ls) n (c#cs) =
      (if n = c then case ll3_inc_jump lsdec 0 cs of
@@ -3129,6 +3145,10 @@ fun write_jump_targets :: "nat option list \<Rightarrow> ll4 \<Rightarrow> ll4 o
   (case mynth ns idx of
    Some a \<Rightarrow> Some ((x,x'), LJmp a idx sz)
   | None \<Rightarrow> None)"
+| "write_jump_targets ns ((x,x'), LJmpI _ idx sz) = 
+  (case mynth ns idx of
+   Some a \<Rightarrow> Some ((x,x'), LJmpI a idx sz)
+  | None \<Rightarrow> None)"
 | "write_jump_targets _ T = Some T"
 
 value "(case prog3 of
@@ -3190,6 +3210,23 @@ value "pipeline' src3 20"
 
 
 value "pipeline src3 20"
+
+definition progif :: ll1 where
+"progif =
+ll1.LSeq [
+ll1.LSeq [
+ll1.L ( Stack (PUSH_N [0])),
+ll1.LJmpI 0,
+ll1.L (Stack (PUSH_N [1])),
+ll1.LJmp 1,
+ll1.LLab 0,
+ll1.L (Stack (PUSH_N [2])),
+ll1.LLab 1
+]]
+"
+
+value "pipeline' progif 30"
+value "pipeline progif 30"
 (* idea: *)
 (* for final codegen pass, use stack_inst.PUSH_N
    *)
