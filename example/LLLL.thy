@@ -3060,6 +3060,9 @@ apply(rule_tac [1] ll3'_descend_relabel)
 (* This lemma seems like a key point right now *)
 (* Is the issue that we should be characterizing
 all LLab descendents, not just some? *)
+(*
+OR: do we need some kind of seq \<rightarrow> seq fact
+*)
 lemma ll3_assign_label_preserve_labels' :
 " (x, y, k) \<in> ll3'_descend \<Longrightarrow>
 (! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
@@ -3099,7 +3102,10 @@ next
   apply(drule_tac[1] ll3_hasdesc) 
       apply(drule_tac[1] ll3_hasdesc)  apply(auto)
 
-
+  (* idea ? - this is transitivity
+     we should combine the two descends facts,
+and then use a lemma about descends (?) 
+no, that is just the same theorem again *)
 
 
     
