@@ -497,12 +497,21 @@ inductive_set ll_valid3' :: "('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3' set" where
                  (z \<in> set l \<Longrightarrow> z \<in> ll_valid3') \<Longrightarrow>
                  (\<not> (\<exists> k y e' . ((x, LSeq e l), (y, LLab e' (List.length k - 1)), k) \<in> ll3'_descend)) \<Longrightarrow>
                  (x, (LSeq [] l)) \<in> ll_valid3'"
+
+(* old version that assumed labels were true
+*)
+(*
   | "\<And> x l e  z k y. (x, l) \<in> ll_validl_q \<Longrightarrow>
                 (z \<in> set l \<Longrightarrow> z \<in> ll_valid3') \<Longrightarrow>
                 (((x, LSeq e l), (y, LLab True (List.length k - 1)), k) \<in> ll3'_descend) \<Longrightarrow>
                 (\<And> k' y' . (((x, LSeq e l), (y, LLab True (List.length k' - 1)), k') \<in> ll3'_descend) \<Longrightarrow> k = e \<and> k = k' \<and> y = y') \<Longrightarrow>
                 (x, LSeq k l) \<in> ll_valid3'"
-
+*)
+  | "\<And> x l e  z k y. (x, l) \<in> ll_validl_q \<Longrightarrow>
+                (z \<in> set l \<Longrightarrow> z \<in> ll_valid3') \<Longrightarrow>
+                (((x, LSeq e l), (y, LLab True (List.length k - 1)), k) \<in> ll3'_descend) \<Longrightarrow>
+                (\<And> k' y' b . (((x, LSeq e l), (y, LLab b (List.length k' - 1)), k') \<in> ll3'_descend) \<Longrightarrow> b = true \<and> k = e \<and> k = k' \<and> y = y') \<Longrightarrow>
+                (x, LSeq k l) \<in> ll_valid3'"
 (* old version of ll3 validity, may have bugs *)
 (*
 inductive_set ll_valid3 :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll set"
@@ -669,363 +678,6 @@ lemma cp_less_least :
   apply(induction rule:cp_less.induct)
     apply(auto)
   done
-(*
-lemma cp_less_trans :
-"(cp_less p1 p2 \<Longrightarrow>
-  (! p3 . cp_less p2 p3 \<longrightarrow> cp_less p1 p3))"
-  apply(induction rule:cp_less.induct) apply(auto)
-    apply(case_tac[1] p3, auto)
-  apply(drule_tac cp_less_least, auto)
-    apply(rule_tac[1] cp_less.intros)
-
-   apply(drule_tac [1] cp_less.cases) apply(auto)
-    apply(rule_tac[1] cp_less.intros)
-"
-
-lemma cp_rev_less_trans :
-"(! p2 . cp_rev_less p1 (p2) \<longrightarrow>
-  (! p3 . cp_rev_less p2 p3 \<longrightarrow> cp_rev_less p1 p3))"
-  apply(induction p1) apply(auto)
-   apply(case_tac p3, auto)
-  apply(case_tac p2, auto)
-
-    apply(drule_tac [1] cp_rev_less_least, auto)
-       apply(drule_tac [1] cp_rev_less_least, auto)
-   apply(case_tac p2, auto)
-       apply(drule_tac [1] cp_rev_less_least, auto)
-    apply(subgoal_tac [1] "? list' n'' . (a#list) = list'@[n'']")
-  apply(auto)
-    apply(rule_tac [1] cp_rev_less.intros) 
-  apply(blast)
-
-
-  
-
-  apply(drule_tac [2] cp_rev_less.cases) apply(auto)
-  apply(drule_tac [1] cp_rev_less.cases) apply(auto)
-    apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-   apply(case_tac l, auto)
-    apply(case_tac t'a, auto)
-    apply(drule_tac [1] cp_rev_less_least, auto)
-
-   apply(drule_tac [1] cp_rev_less.cases) apply(auto)
-    
-    apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-
-   apply(case_tac "pp @ aa # lista", auto)
-
-       apply(drule_tac [1] cp_rev_less_least, auto)
-
-    apply(rule_tac [1] cp_rev_less.intros)
-  apply(drule_tac [1] cp_rev_less.cases) apply(auto)
-  apply(drule_tac [1] cp_rev_less.cases) apply(auto)
-    apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-  
-
-  apply(case_tac[1] p, auto)
-
-lemma cp_rev_less_trans :
-"(cp_rev_less p2 p3 \<Longrightarrow>
-  (! p1 . cp_rev_less p1 p2 \<longrightarrow> cp_rev_less p1 p3))"
-  apply(induction rule:cp_rev_less.induct) apply(auto)
-  apply(case_tac p1, auto)
-    apply(drule_tac [1] cp_rev_less_least, auto)
-   apply(drule_tac [1] cp_rev_less_least, auto)
-  apply(drule_tac[1] cp_rev_less.cases, auto)
-   apply(rule_tac [1] cp_rev_less.intros)
-    apply(rule_tac [1] cp_rev_less.intros, auto) 
-
-  apply(drule_tac[1] cp_rev_less.cases, auto)
-  apply(subgoal_tac[1] "t@[n] = (tb@[na])@l") apply(auto)
-     apply(case_tac[1] l, auto)
-   apply(rule_tac [1] cp_rev_less.intros)
-
-  apply(case_tac ta, auto)
-  apply(case_tac [1] "(t' @ [n'])", auto)
-     apply(rule_tac [1] cp_rev_less.intros) 
-    apply(subgoal_tac [1] "? list' n'' . (a#list) = list'@[n'']")
-  apply(clarsimp)
-
-  apply(drule_tac[1] cp_rev_less.cases, auto)
-      apply(rule_tac [1] cp_rev_less.intros)  apply(auto)
-
-  apply(case_tac [1] l, auto)
-
-      apply(subgoal_tac[1] "cp_rev_less (list' @ [n'']) (t@[n])")
-       apply(thin_tac [1] "cp_rev_less (a # list) (t @ [n])")
-       apply(drule_tac [1] cp_rev_less.cases, auto)
-  apply(subgoal_tac [1] "na = n''", auto)
-
-  apply(case_tac [1] "(t' @ [n'])", auto)
-    apply(rule_tac [1] cp_rev_less.intros) 
-   apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-
-  apply(case_tac l, auto)
-
-     apply(drule_tac[1] cp_rev_less.cases, auto)
-  apply(case_tac [1] "(t' @ [n'])", auto)
-    apply(rule_tac [1] cp_rev_less.intros) 
-      apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-     apply(drule_tac[1] cp_rev_less.cases, auto)
-
-  apply(case_tac[1] "t = ta") apply(auto)
-    apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-   apply(drule_tac[1] cp_rev_less.cases, auto)
-
-  apply(case_tac [1] l, auto)
-
-  apply(case_tac p3, auto)
-    apply(drule_tac [1] cp_rev_less_least, auto)
-   apply(subgoal_tac [1] "? l z . (a#list) = l@[z]") apply(clarify) apply(auto)
-
-     apply(drule_tac[1] cp_rev_less.cases, auto)
-   apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-    apply(case_tac [1] la, auto) 
-      apply(subgoal_tac [1] "cp_rev_less (t@[n]) (l@[z])")
-      apply(rule_tac [2] cp_rev_less.intros) apply(auto)
-
-     apply(drule_tac[1] cp_rev_less.cases, auto)
-     apply(case_tac [1] la, auto)
-     apply(drule_tac[1] cp_rev_less.cases, auto)
-
-   apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-
-
-     apply(subgoal_tac [1] "cp_rev_less (t'@[n']) (l@[z])")
-      apply(thin_tac [1] "cp_rev_less (t' @ [n']) (a # list)") apply(drule_tac [1] cp_rev_less.cases) apply(auto) 
-      apply(subgoal_tac [1] "t'a@[n'a] = l@[z]") apply(clarify) apply(auto)
-      apply(subgoal_tac [1] "t'a@[n'a] = l@[z]") apply(clarify) apply(auto)
-
-
-  apply(d
-       apply(case_tac suf, auto)
-  apply(case_tac pre1, auto)
-   apply(rule_tac [1] cp_rev_less.intros)
-
-
-lemma cp_rev_less_trans :
-"(! p1 . cp_rev_less p1 p2 \<longrightarrow>
-  (! p3 . cp_rev_less p2 p3 \<longrightarrow> cp_rev_less p1 p3))"
-  apply(induction p2, auto)
-   apply(drule_tac [1] cp_rev_less_least, auto)
-apply(case_tac p3, auto)
-   apply(drule_tac [1] cp_rev_less_least, auto) apply(drule_tac [1] cp_rev_less_least, auto)
-  apply(frule_tac[1] cp_rev_less.cases, auto)    apply(rule_tac [1] cp_rev_less.intros)
-  apply(case_tac[1] p', auto)
-   apply(rule_tac [1] cp_rev_less.intros)
-  apply(subgoal_tac [1] "cp_rev_less p1 p2") apply(auto)
-
-  apply(case_tac p1, auto) apply(case_tac p3, auto)
-    apply(drule_tac [1] cp_rev_less_least, auto)
-    apply(drule_tac [1] cp_rev_less_least, auto)
-  apply(rule_tac [1] cp_rev_less.intros)
-
-   apply(frule_tac [1] cp_rev_less.cases, auto)
-    apply(case_tac p3, auto)
-    apply(drule_tac [1] cp_rev_less_least, auto)
-   apply(rule_tac [1] cp_rev_less.intros)
-
-  
-
-lemma cp_rev_less_trans :
-"cp_rev_less p1 p2 \<Longrightarrow>
-  (! p3 . cp_rev_less p2 p3 \<longrightarrow> cp_rev_less p1 p3)"
-  apply(induction rule: cp_rev_less.induct)
-    apply(auto)
-    apply(case_tac p3, auto)
-       apply(drule_tac [1] cp_rev_less_least, auto)
-
-       apply (drule_tac[1] cp_rev_less.cases, auto)
-     apply(rule_tac[1] cp_rev_less.intros(1))
-
-    apply(case_tac l, auto) apply(case_tac t', auto)
-       apply(drule_tac [1] cp_rev_less_least, auto)
-
-
-     apply(subgoal_tac [1] "? xl z. (a#list) = xl@[z]") apply(clarify) apply(auto)
-  apply(case_tac [2] list, auto)
-
-
-      apply(case_tac p3, auto)
-       apply(drule_tac [1] cp_rev_less_least, auto)
-      apply(rule_tac[1] cp_rev_less.intros(1))
-       apply (drule_tac[1] cp_rev_less.cases, auto)
-        apply(rule_tac[1] cp_rev_less.intros(2), auto)
-
-       apply(case_tac suf, auto)
-        apply(drule_tac [1] cp_rev_less.intros(2))
-  apply(rotate_tac [1] 1)
-    apply(drule_tac [1] cp_rev_less.intros(5))
-  apply(auto)
-       apply(drule_tac [1] cp_rev_less_least, auto)
-
-       apply (drule_tac[1] cp_rev_less.cases, auto)
-        apply(auto simp add:cp_rev_less.intros)
-
-       apply(case_tac suf, auto)
-  apply(drule_tac[1] cp_rev_less.intros(2)
-
-lemma cp_rev_less_suc1 :
-"cp_rev_less k p \<Longrightarrow>
-  (! n t . k = Suc n # t \<longrightarrow>
-   cp_rev_less (n#t) p)"
-  apply(induction rule: cp_rev_less.induct)
-    apply(auto simp add:cp_rev_less.intros)
-    apply(case_tac pre1, auto simp add:cp_rev_less.intros)
-     apply(subgoal_tac "cp_rev_less ")
-
-(* auto simp add:cp_rev_less.intros*)
-     apply(subgoal_tac "cp_rev_less (pre1@suf) (pre2@suf)")
-      apply(auto simp add:cp_rev_less.intros)
-      apply(case_tac [1] "pre2@suf", auto)
-  apply(drule_tac [1] "cp_rev_less.cases") apply(auto)
-(*  apply(subgoal_tac "*)
-     apply(rule_tac [2] cp_rev_less.intros) apply(auto)
-
-   apply(subgoal_tac "cp_rev_less ((na#list)@[n]) (t'@[n'])")
-    apply(rule_tac [2] cp_rev_less.intros) apply(auto)
-  apply(case_tac [1] t, auto)
-   apply(subgoal_tac "cp_rev_less ([n]@ta) ((t' @ [Suc n])@ta)")
-    apply(rule_tac [2] cp_rev_less.intros) apply(auto)
-   apply(subgoal_tac "cp_rev_less ([]@[n]) ((t' @ [Suc n]))")
-    apply(rule_tac [2] cp_rev_less.intros) apply(auto)
-
-  apply(subgoal_tac "cp_rev_less ((n#list)@l) (t'@l)")
-   apply(rule_tac [2] cp_rev_less.intros) apply(auto)
-  done
-
-
-
-lemma cp_rev_less_prefix1 :
-"\<And> l h pre .cp_rev_less l ((h#pre)@l)"
-  apply(subgoal_tac "cp_rev_less ([]@l) ((h#pre)@l)")
-   apply(rule_tac [2] cp_rev_less.intros(3))
-   apply(rule_tac [2] cp_rev_less.intros(1))
-  apply(auto)
-  done
-
-lemma cp_rev_less_app :
-"cp_rev_less k p \<Longrightarrow>
- (! kpre kpost . k = kpre @ kpost \<longrightarrow>
-ll  (! ppre ppost . p = ppre @ ppost \<longrightarrow>
-   cp_rev_less kpost ppost \<or>
-   (kpost = ppost \<and> cp_rev_less kpre ppre)))"
-  apply(induction rule:cp_rev_less.induct)
-    apply(auto simp add:cp_rev_less.intros)
-       apply(case_tac [1] ppost, auto)
-       apply(subgoal_tac "cp_rev_less [] (a#list)")
-        apply(rule_tac [2]cp_rev_less.intros(1)) apply(auto)
-
-       apply(case_tac [1] ppost, auto)
-       apply(rule_tac [1]cp_rev_less.intros(1))
-             apply(subgoal_tac "cp_rev_less [] (a#list)")
-       apply(rule_tac [2]cp_rev_less.intros(1)) apply(auto)
-     apply(case_tac kpost, auto)
-  apply(case_tac ppost, auto)
-             apply(subgoal_tac "cp_rev_less [] (a#list)")
-       apply(rule_tac [2]cp_rev_less.intros(1)) apply(auto)
-
-(* we need a lemma here *)
-  apply(subgoal_tac[1] "cp_rev_less (a#list) ppost") apply(clarify)
-    apply(case_tac ppost, auto)
-
-      apply(auto)
-     apply
-  apply(drule_tac cp_rev_less_least) apply(auto)
-
-lemma cp_rev_less_sucs :
-"cp_rev_less k p \<Longrightarrow>
-  (! kp m  . k = (kp @ [m]) \<longrightarrow>
-    (! pp n . p = pp @ [n] \<longrightarrow>
-      (cp_rev_less (kp@[Suc m]) (pp@[Suc n]))))"
-  apply(induction rule:cp_rev_less.induct)
-    apply(auto simp add:cp_rev_less.intros)
-  apply(case_tac t, auto) 
-   apply(subgoal_tac [1] "cp_rev_less (kp @ [Suc n]) ((t' @ kp) @[Suc n])")
-    apply(rule_tac [2] cp_rev_less.intros(3))
-    apply(subgoal_tac [2] "cp_rev_less ([]@kp) (t'@kp)")
-     apply(rule_tac [3] cp_rev_less.intros(3)) apply(auto)
-
-  apply(case_tac t', auto)
-   apply(drule_tac cp_rev_less_least) apply(auto)
-
-  apply(case_tac l, auto)
-
-  apply(subgoal_tac "? kp' m' . a # list = kp' @ [m']")
-   apply(clarsimp)
-   apply(subgoal_tac[1] "? pp' n' . aa # lista = pp' @ [n']")
-    apply(clarsimp) apply(case_tac[2] lista, auto)
-  apply(rotate_tac [1] 1)
-  apply(drule_tac[1] cp_rev_less.cases) apply(auto)
-  apply(rule_tac [2] cp_rev_less_prefix1)
-   apply(rule_tac [2] cp_rev_less.intros(1))
-  apply(auto)
-
-  apply(rule_tac [2] cp_rev_less_prefix1)
-  apply(
-  apply(case_tac list, auto) 
-  
-
-(*
-lemma cp_rev_less_less :
-"cp_rev_less k p \<Longrightarrow>
-  (! pre suf . k = pre @ suf \<longrightarrow>
-   (! suf' . cp_rev_less suf' suf \<longrightarrow> cp_rev_less (pre@suf') p))"
-
-  apply(induction rule: cp_rev_less.induct)
-    apply(auto simp add:cp_rev_less.intros)
-    apply(drule_tac cp_rev_less.cases) apply(auto)
-  apply(drule_tac cp_rev_less_least) apply(auto)
-    apply(case_tac suf', auto simp add:cp_rev_less'.intros)
-
-    apply(drule_tac cp_rev_less'.cases) apply(auto)
-   apply(case_tac pre, auto simp add:cp_rev_less'.intros)
-    apply(case_tac suf', auto simp add:cp_rev_less'.intros)
-  apply(drule_tac [1] cp_rev_less'.cases, auto simp add:cp_rev_less'.intros)
-   apply(case_tac list, auto simp add:cp_rev_less'.intros)
-   apply(rule_tac [1] cp_rev_less'.intros)
-   apply(rule_tac [1] cp_rev_less'.intros)
-   
-   apply(rule_tac [1] cp_rev_less'.intros(3))
-    
-  done
-*)
-lemma cp_rev_less_n :
-"cp_rev_less [n] (h#t@[n])"
-  apply(induction t)
-   apply(auto simp add:cp_rev_less.intros)
-  apply(subgoal_tac "cp_rev_less ([]@[n]) ([h]@[n])")
-    apply(rule_tac [2] cp_rev_less.intros(3))
-    apply(auto  simp add:cp_rev_less.intros)
-  apply(subgoal_tac "cp_rev_less ([]@[n]) ((h#a#t)@[n])")
-      apply(rule_tac [2] cp_rev_less.intros(3))
-    apply(auto  simp add:cp_rev_less.intros)
-  done
-*)
-(*
- cp_rev_less' (pp @ [k - Suc n])
-        (pp2 @ [k2 - Suc n2]) \<Longrightarrow>
-       cp_rev_less' (pp @ [k - n])
-        (pp2 @ [k2 - n2])
-*)
-(*
-lemma cp_rev_less_sub :
-"cp_rev_less p1 p2 \<Longrightarrow>
- (! pp1 a1 . p1 = pp1 @ [a1] \<longrightarrow> 
- (! pp2 a2 . p2 = pp2 @ [a2] \<longrightarrow>
- (! a1' a2' . a1' < a1 \<longrightarrow> a2' < a2 \<longrightarrow> cp_rev_less (pp1 @ [a1']) (pp2 @ [a2']))))"
-  apply(induction rule: cp_rev_less.induct) apply(auto)
-  apply(rule_tac [1] cp_rev_less.intros) apply(auto)
-  apply(auto simp add:cp_rev_less'.intros)
-*)
-(* i should not do it this way *)
-(*
-inductive cp_rev_less :: "childpath \<Rightarrow> childpath \<Rightarrow> bool" where
-"\<And> n t . cp_rev_less [] (n#t)"
-| "\<And> n n' t t' . n < n' \<Longrightarrow> cp_rev_less (t@[n]) (t'@[n'])"
-| "\<And> n t t' . cp_rev_less t t' \<Longrightarrow> cp_rev_less (t@[n]) (t'@[n])"
-*)
-
 type_synonym consume_label_result = "(ll3 list * childpath) option"
 
 
@@ -3355,6 +3007,90 @@ proof(induction rule:ll3'_descend.induct)
     sorry
 qed
 
+lemma haslast2 : 
+"l = h # t \<Longrightarrow> ? ch ct . l = ch @ [ct]"
+  apply(insert haslast'[of "h#t"])
+  apply(auto)
+  done
+
+(* a sublemma needed for consume_label_found
+note that as written it's not quite right,
+we need last/butlast or something
+*)
+lemma ll3'_descend_cons :
+"((q, LSeq e l), x, k) \<in> ll3'_descend \<Longrightarrow>
+ (! q' e' h . ((q', LSeq e' (h#l')), x, k)) \<in> ll3'_descend
+"
+
+(* treat case where returned path is nonnil *)
+(* characterize returned path of consume_label
+(do we need to use validity induction for this? 
+Q: do we have a lemma that already captures this
+ll3_consume_label char might do
+
+TODO
+we need to generalize this to arbitrary nonnil outputs
+the way we are using last/butlast is wrong here
+*)
+lemma ll3_consume_label_found':
+"
+(! q e ls .  (t :: ll3) =  (q, LSeq e ls) \<longrightarrow>
+(! ls' p p' n . ll3_consume_label p n ls = Some (ls', p' ) \<longrightarrow> p' \<noteq> [] \<longrightarrow>
+  ( ? pp k . p' = pp @ k # p \<and>
+  (! q' e' . ((q, LSeq e' ls), (q', LLab True (length p' - 1)), pp @ [(k - n)]) \<in> ll3'_descend)
+)))
+\<and>
+(! p n ls' p'  . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> p' \<noteq> [] \<longrightarrow>
+  ( ? pp k . p' = pp @ k # p \<and>
+  (! e q q'  . ((q, LSeq e ls), (q', LLab True (length p' - 1)), pp @ [(k - n)]) \<in> ll3'_descend)))
+"
+proof(induction rule:my_ll_induct)
+  case 1 thus ?case by auto next
+  case 2 thus ?case by auto next
+  case 3 thus ?case by auto next
+  case 4 thus ?case by auto next
+  case (5 q e l) thus ?case
+    apply(auto)  
+    apply(drule_tac x = p in spec)
+apply(drule_tac x = n in spec)
+    apply(drule_tac x = ls' in spec)
+    apply(auto)
+     apply(case_tac q) apply(auto)
+    apply(case_tac q) apply(auto)
+
+    done next
+  
+  case 6
+  then show ?case by auto next
+  case (7 h l)
+  thus ?case
+    apply(auto)
+    apply(case_tac h, auto)
+    apply(case_tac ba, auto)
+        apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
+        apply(frule_tac[1] ll3_consume_label_sane1) apply(simp) apply(auto)
+
+         apply(drule_tac[1] x = p in spec)
+    apply(rotate_tac [1] 4)
+         apply(drule_tac [1] x = "Suc n" in spec) apply(auto)
+(* here is the point where we need a "shifting" lemma for descend *)
+        apply(drule_tac[1] x = e in spec)
+        apply(drule_tac[1] x = a in spec) apply(drule_tac[1] x = b in spec) apply(auto)
+        apply(rule_tac [1] x = ac in exI) apply (rule_tac [1] x = bb in exI)
+    apply(drule_tac [1] ll3'_descend.cases) apply(auto)
+         apply(rule_tac[1] ll3'_descend.intros) apply(auto) 
+    apply(case_tac[1] l, auto)
+         (* we seem to need another lemma here, about 
+            what happens to the descendents relation when we cons onto a list of nodes
+           for now i'm trying to get by with "cases"
+  *)
+         
+         apply(auto)
+        apply(drule_tac [1] x = "[]" in spec)
+apply(drule_tac [1] x = "[]" in spec)
+        
+  
+    
 (* do we need to use descend instead of set? *)
 (* maybe not, but maaybe we can use "!" operator *)
 (* s'@p' ?*)
@@ -3404,23 +3140,14 @@ next
        apply(case_tac "ll3_consume_label [] 0 l", auto)
      apply(case_tac "ll3_assign_label_list aa", auto)
 
-
-    (* idea, now we need to give a little help to stitch together consumes facts *)
-
      apply(case_tac ba, auto)
     apply(drule_tac [1] x = "[]" in spec)
       apply(drule_tac [1] x = "aa" in spec) apply(auto)
        apply(drule_tac [1] ll3_consumes.intros) apply(auto)
 
-    (* one approach: a lemma saying assign_label does not modify descended LLab nodes
-        at lesser deptths (?) *)
-    (* Another option: if everything in a list is valid3', the only  way for the list to
-     be invalid is if there is an isssue of labels at depth 1 (?)
-this is also noot quite right *)
     apply(frule_tac [1] ll3_consume_label_unch, auto)
 
     apply(rule_tac[1] ll_valid3'.intros(5)[of _ _ _ "[]"])
-(*    apply(rule_tac ll_valid3'.intros(5))  *)
     apply(auto)
        apply(drule_tac [1] ll3_assign_label_qvalid2, auto)
       apply(frule_tac [1] ll3_assign_label_preserve_labels')
@@ -3437,11 +3164,41 @@ this is also noot quite right *)
       apply(frule_tac [1] ll3_descend_nonnil) apply(auto)
 (* we finished this part! *)
 (* now on to more fun *)
-     apply(subgoal_tac[1] "(l, [((a # list), 0)], aa) \<in> ll3_consumes")
-    apply(drule_tac[2] ll3_consumes.intros)
-       apply(frule_tac [1] ll3_consumes.intros) apply(auto)
 
-     apply(rule_tac[1] ll_valid3'.intros(6)[of _ _ _ "rev list @ [a]"])
+     apply(subgoal_tac "a#list = a#list") 
+    apply(drule_tac [1] haslast2) apply(auto)
+     
+     apply(subgoal_tac[1] "(l, [((ch @ [ct]), 0)], aa) \<in> ll3_consumes")
+      apply(drule_tac[2] ll3_consumes.intros(3)) apply(auto)
+    apply(drule_tac [1] x = "[(ch @ [ct], 0)]" in spec)
+    apply(drule_tac [1] x = "aa" in spec) apply(auto)
+
+(* ok, we just changed
+valid3' so that it doesn't assume labels are true in the non nil case
+we probably need some kind of "uniqueness" lemma for ll3_assign_labels
+showing that other labels at that depth get weeded out in the form of a nil result
+(unless this happens automatically somehow)
+*)
+
+    (* we need a consume_label_found fact, characterizing the existence
+       of the consumed node, when non nil returned
+something modeled after
+(*
+lemma ll3_consume_label_find :
+"(l1, l2, k) \<in> ll3'_descend \<Longrightarrow>
+ (! x1 e1 l1l . l1 = (x1, LSeq e1 l1l) \<longrightarrow>
+ (! x2 e2 d . l2 = (x2, LLab e2 d) \<longrightarrow>
+ (! p n l1l' . ll3_consume_label p n l1l = Some (l1l', []) \<longrightarrow>
+ d + 1 \<noteq> length k + length p)))
+"
+*)
+    *)
+    (* we also have to prove that if assign_label_list returned Some,
+       there are no other nodes at that depth *)
+    apply(frule_tac[1] ll3_consume_label_find)
+
+     apply(rule_tac[1] ll_valid3'.intros(6)[of _ _ _ "rev list @[a]"])
+        apply(case_tac [1] "(n,n')", simp)
 
 
     (* another possible option here?
