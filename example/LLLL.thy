@@ -3016,33 +3016,65 @@ lemma haslast2 :
 (* a sublemma needed for consume_label_found
 note that as written it's not quite right,
 we need last/butlast or something
+i think what we really need is to generalize to
+l1 @ l2, where head # tail is a special case
 *)
+
+(*
+idea:
+- if Seq l1, t1, k1 \in ll3'_descend and
+- Seq l2, t2, k2 \in ll3'_descend and
+- k2 = h2 # t2 then
+- Seq (l1 @ l2), t1, k1 \in ll3'_descend and
+- Seq (l1 @ l2), t2, ((h2 + length l1)#t2) \in ll3'_descend
+*)
+
 lemma ll3'_descend_cons :
-"((q, LSeq e l), x, k) \<in> ll3'_descend \<Longrightarrow>
- (! q' e' h . ((q', LSeq e' (h#l')), x, k)) \<in> ll3'_descend
+"(t1, t2, k) \<in> ll3'_descend \<Longrightarrow>
+ (? q e l . t1 = (q, LSeq e l) \<and> (? kh kt . k = kh # kt \<and>
+  (! q' e' h . ((q', LSeq e' (h#l)), t2, (kh+1)#kt) \<in> ll3'_descend)))
 "
+proof(induction rule:ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case
+    apply(auto simp add:ll3'_descend.intros) done
+next
+  case (2 t t' n t'' n')
+  then show ?case 
+    apply(auto)
+    apply(subgoal_tac " (((ab, bb), llt.LSeq e' (((ac, bc), bd) # l)),
+        t'', (Suc kh # kt) @ (kha # kta))
+       \<in> ll3'_descend"
+)
+    apply(rule_tac[2] ll3'_descend.intros(2)) apply(auto)
+done qed
 
-(* treat case where returned path is nonnil *)
-(* characterize returned path of consume_label
-(do we need to use validity induction for this? 
-Q: do we have a lemma that already captures this
-ll3_consume_label char might do
+(* should we be talking about ls or ls' here? *)
+(* i think in the context of the lemma we are trying to prove,
+we want to be talking about ls' *)
 
-TODO
-we need to generalize this to arbitrary nonnil outputs
-the way we are using last/butlast is wrong here
+(*
+Q: should we be talking about the absence of "finds"
+in previous children? i imagine we need this at some point,
+but maybe it should be a different lemma
+*)
+(* there seems to be some kind of problem with Suc n here?
+we _also_ need k \<ge> n
+
 *)
 lemma ll3_consume_label_found':
 "
 (! q e ls .  (t :: ll3) =  (q, LSeq e ls) \<longrightarrow>
 (! ls' p p' n . ll3_consume_label p n ls = Some (ls', p' ) \<longrightarrow> p' \<noteq> [] \<longrightarrow>
-  ( ? pp k . p' = pp @ k # p \<and>
-  (! q' e' . ((q, LSeq e' ls), (q', LLab True (length p' - 1)), pp @ [(k - n)]) \<in> ll3'_descend)
+  ( ? pp k . p' = pp @ k # p \<and> k \<ge> n \<and>
+  (! q' e' . ((q, LSeq e' ls), (q', LLab False (length p' - 1)), (k - n)#(rev pp)) \<in> ll3'_descend \<and>
+             ((q, LSeq e' ls'), (q', LLab True (length p' - 1)), (k - n)#(rev pp)) \<in> ll3'_descend)
 )))
 \<and>
 (! p n ls' p'  . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> p' \<noteq> [] \<longrightarrow>
   ( ? pp k . p' = pp @ k # p \<and>
-  (! e q q'  . ((q, LSeq e ls), (q', LLab True (length p' - 1)), pp @ [(k - n)]) \<in> ll3'_descend)))
+  (! e q q'  . ((q, LSeq e ls), (q', LLab False (length p' - 1)), (k - n)#(rev pp)) \<in> ll3'_descend \<and>
+               ((q, LSeq e ls'), (q', LLab True (length p' - 1)), (k - n)#(rev pp)) \<in> ll3'_descend)))
 "
 proof(induction rule:my_ll_induct)
   case 1 thus ?case by auto next
@@ -3053,11 +3085,11 @@ proof(induction rule:my_ll_induct)
     apply(auto)  
     apply(drule_tac x = p in spec)
 apply(drule_tac x = n in spec)
-    apply(drule_tac x = ls' in spec)
-    apply(auto)
+    apply(frule_tac ll3_consume_label_sane1, auto)
      apply(case_tac q) apply(auto)
+      apply(case_tac q) apply(auto)
     apply(case_tac q) apply(auto)
-
+apply(case_tac q) apply(auto)
     done next
   
   case 6
@@ -3067,16 +3099,117 @@ apply(drule_tac x = n in spec)
     apply(auto)
     apply(case_tac h, auto)
     apply(case_tac ba, auto)
+
         apply(case_tac[1] "ll3_consume_label p (Suc n) l", auto)
         apply(frule_tac[1] ll3_consume_label_sane1) apply(simp) apply(auto)
 
          apply(drule_tac[1] x = p in spec)
-    apply(rotate_tac [1] 4)
          apply(drule_tac [1] x = "Suc n" in spec) apply(auto)
-(* here is the point where we need a "shifting" lemma for descend *)
+         apply(drule_tac [1] x = e in spec)
+         apply(drule_tac [1] x = a in spec)
+         apply(drule_tac [1] x = b in spec)
+    apply(drule_tac [1] x = ac in spec)
+    apply(drule_tac [1] x = bb in spec) apply(auto)
+           apply(drule_tac [1] ll3'_descend_cons) apply(auto)
+         apply(drule_tac[1] x = "ab" in spec)
+    apply(drule_tac[1] x = "ba" in spec)
+    apply(drule_tac[1] x = "e" in spec)
+    apply(drule_tac[1] x = "a" in spec)
+    apply(drule_tac[1] x = "b" in spec)
+        apply(drule_tac[1] x = "llt.L () x12" in spec)
+         apply(case_tac [1] k, auto)
+         apply(subgoal_tac [1] "Suc (nat - n) = (Suc nat) - n")
+          apply(auto)
+
+        apply(drule_tac[1] x = p in spec)
+          apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
+          apply(drule_tac[1] x = e in spec)
+        apply(drule_tac[1] x = ab in spec)
+        apply(drule_tac[1] x = ba in spec)
+        apply(drule_tac[1] x = ac in spec)
+          apply(drule_tac[1] x = bb in spec) apply(auto)
+    apply(thin_tac [1]
+" (((ab, ba), llt.LSeq e l),
+        ((ac, bb), llt.LLab False (length pp + length p)),
+        (k - Suc n) # rev pp)
+       \<in> ll3'_descend
+")
+        apply(drule_tac [1] ll3'_descend_cons) apply(auto)
+        apply(drule_tac[1] x = ab in spec)
+        apply(drule_tac[1] x = ba in spec)
         apply(drule_tac[1] x = e in spec)
-        apply(drule_tac[1] x = a in spec) apply(drule_tac[1] x = b in spec) apply(auto)
-        apply(rule_tac [1] x = ac in exI) apply (rule_tac [1] x = bb in exI)
+apply(drule_tac[1] x = a in spec)
+apply(drule_tac[1] x = b in spec)
+        apply(drule_tac[1] x = "L () x12" in spec) 
+         apply(subgoal_tac [1] "Suc (k - Suc n) = (k) - n")
+           apply(auto)
+
+          apply(drule_tac[1] x = p in spec)
+        apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
+        apply(drule_tac[1] x = e in spec)
+        apply(drule_tac[1] x = ab in spec)
+        apply(drule_tac[1] x = ba in spec)
+        apply(drule_tac[1] x = ac in spec)
+         apply(drule_tac[1] x = bb in spec) apply(auto)
+    apply(thin_tac [1]
+"
+(((ab, ba), llt.LSeq e aa),
+        ((ac, bb), llt.LLab True (length pp + length p)),
+        (k - Suc n) # rev pp)
+       \<in> ll3'_descend
+")
+         apply(drule_tac[1] ll3'_descend_cons) apply(auto)
+         apply(drule_tac[1] x = ab in spec)
+         apply(drule_tac[1] x = ba in spec)
+         apply(drule_tac[1] x = e in spec)
+         apply(drule_tac[1] x = a in spec)
+apply(drule_tac[1] x = b in spec)
+         apply(drule_tac[1] x = "L () x12" in spec) 
+         apply(subgoal_tac [1] "Suc (k - Suc n) = (k) - n")
+           apply(auto)
+
+        apply(drule_tac[1] x = p in spec)
+          apply(drule_tac[1] x = "Suc n" in spec) apply(auto)
+          apply(drule_tac[1] x = e in spec)
+        apply(drule_tac[1] x = ab in spec)
+        apply(drule_tac[1] x = ba in spec)
+        apply(drule_tac[1] x = ac in spec)
+          apply(drule_tac[1] x = bb in spec) apply(auto)
+    apply(thin_tac [1]
+" (((ab, ba), llt.LSeq e l),
+        ((ac, bb), llt.LLab False (length pp + length p)),
+        (k - Suc n) # rev pp)
+       \<in> ll3'_descend
+")
+        apply(drule_tac [1] ll3'_descend_cons) apply(auto)
+        apply(drule_tac[1] x = ab in spec)
+        apply(drule_tac[1] x = ba in spec)
+        apply(drule_tac[1] x = e in spec)
+apply(drule_tac[1] x = a in spec)
+apply(drule_tac[1] x = b in spec)
+        apply(drule_tac[1] x = "L () x12" in spec) 
+         apply(subgoal_tac [1] "Suc (k - Suc n) = (k) - n")
+           apply(auto)
+
+
+       apply(case_tac [1] "x22 = length p") apply(auto)
+        apply(case_tac [1] "\<not>x21", auto)
+         apply(rule_tac[1] ll3'_descend.intros, auto)
+
+          
+        apply(frule_tac[1] ll3_consume_label_sane1) apply(simp) apply(auto)
+
+(* here is the point where we need a "shifting" lemma for descend *)
+    apply(subgoal_tac[1] "
+")
+         
+         apply(drule_tac[1] x = e in spec)
+         apply(drule_tac[1] x = a in spec) apply(drule_tac[1] x = b in spec)
+         
+         apply(drule_tac [1] x = ac in spec)
+         
+        apply(drule_tac [1] x = bb in spec)
+         apply (rule_tac [1] x = bb in exI)
     apply(drule_tac [1] ll3'_descend.cases) apply(auto)
          apply(rule_tac[1] ll3'_descend.intros) apply(auto) 
     apply(case_tac[1] l, auto)
