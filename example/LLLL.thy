@@ -1,6 +1,6 @@
 theory LLLL
   
-  imports Main Nat "~~/src/HOL/ex/MergeSort" "../ContractSem" "../RelationalSem" "../ProgramInAvl" "../Hoare/Hoare" "../lem/Evm" 
+  imports Main Nat "../ContractSem" "../RelationalSem" "../ProgramInAvl" "../Hoare/Hoare" "../lem/Evm" 
 begin
 
 value "CHR''0'' :: char"
@@ -2031,21 +2031,6 @@ lemma ll3_hasdesc2 :
   done
 
 
-(* this one needs work. is the "set" notation the issue *)
-lemma ll3_consume_label_nodesc :
-"
-  (! e l l' p n . t = (x, LSeq e l) \<longrightarrow> 
-  ll3_consume_label p n l = Some (l',[]) \<longrightarrow> 
-    (\<not> (\<exists> k y e' . 
-        ((x, LSeq e l), (y, LLab e' ((List.length k) + (List.length p))), k) \<in> ll3'_descend))) \<and>
-  (! l' p  n . ll3_consume_label p n l = Some (l', []) \<longrightarrow> 
-      (! r . r \<in> set l \<longrightarrow> (! x l2 e . r = (x,LSeq e l2) \<longrightarrow>
-      (\<not> (\<exists> k y e' .
-        (r, (y, LLab e' ((List.length k) + (List.length p) + 1)), k) \<in> ll3'_descend)))))"
-  apply(induction rule:my_ll_induct)
-  apply(auto)
-  sorry
-
 lemma ll3_consume_label_none_descend :
 "(l1, l2, k) \<in> ll3'_descend \<Longrightarrow>
  (! x1 e1 l1l . l1 = (x1, LSeq e1 l1l) \<longrightarrow>
@@ -2588,28 +2573,14 @@ lemma ll3'_descend_relabel [rule_format] :
   apply(rule_tac [1] ll3'_descend.intros) apply(auto)
   done
 
-(* change this to be about immediate child *)
-(*
-if our child is a seq with a descendent
-then labels with requisite depth will be our descendent in corresponding way
-Q: when  in this chain does assign_label come in?
-*)
-lemma ll3_assign_label_preserve_cons' :
-" ! c . c < length ls \<Longrightarrow> (! q e lsdec . ls ! c = (q, LSeq e lsdec) \<longrightarrow>
-  (! k e' q' . ((q, LSeq e lsdec), (q', LLab e' (length k)), k) \<in> ll3'_descend \<longrightarrow>
-  (!)))
-"
-(*
-" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
-(! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
-(! q' e' lsdec' . y = (q', LSeq e' lsdec') \<longrightarrow>
-(! k' e'' q'' . (y, (q'', LLab e'' (length k + length k' - 1)), k') \<in> ll3'_descend \<longrightarrow>
-(! ls eold . ll3_assign_label_list ls = Some ls' \<longrightarrow>
-       ((q, LSeq eold ls), (q'', LLab e'' (length k + length k' - 1)), k@k') \<in> ll3'_descend))))
-"
-*)
-  sorry
-
+lemma ll3'_descend_relabelq [rule_format] :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+  (! q t . x = (q, t) \<longrightarrow>
+    (! q' . ((q', t), y, k) \<in> ll3'_descend))"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto simp add:ll3'_descend.intros)
+  apply(rule_tac ll3'_descend.intros) apply(auto)
+  done
 
 (* we need a seq \<rightarrow> seq version of this lemma** *)
 (* do we need to take consume into account here also? *)
@@ -2639,6 +2610,7 @@ after label assignment *)
 
 (* possibly we need my_ll_induct here*)
 (* use immediate child for last link *)
+(*
 lemma ll3_assign_label_preserve_seq' :
 " (x, y, k) \<in> ll3'_descend \<Longrightarrow>
 (! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
@@ -2711,164 +2683,7 @@ apply(rule_tac [1] ll3'_descend_relabel)
     apply(rule_tac[1] ll3'_descend.intros) apply(auto)
 
     apply(drule_tac [1] ll3_assign_label_length) apply(auto)
-  
-
-(* This lemma seems like a key point right now *)
-(* Is the issue that we should be characterizing
-all LLab descendents, not just some? *)
-(*
-OR: do we need some kind of seq \<rightarrow> seq fact
-*)
-lemma ll3_assign_label_preserve_labels' :
-" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
-(! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
-(! q' e' . y = (q', LLab e' (length k - 1)) \<longrightarrow>
-(! ls enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
-       ((q, LSeq enew ls), (q', LLab e' (length k - 1)), k) \<in> ll3'_descend)))
-"
-proof(induction rule:ll3'_descend.induct)
-  case (1 c q e ls t)
-  then show ?case
-    apply(auto  simp add:ll3'_descend.intros)
-  apply(rule_tac[1] ll3'_descend.intros) 
-     apply(frule_tac [1] ll3_assign_label_length) apply(auto)
-apply(frule_tac [1] ll3_assign_label_length)
-    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
-    done
-next
-  case (2 t t' n t'' n')
-  then show ?case 
-    apply(auto)
-    apply(case_tac t', auto)
-    apply(case_tac bba, auto)
-          apply(case_tac ls, auto)
-
-           apply(drule_tac[1] ll3_hasdesc2) apply(auto)
-
-    apply(case_tac [1] "ll3_assign_label ((ac, bc), bd)", auto)
-    apply(case_tac[1] "ll3_assign_label_list list", auto)
-      apply(drule_tac[1] ll3_hasdesc) 
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc)  
-         apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc) 
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc)  
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc) 
-      apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-
-  (* idea ? - this is transitivity
-     we should combine the two descends facts,
-and then use a lemma about descends (?) 
-no, that is just the same theorem again *)
-
-
-    
-    sorry
-qed
-  apply(induction rule:ll3'_descend.induct)
-   apply(auto  simp add:ll3'_descend.intros)
-  apply(rule_tac[1] ll3'_descend.intros) 
-    apply(frule_tac [1] ll3_assign_label_length) apply(auto)
-   apply(frule_tac[1] ll3_assign_label_length)
-
-    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
-
-
-  apply(case_tac [1] bc, auto)
-  apply(drule_tac[1] ll3_hasdesc) 
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc)  
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc)  
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc)  
-  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-  apply(drule_tac[1] ll3_hasdesc)  
-    apply(drule_tac[1] ll3_hasdesc)  apply(auto)
-
-(*
-    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
-*)
-
-  apply(frule_tac [1] ll3_assign_label_preserve_new2) apply(auto)
-
-    apply(drule_tac[1] ll3_hasdesc2) apply(auto)
-
-       apply(case_tac[1] "ll3_assign_label ((ab, bc), bd)", auto)
-(* speculative *)
-  apply(case_tac [1] n, auto) apply(case_tac a, auto)
-  apply(case_tac [1] "ll3_assign_label_list list", auto)
-
-  apply(rule_tac [1] ll3'_descend.intros)
-   apply(auto)
-
-    (* we need a version of preserve_child2 that goes "backwards"
-       i.e. if a particular label existed after it existed before *)
-    (* what we are calling child3, maybe child4 *)
-
-  apply(case_tac[1] "bc", auto)
-        apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-       apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-      apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-     apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-    apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-
-    (* we need a lemma about descendents of ll3_assign_label_list *)
-      apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
-
-
-    (* we need reverse *)
-   apply(drule_tac [1] ll3'_descend_relabel) apply(auto)
-
-    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
-
-
-  apply(case_tac [1] lsa, auto)
-  (* it looks like we need some proof about preservation
-   of the descendent relation, after all *)
-  apply(auto simp add: ll3'_descend.intros)
-
-   apply(drule_tac [1] ll3_assign_label_preserve_child3_0) apply(auto)
-
-
-   apply(drule_tac [1] ll3_assign_label_preserve_child2) apply(auto)
-  (* is this part true? *)
-   apply(rule_tac [1] ll3'_descend.intros) apply(auto)
-
-  apply(case_tac bc, auto)
-  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-    apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
-
-  (* we need a lemma for seq \<rightarrow> seq paths (like for consumes) *)
-
-   apply(subgoal_tac [1] "(((ac, bf), llt.LSeq enew ls), ((aa, bb), llt.LSeq x51 x52), n) \<in> ll3'_descend")
-    apply(rule_tac [2] ll3'_descend_relabel) apply(auto)
-  apply(rule_tac [1] ll3'_descend.intros) apply(auto)
-  apply(rotate_tac [1] 1)
-  (* we need a "relabeling" lemma for ll3'_descend, saying that we can
-     change the annotation on the root Seq node *)
-  apply(drule_tac [1] 
- "ll3'_descend_relabel"[of x]) apply(auto)  
-
-
-    apply(rule_tac [2] ll3'_descend.intros)
-
-    apply(case_tac [1] "ll3_assign_label ((a, b), ba)", auto)
-  apply(case_tac [1] "ll3_assign_label_list list", auto)
-
-   apply(case_tac [1] enew, auto)
-  apply(case_tac [1] "ll3_assign_label
-              ((aa, ba), bb)", auto)
-  apply(case_tac [1] "ll3_assign_label_list
-              list", auto)
-    apply(case_tac [1] c, auto)
-    
-   apply(auto  simp add:ll3'_descend.intros)
+  *)
 
 
 (* necessary sublemma for valid3' (?) *)
@@ -2913,99 +2728,7 @@ in this one we need to include cases for all possibilities of c: either
 - or c was a label at the appropriate depth that got changed
 - or c is a seq node computed from c' by a "consumes" and then an assign_labels*)
 
-lemma ll3_assign_labels_backwards_fact :
-" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
-(! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
-(! q' c' . y = (q', c') \<longrightarrow>
-(! ls enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
-   (? c . ((q, LSeq enew ls), (q', c), k) \<in> ll3'_descend \<and>
-      (c = c' \<or>
-        (* Q: does this case only work for True? *)
-       (? n . c = LLab True n \<and> c' = LLab True n \<and> n + 1 \<ge> length k) \<or>
-       (? n . c = LLab False n \<and> c' = LLab True n \<and> n + 1 < length k) \<or>
-       (* idea here: 
-          1. do some consumes on lsdec to get lsdec2
-          2. do consume_label normal call on lsdec2 to get lsdec3
-          3. do assign_label on lsdec3 to get lsdec4
-       *)
-       (? edec edec' lsdec lsdec2 lsdec3 lsdec4 cs . 
-          c = LSeq edec lsdec \<and> c' = LSeq edec' lsdec4 \<and>
 
-(* Q: do we need to talk about the max depth of these consumes? *)
-          (lsdec, cs, lsdec2) \<in> ll3_consumes \<and>
-          ll3_consume_label [] 0 lsdec2 = Some (lsdec3, rev edec') \<and>
-          ll3_assign_label_list lsdec3 = Some lsdec4)
-      )
-))))
-"
-proof(induction rule:ll3'_descend.induct)
-  case (1 c q e ls t)
-  then show ?case
-    apply(auto) 
-    apply(frule_tac[1] ll3_assign_label_preserve_new2_gen)
-     apply(drule_tac[1] ll3_assign_label_length) apply(auto)
-    apply(drule_tac[1] x = c in spec)
-    apply(auto)
-        apply(drule_tac[1] x = "c'" in spec) apply(auto)
-    apply(subgoal_tac[1] "((q, llt.LSeq enew lsa), ((a, b), c'), [c])
-       \<in> ll3'_descend") apply(rule_tac[2] ll3'_descend.intros(1)) apply(auto)
-
-        apply(drule_tac[1] x = "c'" in spec) apply(auto)
-    apply(subgoal_tac[1] "((q, llt.LSeq enew lsa), ((a, b), c'), [c])
-       \<in> ll3'_descend") apply(rule_tac[2] ll3'_descend.intros(1)) apply(auto)
-
-        apply(drule_tac[1] x = "c'" in spec) apply(auto)
-    apply(subgoal_tac[1] "((q, llt.LSeq enew lsa), ((a, b), c'), [c])
-       \<in> ll3'_descend") apply(rule_tac[2] ll3'_descend.intros(1)) apply(auto)
-
-     apply(rule_tac[1] x = "c'" in exI) apply(auto)
-     apply(rule_tac[1] ll3'_descend.intros(1)) apply(auto)
-
-         apply(rule_tac[1] x = "llt.LSeq e lsdec" in exI) apply(auto)
-     apply(rule_tac[1] ll3'_descend.intros(1)) apply(auto)
-     apply(drule_tac[1] x = lsdec in spec) apply(auto)
-      apply(subgoal_tac[1] "(lsdec, [], lsdec) \<in> ll3_consumes")
-      apply(rule_tac[2] ll3_consumes.intros) apply(auto)
-
-    apply(drule_tac[1] x = lsdec in spec) apply(auto)
-      apply(subgoal_tac[1] "(lsdec, [], lsdec) \<in> ll3_consumes")
-     apply(rule_tac[2] ll3_consumes.intros) apply(auto)
-    done next
-
-   
-  case (2 t t' n t'' n')
-  then show ?case
-    apply(auto)
-    apply(case_tac t', auto) apply(case_tac bba, auto)
-        apply(drule_tac[1] ll3_hasdesc2)
-        apply(drule_tac[1] ll3_hasdesc2, auto)
-       apply(drule_tac[1] ll3_hasdesc2)
-       apply(drule_tac[1] ll3_hasdesc2, auto)
-       apply(drule_tac[1] ll3_hasdesc2)
-      apply(drule_tac[1] ll3_hasdesc2, auto)
-       apply(drule_tac[1] ll3_hasdesc2)
-     apply(drule_tac[1] ll3_hasdesc2, auto)
-
-    apply(case_tac[1] c', auto)
-    apply(rotate_tac [1] 2)
-        apply(drule_tac x = ls in spec) apply(auto)
-        apply(drule_tac x = enew in spec) apply(auto)
-         apply(auto simp add:ll3'_descend.intros)
-        apply(drule_tac x = lsdec3 in spec) apply(auto)
-      (* the issue now becomes dispatching this consumes fact
-         this seems to suggest we might need a bound on consumes depth after all
-         or can we otherwise characterize the consumes list
-*)
-    apply(auto simp add:ll3'_descend.intros)
-
-        apply(drule_tac x = ls in spec) apply(auto)
-         apply(drule_tac x = enew in spec) apply(auto)
-    apply(auto simp add:ll3'_descend.intros)
-
-    apply(case_tac ls, auto)
-    apply(drule_tac[1] x = 
-    sorry
-qed
 
 lemma haslast2 : 
 "l = h # t \<Longrightarrow> ? ch ct . l = ch @ [ct]"
@@ -3366,10 +3089,301 @@ lemma ll3_consume_label_found:
   apply(insert ll3_consume_label_found') apply(clarsimp)
   done
 
+
+(* add something about uniqueness of k? *)
+(* or at least somehow describe the fact that we didn't see this label in previous children *)
+lemma ll3_assign_labels_backwards_fact :
+" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
+(! q' c' . y = (q', c') \<longrightarrow>
+(* ll3_consumes premise here? *)
+(! ls enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
+   (? c . ((q, LSeq enew ls), (q', c), k) \<in> ll3'_descend \<and>
+(* returned thing should only have true labels *)
+      (c = c' \<or>
+        (* Q: does this case only work for True? do we want/need this case? *)
+(*       (? n . c = LLab True n \<and> c' = LLab True n \<and> n + 1 \<ge> length k) \<or> *)
+(* i am skeptical about this case too, it probably needs revision *)
+       (? n . c = LLab False n \<and> c' = LLab True n \<and> n + 1 < length k) \<or>
+       (* idea here: 
+          1. do some consumes on lsdec to get lsdec2
+          2. do consume_label normal call on lsdec2 to get lsdec3
+          3. do assign_label on lsdec3 to get lsdec4
+       *)
+       (? edec edec' lsdec lsdec2 lsdec3 lsdec4 cs . 
+          c = LSeq edec lsdec \<and> c' = LSeq edec' lsdec4 \<and>
+
+(* Q: do we need to talk about the max depth of these consumes? *)
+          (lsdec, cs, lsdec2) \<in> ll3_consumes \<and>
+          ll3_consume_label [] 0 lsdec2 = Some (lsdec3, rev edec') \<and>
+          ll3_assign_label_list lsdec3 = Some lsdec4)
+      )
+))))
+"
+proof(induction rule:ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case
+    apply(auto) 
+    apply(frule_tac[1] ll3_assign_label_preserve_new2_gen)
+     apply(drule_tac[1] ll3_assign_label_length) apply(auto)
+    apply(drule_tac[1] x = c in spec)
+    apply(auto)
+        apply(drule_tac[1] x = "c'" in spec) apply(auto)
+    apply(subgoal_tac[1] "((q, llt.LSeq enew lsa), ((a, b), c'), [c])
+       \<in> ll3'_descend") apply(rule_tac[2] ll3'_descend.intros(1)) apply(auto)
+
+        apply(drule_tac[1] x = "c'" in spec) apply(auto)
+    apply(subgoal_tac[1] "((q, llt.LSeq enew lsa), ((a, b), c'), [c])
+       \<in> ll3'_descend") apply(rule_tac[2] ll3'_descend.intros(1)) apply(auto)
+
+        apply(drule_tac[1] x = "c'" in spec) apply(auto)
+    apply(subgoal_tac[1] "((q, llt.LSeq enew lsa), ((a, b), c'), [c])
+       \<in> ll3'_descend") apply(rule_tac[2] ll3'_descend.intros(1)) apply(auto)
+
+     apply(rule_tac[1] x = "c'" in exI) apply(auto)
+     apply(rule_tac[1] ll3'_descend.intros(1)) apply(auto)
+
+         apply(rule_tac[1] x = "llt.LSeq e lsdec" in exI) apply(auto)
+     apply(rule_tac[1] ll3'_descend.intros(1)) apply(auto)
+     apply(drule_tac[1] x = lsdec in spec) apply(auto)
+      apply(subgoal_tac[1] "(lsdec, [], lsdec) \<in> ll3_consumes")
+      apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+
+    apply(drule_tac[1] x = lsdec in spec) apply(auto)
+      apply(subgoal_tac[1] "(lsdec, [], lsdec) \<in> ll3_consumes")
+     apply(rule_tac[2] ll3_consumes.intros) apply(auto)
+    done next
+
+   
+  case (2 t t' n t'' n')
+  then show ?case
+    apply(auto)
+    apply(case_tac t', auto) apply(case_tac bba, auto)
+        apply(drule_tac[1] ll3_hasdesc2)
+        apply(drule_tac[1] ll3_hasdesc2, auto)
+       apply(drule_tac[1] ll3_hasdesc2)
+       apply(drule_tac[1] ll3_hasdesc2, auto)
+       apply(drule_tac[1] ll3_hasdesc2)
+      apply(drule_tac[1] ll3_hasdesc2, auto)
+       apply(drule_tac[1] ll3_hasdesc2)
+     apply(drule_tac[1] ll3_hasdesc2, auto)
+
+    apply(case_tac[1] c', auto)
+    apply(rotate_tac [1] 2)
+        apply(drule_tac[1] x = ls in spec) apply(auto)
+        apply(drule_tac[1] x = enew in spec) apply(auto)
+         apply(auto simp add:ll3'_descend.intros)
+        apply(drule_tac[1] x = lsdec3 in spec) apply(auto)
+      (* the issue now becomes dispatching this consumes fact
+         this seems to suggest we might need a bound on consumes depth after all
+         or can we otherwise characterize the consumes list
+*)  (* case split on x51 (returned path of last consumes call? *)
+        apply(case_tac x51) apply(auto)
+    apply(frule_tac[1] ll3_consume_label_unch) apply(clarsimp)
+    apply(rotate_tac[1] 6)
+         apply(rule_tac[1] ll3'_descend.intros) apply(simp)
+        apply(auto simp add:ll3'_descend.intros)
+
+        apply(drule_tac x = ls in spec) apply(auto)
+         apply(drule_tac x = enew in spec) apply(auto)
+    apply(auto simp add:ll3'_descend.intros)
+
+    apply(case_tac ls, auto)
+    apply(drule_tac[1] x = 
+    sorry
+qed
+   (* This lemma seems like a key point right now *)
+(* Is the issue that we should be characterizing
+all LLab descendents, not just some? *)
+
+lemma ll3_assign_label_preserve_labels' :
+" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
+(! q' e' . y = (q', LLab e' (length k - 1)) \<longrightarrow>
+(! ls enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
+       ((q, LSeq enew ls), (q', LLab e' (length k - 1)), k) \<in> ll3'_descend)))
+"
+
+
+(* TODO: this lemma is needed by the valid3' proof but we don't
+have the necessary sublemmas to prove it yet *)
+(* also i wonder if this will need to interact with consumes in some way? 
+maybe that is where the bound on consumes comes in.*)
+lemma ll3_assign_label_preserve_labels' :
+" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
+(! q' e' . y = (q', LLab e' (length k - 1)) \<longrightarrow>
+(! ls enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
+       ((q, LSeq enew ls), (q', LLab e' (length k - 1)), k) \<in> ll3'_descend)))
+"
+proof(induction rule:ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case
+    apply(auto  simp add:ll3'_descend.intros)
+  apply(rule_tac[1] ll3'_descend.intros) 
+     apply(frule_tac [1] ll3_assign_label_length) apply(auto)
+apply(frule_tac [1] ll3_assign_label_length)
+    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
+    done
+next
+  case (2 t t' n t'' n')
+  then show ?case 
+    apply(auto)
+    apply(case_tac t', auto)
+
+    apply(case_tac bba, auto)
+      apply(drule_tac[1] ll3_hasdesc) 
+          apply(drule_tac[1] ll3_hasdesc) apply(auto)
+apply(drule_tac[1] ll3_hasdesc) 
+         apply(drule_tac[1] ll3_hasdesc) apply(auto)
+apply(drule_tac[1] ll3_hasdesc) 
+        apply(drule_tac[1] ll3_hasdesc) apply(auto)
+apply(drule_tac[1] ll3_hasdesc) 
+       apply(drule_tac[1] ll3_hasdesc) apply(auto)
+apply(drule_tac[1] ll3_hasdesc) 
+      apply(drule_tac[1] ll3_hasdesc) apply(auto)
+
+
+
+          (*apply(case_tac ls, auto)*)
+
+           apply(drule_tac[1] ll3_hasdesc2) apply(auto)
+
+    apply(case_tac [1] "ll3_assign_label ((ac, bc), bd)", auto)
+    apply(case_tac[1] "ll3_assign_label_list list", auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  
+         apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) 
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) 
+      apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+ 
+     
+     apply(rule_tac[1] ll3'_descend.intros) apply(auto)
     
+    apply(drule_tac[1] ll3'_descend_relabelq) apply(simp)
+    apply(drule_tac[1] ll3'_descend_relabel) apply(auto)
+  (* idea ? - this is transitivity
+     we should combine the two descends facts,
+and then use a lemma about descends (?) 
+no, that is just the same theorem again *)
+
+
+    
+    sorry
+qed
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto  simp add:ll3'_descend.intros)
+  apply(rule_tac[1] ll3'_descend.intros) 
+    apply(frule_tac [1] ll3_assign_label_length) apply(auto)
+   apply(frule_tac[1] ll3_assign_label_length)
+
+    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
+
+
+  apply(case_tac [1] bc, auto)
+  apply(drule_tac[1] ll3_hasdesc) 
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  
+    apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+
+(*
+    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
+*)
+
+  apply(frule_tac [1] ll3_assign_label_preserve_new2) apply(auto)
+
+    apply(drule_tac[1] ll3_hasdesc2) apply(auto)
+
+       apply(case_tac[1] "ll3_assign_label ((ab, bc), bd)", auto)
+(* speculative *)
+  apply(case_tac [1] n, auto) apply(case_tac a, auto)
+  apply(case_tac [1] "ll3_assign_label_list list", auto)
+
+  apply(rule_tac [1] ll3'_descend.intros)
+   apply(auto)
+
+    (* we need a version of preserve_child2 that goes "backwards"
+       i.e. if a particular label existed after it existed before *)
+    (* what we are calling child3, maybe child4 *)
+
+  apply(case_tac[1] "bc", auto)
+        apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+       apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+      apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+     apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+    apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+
+    (* we need a lemma about descendents of ll3_assign_label_list *)
+      apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
+
+
+    (* we need reverse *)
+   apply(drule_tac [1] ll3'_descend_relabel) apply(auto)
+
+    apply(drule_tac[1] ll3_assign_label_preserve_new2_gen) apply(auto)
+
+
+  apply(case_tac [1] lsa, auto)
+  (* it looks like we need some proof about preservation
+   of the descendent relation, after all *)
+  apply(auto simp add: ll3'_descend.intros)
+
+   apply(drule_tac [1] ll3_assign_label_preserve_child3_0) apply(auto)
+
+
+   apply(drule_tac [1] ll3_assign_label_preserve_child2) apply(auto)
+  (* is this part true? *)
+   apply(rule_tac [1] ll3'_descend.intros) apply(auto)
+
+  apply(case_tac bc, auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+  apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+    apply(drule_tac[1] ll3_hasdesc) apply(drule_tac[1] ll3_hasdesc) apply(auto)
+
+  (* we need a lemma for seq \<rightarrow> seq paths (like for consumes) *)
+
+   apply(subgoal_tac [1] "(((ac, bf), llt.LSeq enew ls), ((aa, bb), llt.LSeq x51 x52), n) \<in> ll3'_descend")
+    apply(rule_tac [2] ll3'_descend_relabel) apply(auto)
+  apply(rule_tac [1] ll3'_descend.intros) apply(auto)
+  apply(rotate_tac [1] 1)
+  (* we need a "relabeling" lemma for ll3'_descend, saying that we can
+     change the annotation on the root Seq node *)
+  apply(drule_tac [1] 
+ "ll3'_descend_relabel"[of x]) apply(auto)  
+
+
+    apply(rule_tac [2] ll3'_descend.intros)
+
+    apply(case_tac [1] "ll3_assign_label ((a, b), ba)", auto)
+  apply(case_tac [1] "ll3_assign_label_list list", auto)
+
+   apply(case_tac [1] enew, auto)
+  apply(case_tac [1] "ll3_assign_label
+              ((aa, ba), bb)", auto)
+  apply(case_tac [1] "ll3_assign_label_list
+              list", auto)
+    apply(case_tac [1] c, auto)
+    
+   apply(auto  simp add:ll3'_descend.intros)
+
+
 (* do we need to use descend instead of set? *)
 (* maybe not, but maaybe we can use "!" operator *)
 (* s'@p' ?*)
+(* is our use of "consumes" here reasonable? *)
+(* do we need to bound the consumes depth here? *)
 lemma ll3_assign_label_valid3' :
 "((q,t::ll3t) \<in> ll_valid_q \<longrightarrow> 
     ((! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> q = q' \<and> (q',t') \<in> ll_valid3')
@@ -3415,7 +3429,7 @@ next
       apply(case_tac "ll3_assign_label_list aa", auto)
        apply(case_tac "ll3_consume_label [] 0 l", auto)
      apply(case_tac "ll3_assign_label_list aa", auto)
-
+ 
      apply(case_tac ba, auto)
     apply(drule_tac [1] x = "[]" in spec)
       apply(drule_tac [1] x = "aa" in spec) apply(auto)
@@ -3426,6 +3440,23 @@ next
     apply(rule_tac[1] ll_valid3'.intros(5)[of _ _ _ "[]"])
     apply(auto)
        apply(drule_tac [1] ll3_assign_label_qvalid2, auto)
+
+      apply(frule_tac[1] ll3'_descend.cases) apply(auto)
+       apply(frule_tac[1] ll3_consume_label_find, auto)
+    apply(drule_tac[1] x = "[]" in spec) apply(auto)
+
+       apply(drule_tac [1] x = ac in spec) apply(drule_tac x = bb in spec)
+       apply(drule_tac[1] x = "llt.LLab e' 0" in spec)
+    apply(frule_tac[1] List.nth_mem) apply(auto)
+    apply(subgoal_tac[1] "((ac, bb), llt.LLab e' 0) \<in> set ls") apply(auto)
+      apply(frule_tac[1] ll3_descend_nonnil, auto)
+
+      apply(drule_tac[1] x = "[]" in spec) apply(clarsimp)
+
+      apply(frule_tac[1] ll3_assign_labels_backwards_fact) apply(auto)
+      apply(drule_tac[1] x = l in spec) apply(auto)
+(* preserve_labels' works but we can't prove it yet
+is there something more general that would work here? *)
       apply(frule_tac [1] ll3_assign_label_preserve_labels')
       apply(auto)
       apply(drule_tac [1] x = l in spec) apply(auto)
@@ -3448,10 +3479,8 @@ worth it to expose the induction hypothesis as we need that too *)
      apply(rule_tac[1] ll_valid3'.intros(6)) apply(clarsimp)
     (* need q validity here *)
 
-     apply(subgoal_tac[1] "(l, [((ch @ [ct]), 0)], aa) \<in> ll3_consumes")
-      apply(drule_tac[2] ll3_consumes.intros(3)) apply(auto)
     apply(drule_tac [1] x = "[(ch @ [ct], 0)]" in spec)
-    apply(drule_tac [1] x = "aa" in spec) apply(auto)
+    apply(drule_tac [1] x = "aa" in spec) apply(
 
 (* ok, we just changed
 valid3' so that it doesn't assume labels are true in the non nil case
@@ -3487,7 +3516,7 @@ lemma ll3_consume_label_find :
 
 (* speculative work *)
       apply(rule_tac[2] ll_valid3'.intros(6)[of _ _ _ []]) 
-ah(
+
     apply(frule_tac [1] ll3_assign_label_preserve_new2)
 
 
@@ -3518,43 +3547,6 @@ next
   case (7 n h n' t n'')
   then show ?case sorry
 qed
-
-lemma ll_assign_label_valid3' :
-"((q,t) \<in> ll_valid_q \<longrightarrow> ((! q' t' . ll3_assign_label (q,t) = Some (q',t') \<longrightarrow> (q',t') \<in> ll_valid3') \<and>
-    ((! e l . t = LSeq e l \<longrightarrow> (!p n  s l' . (l,s,l') \<in> ll3_consumes \<longrightarrow>
-                     (! l'' . ll3_assign_label_list l' = Some l'' \<longrightarrow> (! z . z \<in> set l'' \<longrightarrow> z \<in> ll_valid3')))))))
-\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
-    ((! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> (! z . z \<in> set ls' \<longrightarrow> z \<in> ll_valid3'))
-     \<and> (!p n  s ls' . (ls,s,ls') \<in> ll3_consumes \<longrightarrow>
-                     (! ls'' . ll3_assign_label_list ls' = Some ls'' \<longrightarrow> (! z . z \<in> set ls'' \<longrightarrow> z \<in> ll_valid3')))))" 
-   (* we need to strengthen this *)
-proof(induction rule:ll_valid_q_ll_validl_q.induct)
-  case (1 i x e)
-  then show ?case
-    apply(auto simp add:ll_valid3'.intros) done
-next
-  case (2 x d e)
-  then show ?case
-    apply(auto simp add:ll_valid3'.intros)
-    apply(subgoal_tac "((x, Suc x), llt.LLab e d) \<in> ll_valid_q")
-    apply(drule_tac [1] ll3_assign_label_qvalid1) apply(auto simp add:ll_valid3'.intros)
-    done
-
-next
-  case (3 x d e s)
-  then show ?case sorry
-next
-case (4 x d e s)
-  then show ?case sorry
-next
-  case (5 n l n' e)
-  then show ?case sorry
-next
-  case (6 n)
-  then show ?case sorry
-next
-  case (7 n h n' t n'')
-  then show ?case sorry
 
 
 fun ll3_unwrap :: "(ll3 list \<Rightarrow> 'a option) \<Rightarrow> ll3  \<Rightarrow> 'a option" where
