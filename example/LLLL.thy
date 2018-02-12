@@ -3195,17 +3195,27 @@ lemma ll3_descend_split :
     apply(drule_tac[1] x = "[ad]" in spec) apply(drule_tac[1] x = "list" in spec) apply(auto)
     apply(case_tac list, auto)
 
+     apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+    apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+    apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+
+  apply(case_tac k2, auto)
+
+  
 (* need to massage this a little more, but it might work *)
-     apply(auto simp add:ll3'_descend.intros)
-
-  apply(case_tac t)
-   apply(auto)
-   apply(case_tac n, auto) apply(drule_tac ll3_descend_nonnil, auto)
-   apply(drule_tac ll3_descend_nonnil, auto) apply(drule_tac ll3_descend_nonnil, auto)
-
 
   apply(case_tac n, auto) apply(drule_tac ll3_descend_nonnil, auto)
-  apply(case_tac n', auto) apply(drule_tac ll3_descend_nonnil, auto) apply(drule_tac ll3_descend_nonnil, auto)
+   apply(case_tac n', auto) apply(drule_tac ll3_descend_nonnil, auto) 
+   apply(drule_tac x = "[ac]" in spec) apply(drule_tac[1] x = "[ad]" in spec)
+   apply(auto)
+  apply(case_tac lista, auto) apply(case_tac list, auto)
+   apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+    apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+    apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+
+  apply(case_tac list, auto)
+   apply(drule_tac[1] ll3'_descend.intros) apply(auto)
+    apply(drule_tac[1] ll3'_descend.intros) apply(auto)
 
 
    apply(drule_tac ll3_descend_nonnil, auto) apply(drule_tac ll3_descend_nonnil, auto)
