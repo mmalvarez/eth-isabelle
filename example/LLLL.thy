@@ -3526,6 +3526,65 @@ next
     sorry
 qed
 *)
+
+lemma ll3_consumes_qvalid' :
+"
+(((q, t) \<in> ll_valid_q \<longrightarrow>
+ (! e l . t = LSeq e l \<longrightarrow>
+  (! s l' . (l, s, l') \<in> ll3_consumes \<longrightarrow> (q, l') \<in> ll_validl_q ))))
+\<and>
+((((x,x'), l) \<in> ll_validl_q \<longrightarrow>
+  (! s l' . (l, s, l') \<in> ll3_consumes \<longrightarrow> ((x,x'), l') \<in> ll_validl_q )))
+"
+  apply(induction rule:ll_valid_q_ll_validl_q.induct)
+        apply(auto)
+   apply(drule_tac[1] ll3_consumes_alt_eq_r2l) apply(case_tac s, auto)
+   apply(rule_tac[1] ll_valid_q_ll_validl_q.intros)
+
+  apply(frule_tac[1] ll3_consumes_length, simp)
+  apply(case_tac l', auto)
+  apply(drule_tac ll3_consumes_split) apply(auto)
+
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  apply(rule_tac ll_valid_q_ll_validl_q.intros, auto)
+  apply(drule_tac ll_valid_q.cases, auto)
+  apply(rule_tac ll_valid_q_ll_validl_q.intros, auto)
+  done
+
+lemma ll3_consumes_qvalid :
+"(q, l) \<in> ll_validl_q \<Longrightarrow>
+ (l, s, l') \<in> ll3_consumes \<Longrightarrow>
+ (q, l') \<in> ll_validl_q"
+  apply(case_tac q)
+  apply(insert ll3_consumes_qvalid')
+  apply(auto)
+  done
+
+lemma ll3_consumes_unch :
+"(l, [], l') \<in> ll3_consumes \<Longrightarrow>
+l = l'"
+  apply(drule_tac ll3_consumes_alt_eq_r2l2) apply(drule_tac ll3_consumes_alt.cases)
+   apply(auto)
+  done
+
+
+(* is this covered by consumes_split? *)
+(* not quite, we want to say that if h#t consumed succesfully,
+*)
+lemma ll3_consume_label_tail :
+"
+ (! q e h ls . (t :: ll3) = (q, LSeq e (h#ls)) \<longrightarrow>
+  (! p n p' ls' . ll3_consume_label p n (h#ls) = Some (h#ls', p') \<longrightarrow>
+ll3_consume_label p (n+1) ls = Some (ls', p')))
+\<and>
+(! h ls . (l :: ll3 list) = h#ls \<longrightarrow> 
+  (! p n ls' p' . ll3_consume_label p n (h#ls) = Some (h#ls', p') \<longrightarrow>
+ll3_consume_label p (n+1) ls = Some (ls', p')))"
+  apply(induction rule:my_ll_induct)
+        apply(auto)
+  apply(case_tac ba, auto)
+
+
 (* more elaborated version, with the consumes premises *)
 lemma ll3_assign_label_valid3' :
 "((q,t::ll3t) \<in> ll_valid_q \<longrightarrow> 
@@ -3607,9 +3666,30 @@ next
   case (7 n h n' t n'')
   then show ?case 
     apply(auto)
-    using [[simp_trace]]
-    apply(case_tac h, clarify)
-  
+    apply(subgoal_tac "((n,n''), ((n,n'),h)#t) \<in> ll_validl_q")
+     apply(rule_tac[2] ll_valid_q_ll_validl_q.intros) apply(auto)
+    apply(drule_tac ll3_consumes_qvalid, auto)
+    apply(drule_tac ll3_consume_label_qvalid, auto)
+    apply(drule_tac ls = ls'' in ll3_assign_label_qvalid2) apply(auto)
+
+    apply(frule_tac ll3_consumes_length, auto) apply(case_tac ls', auto)
+    apply(drule_tac ll3_consumes_split, auto)
+
+      apply(case_tac p'', auto)
+       apply(rule_tac ll_valid3'.intros) apply(auto)
+        apply(frule_tac ll3_consume_label_unch, auto)
+    apply(case_tac "ll3_assign_label ((n, n'), h)", auto)
+        apply(case_tac " ll3_assign_label_list list", auto)
+        apply(drule_tac ll3_consumes.intros)
+    apply(frule_tac s = "[]" in ll3_consumes_split, auto)
+        
+        apply(case_tac s', auto)
+    apply(drule_tac ll3_consumes_unch, auto)
+    apply(drule_tac ll3_consumes.cases, auto)
+      
+    apply(drule_tac x = list in spec) apply(auto)
+
+
     sorry
 qed
 
