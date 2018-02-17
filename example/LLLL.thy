@@ -2656,6 +2656,13 @@ in previous children? i imagine we need this at some point,
 but maybe it should be a different lemma
 *)
 (* TODO: do we also need to characterize all the other children? that might be a good thing to add to this theorem
+the problem is that the entire spine changes, we need to capture this
+
+ll3_consume_label_restsame :
+ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> p' \<noteq> [] \<longrightarrow>
+  ( ? pp k . p' = pp @ k # p \<and> k \<ge> n \<and>
+  (? q' . ! e' . ((q, LSeq e' ls), (q', LLab False (length p' - 1)), (k - n)#(rev pp)) \<in> ll3'_descend \<and>
+             ((q, LSeq e' ls'), (q', LLab True (length p' - 1)), (k - n)#(rev pp)) \<in> ll3'_descend)
 *)
 lemma ll3_consume_label_found':
 "
@@ -3409,6 +3416,79 @@ apply(case_tac ls, auto)
 
   done
 
+lemma ll3_descend_splitpath_cons :
+"(t1, t3, k1#k2) \<in> ll3'_descend \<Longrightarrow>
+( case k2 of
+   [] \<Rightarrow> (case k2 of [] \<Rightarrow> (t1, t3, [k1]) \<in> ll3'_descend)
+   |  _ \<Rightarrow> (? t2 . (t1, t2, [k1]) \<in> ll3'_descend \<and> (t2, t3, k2) \<in> ll3'_descend))"
+  apply(insert ll3_descend_splitpath[of t1 t3 "[k1]" k2]) apply(auto)
+  apply(case_tac k2) apply(auto)
+  done
+
+lemma ll3_consume_label_forwards_fact :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+(! q' c . y = (q', c) \<longrightarrow>
+(! p p'  n ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow>
+   (? c' .
+      (! enew . ((q, LSeq enew ls'), (q', c'), k) \<in> ll3'_descend \<and>
+      ((p' = [] \<and> c = c') \<or>
+      (? pp m . p' = pp @ m # p \<and> n \<le> m \<and>
+       (m - n \<noteq> List.hd k \<and> c = c' ) \<or>
+       (m - n = List.hd k \<and> 
+        ( (c = LLab False (length p' - 1) \<and> c' = LLab True (length p' - 1)) 
+          \<or> (? lsdec lsdec' edec . 
+              (c = LSeq edec lsdec \<and> c' = LSeq edec lsdec' \<and>
+               ll3_consume_label [List.hd k] 0 lsdec = Some (lsdec', pp)
+)))))))))))"
+proof(induction rule:ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case 
+    apply(auto)
+    apply(case_tac p', auto)
+     apply(drule_tac ll3_consume_label_unch, auto)
+     apply(rule_tac x =  ca in exI) apply(auto)
+     apply(auto simp add:ll3'_descend.intros)
+
+    apply(frule_tac ll3_consume_label_char, auto)
+    apply(case_tac "m - n = c", auto)
+
+     apply(frule_tac ll3_consume_label_found, auto)
+     apply(drule_tac x = "fst q" in spec) apply(drule_tac x = "snd q" in spec) apply(drule_tac x = "[]" in spec)
+     apply(auto )
+     apply(drule_tac ll3_descend_splitpath_cons) apply(case_tac "rev pp" ,auto)
+     apply(case_tac ls, auto)
+
+      apply(rule_tac x = " llt.LLab False (length p)" in exI, auto)
+    apply(auto simp add:ll3'_descend.intros)
+
+     apply(frule_tac ll3_consume_label_found, auto)
+     apply( auto) apply(case_tac ls, auto)
+    apply(case_tac c, auto)
+next
+  case (2 t t' n t'' n')
+  then show ?case sorry
+qed
+(*
+          (! b n . c = LLab b n \<longrightarrow> (b = True (*\<and> n + 1 \<ge> length k*))) \<and>
+          (! edec lsdec . c = LSeq edec lsdec \<longrightarrow>
+        (ll3_consume_label [] 0 lsdec = Some (lsdec, []) \<and>
+          ll3_assign_label_list lsdec = Some lsdec)) (* \<and>
+            ll3_assign_label (q', c) = Some (q', c) *) ) \<or>
+       (? n . c = LLab False n \<and> c' = LLab True n \<and> n + 1 < length k) \<or>
+       (? edec edec' lsdec lsdec2 lsdec3 . 
+          c = LSeq edec lsdec \<and> c' = LSeq edec' lsdec3 \<and>
+          ll3_consume_label [] 0 lsdec = Some (lsdec2, rev edec') \<and>
+          ll3_assign_label_list lsdec2 = Some lsdec3 
+"*)
+(* *)
+(*
+
+need a version with consumes premise
+to make it provable, in order to prove that one we will need analogous facts about consumes and descend
+
+*)
+
 lemma ll3_assign_labels_backwards_fact :
 " (x, y, k) \<in> ll3'_descend \<Longrightarrow>
 (! q e ls' . x = (q, LSeq e ls') \<longrightarrow>
@@ -3507,11 +3587,15 @@ apply(rule_tac x = "LLab True na" in exI)
      apply(rule_tac[1] ll3'_descend.intros) apply(auto)
 
 
-    apply(drule_tac x = lsdec2 in spec)
-    apply(case_tac c', auto)
+    sorry
+(*
+    apply(drule_tac x = lsdec2 in spec) apply(auto)
+
 
           apply(case_tac x51, auto)
-    apply(frule_tac ll3_consume_label_unch, auto)
+     apply(frule_tac ll3_consume_label_unch, auto)
+    apply(drule_tac x = lsdec2 in spec) apply(auto)
+
            apply(drule_tac x = enew in spec) apply(drule_tac x = edec in spec)
            apply(drule_tac[1] t = "((a,b),LSeq enew ls)" in ll3'_descend.intros(2))
             apply(auto)
@@ -3542,8 +3626,7 @@ apply(rule_tac x = "LLab True na" in exI)
 
   (* idea: Seq must be unchanged? *)
 
-    sorry
-qed
+qed*)
 
 
 (* TODO: this lemma is needed by the valid3' proof but we don't
@@ -3558,6 +3641,7 @@ lemma ll3_assign_label_preserve_labels' :
 (! ls enew . ll3_assign_label_list ls = Some ls' \<longrightarrow>
        ((q, LSeq enew ls), (q', LLab e' (length k - 1)), k) \<in> ll3'_descend)))
 "
+(*
 proof(induction rule:ll3'_descend.induct)
   case (1 c q e ls t)
   then show ?case
@@ -3589,7 +3673,7 @@ apply(drule_tac[1] ll3_hasdesc)
 
           (*apply(case_tac ls, auto)*)
 
-           apply(drule_tac[1] ll3_hasdesc2) apply(auto)
+           apply(drule_tac[1] ll3_hasdesc2) apply(auto)*)
     sorry
   (* idea ? - this is transitivity
      we should combine the two descends facts,
