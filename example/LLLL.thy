@@ -3425,6 +3425,37 @@ lemma ll3_descend_splitpath_cons :
   apply(case_tac k2) apply(auto)
   done
 
+lemma ll3_consume_label_length1 :
+"ll3_consume_label p n l1 = Some (l2, p') \<Longrightarrow>
+length l1 = length l2"
+  apply(insert ll3_consume_label_length)
+  apply(blast)
+  done
+
+(* we need a more general consume_label_child, that has all cases *)
+(* we probably also need a backwards one. *)
+(*
+lemma ll3_consume_label_forward_child_cases :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+(! q' c . y = (q', c) \<longrightarrow>
+(! p p'  n ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow>
+   (? c' .
+      (! enew . ((q, LSeq enew ls'), (q', c'), k) \<in> ll3'_descend \<and>
+      ((p' = [] \<and> c = c') \<or>
+      (? pp m . p' = pp @ m # p \<and> n \<le> m \<and>
+       (m - n \<noteq> List.hd k \<and> c = c' ) \<or>
+       (m - n = List.hd k \<and> 
+        ( (c = LLab False (length p' - 1) \<and> c' = LLab True (length p' - 1)) 
+          \<or> (? lsdec lsdec' edec . 
+              (c = LSeq edec lsdec \<and> c' = LSeq edec lsdec' \<and>
+               ll3_consume_label [List.hd k] 0 lsdec = Some (lsdec', pp)
+"
+*)
+
+(*
+we need to better characterize the output descendent
+*)
 lemma ll3_consume_label_forwards_fact :
 "(x, y, k) \<in> ll3'_descend \<Longrightarrow>
 (! q e ls . x = (q, LSeq e ls) \<longrightarrow>
@@ -3451,15 +3482,27 @@ proof(induction rule:ll3'_descend.induct)
      apply(auto simp add:ll3'_descend.intros)
 
     apply(frule_tac ll3_consume_label_char, auto)
+
+    apply(case_tac ca, auto)
+
     apply(case_tac "m - n = c", auto)
 
+    apply(rule_tac [1] x = "LLab True (length list)" in exI)
+     apply(rule_tac[2] x = ca in exI) apply(auto)
+    apply(rule_tac[2] ll_descend_eq_l2r) apply(auto)
+    apply(frule_tac[2] ll3_consume_label_length1) apply(auto)
+    apply(case_tac[2] ls', auto)
      apply(frule_tac ll3_consume_label_found, auto)
      apply(drule_tac x = "fst q" in spec) apply(drule_tac x = "snd q" in spec) apply(drule_tac x = "[]" in spec)
      apply(auto )
-     apply(drule_tac ll3_descend_splitpath_cons) apply(case_tac "rev pp" ,auto)
-     apply(case_tac ls, auto)
+     apply(frule_tac ll3_descend_splitpath_cons) apply(case_tac "rev pp" ,auto)
+      apply(case_tac ls, auto)
 
-      apply(rule_tac x = " llt.LLab False (length p)" in exI, auto)
+    apply(case_tac "m-n", auto)
+
+      apply(rule_tac x = " llt.LLab True (length p)" in exI, auto)
+    
+    apply(rule_tac e = "[]" in ll3'_descend_relabel, auto)
     apply(auto simp add:ll3'_descend.intros)
 
      apply(frule_tac ll3_consume_label_found, auto)
