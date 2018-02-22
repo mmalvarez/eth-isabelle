@@ -3823,7 +3823,7 @@ apply(drule_tac x = enew in spec) (* bogus *)
 
     (* this should be a contradiction: if we found the node in the
 parent, there should also be a find in the immediate child *)
-
+(* or should it: what if we found in parent but it's actually a different child *)
        apply(frule_tac ll3_descend_nonnil, auto)
        apply(frule_tac ll3_consume_label_char, auto)
     apply(frule_tac ll3_consume_label_unch, auto)
