@@ -3814,9 +3814,9 @@ apply(drule_tac x = enew in spec) (* bogus *)
     apply(frule_tac e' = enew in ll3'_descend_relabel)
       apply(auto simp add:ll3'_descend.intros)
 
-       apply(frule_tac ll3_descend_nonnil, auto)
+(*       apply(frule_tac ll3_descend_nonnil, auto)*)
        apply(frule_tac ll3_consume_label_char, auto)
-
+(* TODO: add a hypothesis about length to char'? *)
     apply(drule_tac x = "(m-na)#p" in spec) apply(rotate_tac -1)
     apply(drule_tac x = pp in spec) apply(rotate_tac -1)
     apply(drule_tac x = 0 in spec) apply(auto)
@@ -3824,15 +3824,21 @@ apply(drule_tac x = enew in spec) (* bogus *)
     (* this should be a contradiction: if we found the node in the
 parent, there should also be a find in the immediate child *)
 (* or should it: what if we found in parent but it's actually a different child *)
-       apply(frule_tac ll3_descend_nonnil, auto)
        apply(frule_tac ll3_consume_label_char, auto)
     apply(frule_tac ll3_consume_label_unch, auto)
+    apply(frule_tac ll3_descend_nonnil, auto)
 
        apply(rule_tac x = c' in exI) apply(auto)
     apply(drule_tac x = enew in spec)
         apply(drule_tac x = ea in spec)
         apply(rotate_tac -2)
-    apply(drule_tac ll3'_descend.intros(2)) apply(auto)
+        apply(drule_tac ll3'_descend.intros(2)) apply(auto)
+
+       apply(case_tac "ma - na = m - na") apply(auto)
+    apply(rule_tac x = "[]" in exI) apply(rule_tac x = ma in exI) apply(auto)
+
+       apply(rule_tac x = ppa in exI) apply(rule_tac x = ma in exI)
+    apply(auto)
           apply(auto simp add:ll3'_descend.intros)
 
     apply(drule_tac ll3_descend_splitpath_cons)
