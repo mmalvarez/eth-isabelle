@@ -4434,6 +4434,25 @@ another idea? what if we change valid3' so that it tracks the
 location of unconsumed labels?
 *)
 
+(* another idea: create a "gather" function tracking all childpaths that match
+Lab nodes at correct depth *)
+(*
+*)
+fun gather_ll3_labels :: "ll3 \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
+and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where
+"gather_ll3_labels (_, llt.L _ _) _ _ = []"
+| "gather_ll3_labels (_, llt.LJmp _ _ _) _ _ = []"
+| "gather_ll3_labels (_, llt.LJmpI _ _ _) _ _ = []"
+| "gather_ll3_labels (_, llt.LLab _ n) cp d = 
+     (if n = d then [cp] else [])"
+| "gather_ll3_labels (_, LSeq _ ls) cp d =
+   gather_ll3_labels_list ls cp 0 d"
+| "gather_ll3_labels_list [] _ _ _ = []"
+| "gather_ll3_labels_list (h#t) cp ofs d =
+   gather_ll3_labels h (cp@[ofs]) (d+1) @
+   gather_ll3_labels_list t cp (ofs+1) d"
+
+(* TODO: use gather instead? *)
 fun check_ll3_seq_nolabel :: "ll3 \<Rightarrow> nat \<Rightarrow> bool" where
 "check_ll3_seq_nolabel (_, llt.L _ _) _ = True"
 | "check_ll3_seq_nolabel (_, llt.LJmp _ _ _) _ = True"
@@ -4441,6 +4460,8 @@ fun check_ll3_seq_nolabel :: "ll3 \<Rightarrow> nat \<Rightarrow> bool" where
 | "check_ll3_seq_nolabel (_, llt.LLab b n) d = (b = True \<and> n \<noteq> d)"
 | "check_ll3_seq_nolabel (_, LSeq _ ls) d =
    List.list_all (\<lambda> x . check_ll3_seq_nolabel x (d+1)) ls"
+
+
 
 lemma numnodes_child [rule_format] :
 "((a, b), ba) \<in> set ls \<Longrightarrow>
@@ -4459,7 +4480,7 @@ in check_ll3 *)
 (* is the "set" formulation correct here? *)
 
 (* another idea: enumerate paths up to d, and try them all? *)
-
+(*
 function check_ll3_seq_label :: "ll3 \<Rightarrow> nat \<Rightarrow> bool" where
 "check_ll3_seq_label (_, llt.L _ _) _ = False"
 | "check_ll3_seq_label (_, llt.LJmp _ _ _) _ = False"
@@ -4474,15 +4495,97 @@ termination
    apply(auto)
   apply(rule_tac numnodes_child) apply(auto)
   done
+*)
+fun check_ll3 :: "ll3  \<Rightarrow> bool" where
+"check_ll3 (_, llt.L _ _) = True"
+| "check_ll3 (_, llt.LJmp _ _ _) = True"
+| "check_ll3 (_, llt.LJmpI _ _ _) = True"
+| "check_ll3 (_, llt.LLab b n) = (b = True)"
+| "check_ll3 (_, llt.LSeq [] ls) =
+   (List.list_all check_ll3 ls \<and>
+   gather_ll3_labels_list ls [] 0 0 = [])"
+| "check_ll3 (_, llt.LSeq p ls) =
+   (List.list_all check_ll3 ls \<and>
+    gather_ll3_labels_list ls [] 0 0 = [p])"
+
+(* This should say something about how everything returned by 
+gather should be a true descendent *)
+lemma ll3_gather_correct :
+"True"
+  by auto
+
+(* lemmas we need:
+- generalizing to different nat offsets
+- gather_labels/gather_labels_list never returns [[]] *)
 
 (*
-fun check_ll3 :: "ll3  \<Rightarrow> bool" where
-"check_ll3 (_, llt.L _ _) _ = True"
-| "check_ll3 (_, llt.LJmp _ _ _) _ = True"
-| "check_ll3 (_, llt.LJmpI _ _ _) _ = True"
-| "check_ll3 (_, llt.LSeq [] ls) =
-   List.list_forall (check_ll3_seq_nolabel"
+idea: change to or of existentials?
 *)
+(* getting closer here hopefully *)
+lemma check_ll3_valid :
+"((q,t) \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
+\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
+    List.list_all check_ll3 ls \<longrightarrow>
+       ((gather_ll3_labels_list ls [] 0 0 = [] \<longrightarrow> 
+         ((x,x'), LSeq [] ls) \<in> ll_valid3'))
+       \<and> (! p . gather_ll3_labels_list ls [] 0 0 = [p] \<longrightarrow>
+          (? ph pt . p = ph#pt \<and>
+         ((x, x'), LSeq p ls) \<in> ll_valid3'))
+       \<and> (! p p' t . gather_ll3_labels_list ls [] 0 0 = (p#p'#t) \<longrightarrow>
+          (p \<noteq> [] \<and> p' \<noteq> [] \<and>
+         (! p'' . ((x,x'), LSeq p'' ls) \<notin> ll_valid3'))))
+"
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+case (1 i x e)
+  then show ?case
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (2 x d e)
+  then show ?case
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (3 x d e s)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (4 x d e s)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (5 n l n' e)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros)
+      apply(case_tac e, auto)
+     apply(case_tac e, auto)
+     apply(case_tac e, auto)
+    done
+next
+  case (6 n)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros)
+    apply(rule_tac ll_valid3'.intros) apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k) apply(auto)
+    done
+next
+  case (7 n h n' t n'')
+  then show ?case
+    apply(clarify)
+    apply(simp)
+    apply(auto)
+       apply(rule_tac ll_valid3'.intros(5)) apply(auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+          apply(case_tac "gather_ll3_labels_list t [] 0 0", auto)
+              apply(case_tac list, auto)
+             apply(drule_tac ll_valid3'_child) apply(auto)
+(* we need lemmas about gather *)
+            apply(drule_tac ll3_descend_nonnil, auto)
+          apply(case_tac "gather_ll3_labels_list t [] 0 0", auto)
+             apply(case_tac list, auto)
+(* we need a "gen" lemma for gather_labels *)
+            apply(case_tac list, auto)
+(* *)
+qed
+
 (* new version, generalize to arbitrary offsets but nil paths *)
 (* Unfortunately we still need to care about the nil (returned path) case*)
 lemma ll3_assign_label_valid3' :
