@@ -4457,12 +4457,16 @@ lemma numnodes_child [rule_format] :
 (* i think we can just tack this on as an extra condition to check
 in check_ll3 *)
 (* is the "set" formulation correct here? *)
+
+(* another idea: enumerate paths up to d, and try them all? *)
+
 function check_ll3_seq_label :: "ll3 \<Rightarrow> nat \<Rightarrow> bool" where
 "check_ll3_seq_label (_, llt.L _ _) _ = False"
 | "check_ll3_seq_label (_, llt.LJmp _ _ _) _ = False"
 | "check_ll3_seq_label (_, llt.LJmpI _ _ _) _ = False"
 | "check_ll3_seq_label (_, llt.LLab b n) d = (b = True \<and> n = d)"
 | "check_ll3_seq_label (_, LSeq _ ls) d =
+   (?x . 
    List.list_ex1 (\<lambda> x . check_ll3_seq_label x (d+1)) ls"
   by pat_completeness auto
 termination
