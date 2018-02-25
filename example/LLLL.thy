@@ -4437,6 +4437,12 @@ location of unconsumed labels?
 (* another idea: create a "gather" function tracking all childpaths that match
 Lab nodes at correct depth *)
 (*
+TODO: need to revise these functions,
+they can return [[]] in some cases it seems
+
+also, we need to adjust when we are updating the depth
+to compensate for the fact that gather_ll3_labels_list
+is our real entry point
 *)
 fun gather_ll3_labels :: "ll3 \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
 and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where
@@ -4446,10 +4452,10 @@ and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> na
 | "gather_ll3_labels (_, llt.LLab _ n) cp d = 
      (if n = d then [cp] else [])"
 | "gather_ll3_labels (_, LSeq _ ls) cp d =
-   gather_ll3_labels_list ls cp 0 d"
+   gather_ll3_labels_list ls cp 0 (d+1)"
 | "gather_ll3_labels_list [] _ _ _ = []"
 | "gather_ll3_labels_list (h#t) cp ofs d =
-   gather_ll3_labels h (cp@[ofs]) (d+1) @
+   gather_ll3_labels h (cp@[ofs]) (d) @
    gather_ll3_labels_list t cp (ofs+1) d"
 
 (* TODO: use gather instead? *)
@@ -4510,18 +4516,185 @@ fun check_ll3 :: "ll3  \<Rightarrow> bool" where
 
 (* This should say something about how everything returned by 
 gather should be a true descendent *)
-lemma ll3_gather_correct :
+(* we need my_ll_induct here*)
+(*
+lemma gather_ll3_labels_list_nil_gen [rule_format]:
+"(! cp ofs d . gather_ll3_labels_list ls cp ofs d = [] \<longrightarrow>
+ (! ofs' . gather_ll3_labels_list ls cp ofs' d = []))"
+  apply(induction ls)
+   apply(auto)
+  apply(case_tac ba, auto)
+  apply(case_tac x52, auto)
+
+  apply(case_tac ba, auto)
+  apply(case_tac x52, auto)
+
+  apply(case_tac ba, auto)
+  apply(case_tac x52, auto)
+*)
+(*
+we probably need a general correctness lemma.
+that is:
+"IF i am in the output of gather, THEN i am an appropriately descended label
+ IF i am an appropriate descendent THEN i will show up in the gather
+
+this probably needs separate lemma for each side
+
+we _do_ need both directions
+*)
+lemma ll3_gather_correct1 :
 "True"
   by auto
 
-(* lemmas we need:
-- generalizing to different nat offsets
-- gather_labels/gather_labels_list never returns [[]] *)
 
 (*
-idea: change to or of existentials?
+idea: if we are descended via k
+then for any childpath cp
+k@cp will be output by gather
+applied to a depth of 0 (?)
+how does depth fit into this?
+depth fits in determining the offset of the label
 *)
+(*
+lemma ll3_gather_correct2 :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+ k \<in> "
+*)
+(* lemmas we need:
+- generalizing to different nat offsets
+- gather_labels/gather_labels_list never returns [[]] (?) *)
+
+
 (* getting closer here hopefully *)
+lemma check_ll3_valid :
+"((q,t) \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
+\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
+     (! e . check_ll3 ((x,x'), LSeq e ls) = True \<longrightarrow> ((x,x'), LSeq e ls) \<in> ll_valid3'))"
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+case (1 i x e)
+  then show ?case
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (2 x d e)
+  then show ?case
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (3 x d e s)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (4 x d e s)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (5 n l n' e)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (6 n)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros)
+    apply(case_tac e, auto)
+    apply(rule_tac ll_valid3'.intros) apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k) apply(auto)
+    done
+next
+  case (7 n h n' t n'')
+  then show ?case
+    apply(clarify)
+    apply(auto)
+     apply(case_tac e, auto)
+
+    apply(case_tac e, auto)
+    apply(rule_tac ll_valid3'.intros, auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+      apply(case_tac "check_ll3 ((n', n''), llt.LSeq [] t)")
+       apply(drule_tac x = "[]" in spec) apply(auto)
+       apply(drule_tac ll_valid3'_child, auto)
+(* need a gen lemma here *)
+(* need a lemma saying that if gather returns nil there are no descendents at that depth
+
+*)
+
+    apply(rule_tac[3] ll_valid3'.intros, auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(frule_tac[2] ll3_descend_nonnil) apply(auto)
+      apply(frule_tac[2] ll_descend_eq_r2l) apply(auto)
+        apply(case_tac[2] hd, auto)
+    apply(case_tac[2] tl, auto)
+         apply(frule_tac[2] ll_descend_eq_l2r)
+
+         (* in the first case, we can draw a contradiction
+            take descendents fact about h
+use it to prove gather_ll3_labels h [0] 0 cannot be 0
+*)
+    apply(frule_tac[3] "ll_descend_eq_l2r_list")
+
+(* in this case we can do something analogous,
+again relying on correctness of gather *)
+
+(* in the next case (case 4)
+do a case split to see whether the head or the tail has the descendent
+now we know the right argument to put into the inductive hyp.
+use that along with valid3'_child 
+*)
+
+(* case 5
+do a case split to see if the head or the tail has the descendent
+this could take the form of a case split on a
+as well as on one or the other of the "gather_ll3_labels" facts
+using that plus the computation rules for descend we should have this case
+need "gather \<Rightarrow> descend here"
+*)
+
+(* case 6
+case split on a
+(as with previous goals, this will require case splits on one or the other gather_ll3_labels facts
+case split on hd
+if hd=0
+the descendents fact contradicts the fact that gather didn't find anything in h
+if hd is nonzero
+then either gather_labels_list t is empty \<rightarrow> contradiction
+or we can compute on descendent fact to get a fact about t
+which we can then use to prove it must have shown up in gather_labels_list
+which means that we are done because that list is a singleton
+
+in the final case, reasoning is similar
+case split on hd, compute as appropriate on the descend fact
+case split on a/result of gathers
+use descend \<Rightarrow> gather fact to establish that we must be an element of 
+of a thing that is a singleton, so we must be equal
+*)
+         apply(frule_tac[6] ll3_descend_nonnil) apply(auto)
+          apply(case_tac[6] hd) apply(auto)
+    apply(case_tac[6] a, auto)
+    apply(case_tac[6] k')
+         apply(auto)
+
+      apply(case_tac "check_ll3 ((n', n''), llt.LSeq [] t)") apply(auto)
+      
+
+    apply(case_tac t, auto)
+    apply(case_tac h, auto)
+
+                        apply(rule_tac ll_valid3'.intros, auto)
+                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+                        apply(frule_tac ll3_descend_nonnil) apply(auto)
+                        apply(drule_tac ll_descend_eq_r2l) apply(auto)
+                        apply(case_tac hd, auto)
+                        apply(case_tac tl, auto)
+(* off by one error? *)
+    apply(case_tac "x22 = Suc 0", auto)
+                        apply(rule_tac ll_valid3'.intros, auto)
+                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+                        apply(frule_tac ll3_descend_nonnil) apply(auto)
+                        apply(drule_tac ll_descend_eq_r2l) apply(auto)
+                        apply(case_tac hd, auto)
+          apply(case_tac tl, auto)
+
+(* getting closer here hopefully *)
+(* we need to generalize to arbitrary offsets though *)
 lemma check_ll3_valid :
 "((q,t) \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
 \<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
@@ -4572,8 +4745,47 @@ next
     apply(clarify)
     apply(simp)
     apply(auto)
+                        apply(rule_tac ll_valid3'.intros, auto)
+                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac t, auto )
+                        apply(case_tac h)
+                        apply(rule_tac ll_valid3'.intros, auto)
+                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+                        apply(frule_tac ll3_descend_nonnil) apply(auto)
+                        apply(drule_tac ll_descend_eq_r2l) apply(auto)
+                        apply(case_tac hd, auto)
+                        apply(case_tac tl, auto)
+(* off by one error? *)
+    apply(case_tac "x22 = Suc 0", auto)
+                        apply(rule_tac ll_valid3'.intros, auto)
+                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+                        apply(frule_tac ll3_descend_nonnil) apply(auto)
+                        apply(drule_tac ll_descend_eq_r2l) apply(auto)
+                        apply(case_tac hd, auto)
+                        apply(case_tac tl, auto)
+
+
+(*    apply(case_tac "gather_ll3_labels_list t [] 0 0", auto) *)
+(*
+using the above, commented-out tactic
+we see we need a lemma relating results of gather
+to the preconditions for the intros of valid3'
+*)
+    apply(auto)
+(* cases 1-2: contradiction,
+through straightforward use of generalization lemma
+for arbitrary offsets *)
+(*
+case 3: 
+using gen lemma, we know
+gather_labels_list t [] 0 0 = [p']
+(for appropriately modified p')
+this means we found what we want in the tail
+*)
        apply(rule_tac ll_valid3'.intros(5)) apply(auto)
-    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+                 apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
           apply(case_tac "gather_ll3_labels_list t [] 0 0", auto)
               apply(case_tac list, auto)
              apply(drule_tac ll_valid3'_child) apply(auto)
