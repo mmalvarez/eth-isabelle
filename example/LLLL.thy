@@ -5527,111 +5527,8 @@ apply(drule_tac x = "[]" in spec)
 qed
 
 
-(* getting closer here hopefully *)
-(* we need to generalize to arbitrary offsets though *)
-lemma check_ll3_valid :
-"((q,t) \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
-\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
-    List.list_all check_ll3 ls \<longrightarrow>
-       ((gather_ll3_labels_list ls [] 0 0 = [] \<longrightarrow> 
-         ((x,x'), LSeq [] ls) \<in> ll_valid3'))
-       \<and> (! p . gather_ll3_labels_list ls [] 0 0 = [p] \<longrightarrow>
-          (? ph pt . p = ph#pt \<and>
-         ((x, x'), LSeq p ls) \<in> ll_valid3'))
-       \<and> (! p p' t . gather_ll3_labels_list ls [] 0 0 = (p#p'#t) \<longrightarrow>
-          (p \<noteq> [] \<and> p' \<noteq> [] \<and>
-         (! p'' . ((x,x'), LSeq p'' ls) \<notin> ll_valid3'))))
-"
-proof(induction rule:ll_valid_q_ll_validl_q.induct)
-case (1 i x e)
-  then show ?case
-    apply(auto simp add:ll_valid3'.intros) done
-next
-  case (2 x d e)
-  then show ?case
-    apply(auto simp add:ll_valid3'.intros) done
-next
-  case (3 x d e s)
-  then show ?case 
-    apply(auto simp add:ll_valid3'.intros) done
-next
-  case (4 x d e s)
-  then show ?case 
-    apply(auto simp add:ll_valid3'.intros) done
-next
-  case (5 n l n' e)
-  then show ?case 
-    apply(auto simp add:ll_valid3'.intros)
-      apply(case_tac e, auto)
-     apply(case_tac e, auto)
-     apply(case_tac e, auto)
-    done
-next
-  case (6 n)
-  then show ?case 
-    apply(auto simp add:ll_valid3'.intros)
-    apply(rule_tac ll_valid3'.intros) apply(auto simp add:ll_valid_q_ll_validl_q.intros)
-    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k) apply(auto)
-    done
-next
-  case (7 n h n' t n'')
-  then show ?case
-    apply(clarify)
-    apply(simp)
-    apply(auto)
-                        apply(rule_tac ll_valid3'.intros, auto)
-                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
-
-    apply(case_tac t, auto )
-                        apply(case_tac h)
-                        apply(rule_tac ll_valid3'.intros, auto)
-                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
-                        apply(frule_tac ll3_descend_nonnil) apply(auto)
-                        apply(drule_tac ll_descend_eq_r2l) apply(auto)
-                        apply(case_tac hd, auto)
-                        apply(case_tac tl, auto)
-(* off by one error? *)
-    apply(case_tac "x22 = Suc 0", auto)
-                        apply(rule_tac ll_valid3'.intros, auto)
-                        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
-                        apply(frule_tac ll3_descend_nonnil) apply(auto)
-                        apply(drule_tac ll_descend_eq_r2l) apply(auto)
-                        apply(case_tac hd, auto)
-                        apply(case_tac tl, auto)
-
-
-(*    apply(case_tac "gather_ll3_labels_list t [] 0 0", auto) *)
+(* old work, before i switched to translation validator approach *)
 (*
-using the above, commented-out tactic
-we see we need a lemma relating results of gather
-to the preconditions for the intros of valid3'
-*)
-    apply(auto)
-(* cases 1-2: contradiction,
-through straightforward use of generalization lemma
-for arbitrary offsets *)
-(*
-case 3: 
-using gen lemma, we know
-gather_labels_list t [] 0 0 = [p']
-(for appropriately modified p')
-this means we found what we want in the tail
-*)
-       apply(rule_tac ll_valid3'.intros(5)) apply(auto)
-                 apply(auto simp add:ll_valid_q_ll_validl_q.intros)
-
-          apply(case_tac "gather_ll3_labels_list t [] 0 0", auto)
-              apply(case_tac list, auto)
-             apply(drule_tac ll_valid3'_child) apply(auto)
-(* we need lemmas about gather *)
-            apply(drule_tac ll3_descend_nonnil, auto)
-          apply(case_tac "gather_ll3_labels_list t [] 0 0", auto)
-             apply(case_tac list, auto)
-(* we need a "gen" lemma for gather_labels *)
-            apply(case_tac list, auto)
-(* *)
-qed
-
 (* new version, generalize to arbitrary offsets but nil paths *)
 (* Unfortunately we still need to care about the nil (returned path) case*)
 lemma ll3_assign_label_valid3' :
@@ -5722,9 +5619,9 @@ next
   case (7 n h n' t n'')
   then show ?case sorry
 qed
+*)
 
-
-
+(*
 (* more elaborated version, with the consumes premises *)
 
 lemma ll3_assign_label_valid3' :
@@ -6005,7 +5902,6 @@ valid3' facts *)
       apply(rule_tac ll_valid3'.intros, auto 0 0)
       apply(drule_tac x = s' in spec) apply(rotate_tac -1)
     apply(drule_tac x = lista in spec) apply(auto 0 0)
-(*
     apply(rotate_tac -1)
        apply(drule_tac ll3_consumes_split, simp) apply(auto 0 0)
 
@@ -6065,11 +5961,10 @@ valid3' facts *)
 
 (* for case 1 we need a forward fact about assign_labels not touching labels out of its depth *)
 (* for case 2 ll3_consume_label_found might suffice  *)
-(* *)
 
     apply(drule_tac ll3_assign_label_preserve_labels') apply(auto 0 0)
     apply(simp)
-(*
+
     apply(frule_tac ll3_consume_label_found, auto)
       apply(case_tac m, auto) apply(rotate_tac -1)
     apply(drule_tac x = n in spec) apply(rotate_tac -1)
@@ -6077,9 +5972,9 @@ valid3' facts *)
     apply(drule_tac x = "[]" in spec) apply(auto)
        apply(rule_tac ll_valid3'.intros(6), auto)
     apply(case_tac h, safe)
-(*
+
     apply(thin_tac "((n', n''), t) \<in> ll_validl_q")
-    apply(thin_tac "((n, n'), h) \<in> ll_valid_q") *)
+    apply(thin_tac "((n, n'), h) \<in> ll_valid_q") 
          apply(case_tac bc, auto)
 
  apply(thin_tac "((n', n''), t) \<in> ll_validl_q")
@@ -6121,7 +6016,6 @@ valid3' facts *)
 
     apply(simp)
 
-(*
          apply(drule_tac x = s' in spec) apply(drule_tac x = list in spec) apply(auto)
          apply(case_tac h, auto)
              apply(case_tac "ll3_consume_label [] (Suc 0) list", auto)
@@ -6321,8 +6215,16 @@ definition src3 where
 definition prog3 where
 "prog3 = ll3_assign_label (ll3_init (ll_pass1 (
 ll1.LSeq [ll1.LSeq [ll1.LLab 0], ll1.LSeq [ll1.LJmp 1], ll1.LSeq [ll1.LLab 1]])))"
- 
+
 value prog3
+
+value "(case prog3 of
+Some p' \<Rightarrow> Some (check_ll3 p')
+| _ \<Rightarrow> None)"
+
+(* TODO: a "wrapper" function for check_ll3
+that doesn't increment counter the first time *)
+
 
 (* now we go to ll4, we are getting ready to put in jump targets *)
 fun ll4_init :: "ll3 \<Rightarrow> ll4" where
@@ -6548,6 +6450,14 @@ value "Evm.byteFromNat 255"
 
 value "Divides.divmod_nat 255 256"
 
+lemma divmod_decrease [rule_format]:
+"(! n' . fst (Divides.divmod_nat n 256) = Suc n' \<longrightarrow>
+    Suc n' < n)
+ "
+  apply(induction n)
+   apply(auto)
+  done
+
 (* TODO ensure these are coming out in the right order *)
 (* TODO this terminates because divmod decreases number *)
 function output_address :: "nat \<Rightarrow> 8 word list" where
@@ -6555,7 +6465,14 @@ function output_address :: "nat \<Rightarrow> 8 word list" where
                          (0, mo) \<Rightarrow> [Evm.byteFromNat mo]
                         |(Suc n, mo) \<Rightarrow> (Evm.byteFromNat mo)#(output_address (Suc n)))"
   by auto
-termination sorry
+termination
+  apply(relation "measure (\<lambda> x . x)")
+   apply(auto)
+  apply(subgoal_tac "fst (Divides.divmod_nat n 256) = Suc nat")
+   apply(drule_tac divmod_decrease) apply(simp)
+  apply(case_tac "Divides.divmod_nat n
+        256", auto)
+  done
 
 (* use word256FromNat to get w256
    then use word_rsplit245 *)
