@@ -4459,6 +4459,7 @@ and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> na
    gather_ll3_labels_list t cp (ofs+1) d"
 
 (* TODO: use gather instead? *)
+(*
 fun check_ll3_seq_nolabel :: "ll3 \<Rightarrow> nat \<Rightarrow> bool" where
 "check_ll3_seq_nolabel (_, llt.L _ _) _ = True"
 | "check_ll3_seq_nolabel (_, llt.LJmp _ _ _) _ = True"
@@ -4466,7 +4467,7 @@ fun check_ll3_seq_nolabel :: "ll3 \<Rightarrow> nat \<Rightarrow> bool" where
 | "check_ll3_seq_nolabel (_, llt.LLab b n) d = (b = True \<and> n \<noteq> d)"
 | "check_ll3_seq_nolabel (_, LSeq _ ls) d =
    List.list_all (\<lambda> x . check_ll3_seq_nolabel x (d+1)) ls"
-
+*)
 
 
 lemma numnodes_child [rule_format] :
@@ -4541,12 +4542,56 @@ that is:
 this probably needs separate lemma for each side
 
 we _do_ need both directions
+
+we need to figure out how exactly gather_labels produces output relative to cp, off, and d
+a "spec" lemma defining the returned paths in terms of these parameters
 *)
-lemma ll3_gather_correct1 :
-"True"
-  by auto
+(*
+need my_ll_induct here
+*)
+lemma gather_ll3_fact [rule_format] :
+" (! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! x cp off d . x \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+    (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost)))
+\<and> (! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ll3 list) cp off d) \<longrightarrow>
+    (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost))"
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case by auto
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case 
+    apply(auto)
+     apply(case_tac h, auto) apply(case_tac ba, auto)
+     apply(drule_tac x = x in spec)
+     apply(rotate_tac -1)
+     apply(drule_tac x = "cp@[off]" in spec) apply(drule_tac x = 0 in spec) apply(auto)
 
+    apply(drule_tac x = x in spec) apply(rotate_tac -1)
+    apply(drule_tac x = cp in spec) apply(drule_tac x = "Suc off" in spec)
+    apply(auto)
+    done qed
 
+lemma gather_ll3_fact2 [rule_format] :
+"(! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ll3 list) cp off d) \<longrightarrow>
+    (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost))"
+  apply(insert gather_ll3_fact)
+  apply(blast)
+  done
 (*
 idea: if we are descended via k
 then for any childpath cp
@@ -4556,10 +4601,154 @@ how does depth fit into this?
 depth fits in determining the offset of the label
 *)
 (*
-lemma ll3_gather_correct2 :
-"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
- k \<in> "
+lemma gather_ll3_labels_child' [rule_format] :
+"
+(! c aa bb e d . length ls > c \<longrightarrow> ls ! c = ((aa, bb), llt.LLab e d) \<longrightarrow>
+ (_ \<in> set (gather_ll3_labels_list ls cp 0 d)))
 *)
+(* we will need to prove a single step version of this one
+by my_ll_induct,
+then use a descend induction to stitch it together
+*)
+lemma gather_ll3_correct2_child [rule_format]:
+"  (! c . c < length ls \<longrightarrow>
+       (! a b ba n . ls ! c = ((a, b), llt.LLab ba n) \<longrightarrow>
+       (! cp off . cp @ [c+off] \<in> set (gather_ll3_labels_list ls cp off n))))"
+proof(induction ls)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons a ls)
+  then show ?case 
+    apply(auto)
+    apply(case_tac c, auto)
+
+    apply(drule_tac x = nat in spec) apply(auto)
+    apply(drule_tac x = cp in spec) apply(drule_tac x = "Suc off" in spec) apply(auto)
+    done
+qed
+
+(* get rid of c' *)
+lemma gather_ll3_correct2_child2' [rule_format] :
+"
+(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! c . c < length ls \<longrightarrow>
+  (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
+   (! d cp off1 off2 post . (cp@[c+off1]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off1]) 0 (Suc d))  \<longrightarrow>
+          (cp@[c+off1]@post) \<in> set (gather_ll3_labels_list ls cp off1 d)
+))))
+\<and>
+(! c . c < length ls \<longrightarrow>
+  (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
+   (! d cp off1 off2 post . (cp@[c+off1]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off1]) 0 (Suc d))  \<longrightarrow>
+          (cp@[c+off1]@post) \<in> set (gather_ll3_labels_list ls cp off1 d)
+)))"
+(* we need a "gen" lemma to deal with offset discrepancies *)
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+    apply(case_tac c, auto)
+    apply(rotate_tac 1)
+    apply(drule_tac x = nat in spec) apply(auto)
+    apply(rotate_tac -1)
+    apply(drule_tac x = d in spec) apply(rotate_tac -1)
+    apply(drule_tac x = cp in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "Suc off1" in spec) apply(auto)
+    done
+qed
+(* how are we going to handle changes of offset? *)
+(* idea: off is our starting offset, want off+c *)
+lemma gather_ll3_correct2_child2 [rule_format] :
+"(! c . c < length ls \<longrightarrow>
+  (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
+   (! d cp off post . (cp@[c+off]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off]) 0 (Suc d))  \<longrightarrow>
+          (cp@[c+off]@post) \<in> set (gather_ll3_labels_list ls cp off d)
+)))
+"
+(* bogus first argument to induction principle *)
+  apply(insert gather_ll3_correct2_child2'[of "((0,0),LSeq [] [])" ls])
+  apply(auto)
+  done
+
+(* this needs to account for post *)
+lemma gather_ll3_correct_desc' [rule_format] :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+ (! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+ (! q' e' lsdec . y = (q', LSeq e' lsdec) \<longrightarrow>
+  (! cp n post . (cp@k@post) \<in> set (gather_ll3_labels_list lsdec (cp@k) 0 (n + length k) ) \<longrightarrow>
+     (cp@k@post) \<in> set (gather_ll3_labels_list ls cp 0 n))))"
+proof(induction rule: ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case
+    apply(auto)
+    apply(frule_tac gather_ll3_fact2) apply(auto)
+    apply(drule_tac post = "na#cpost" and cp = cp and d = n and off = 0 in gather_ll3_correct2_child2) apply(auto)
+    done
+next
+  case (2 t t' n t'' n')
+  then show ?case
+    apply(auto)
+    apply(rotate_tac 1)
+    apply(frule_tac ll3_hasdesc) apply(auto)
+    apply(rotate_tac 2)
+    apply(drule_tac x = "cp@n" in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "na + length n" in spec) apply(auto)
+    apply(rotate_tac -1)
+    apply(drule_tac x = post in spec) apply(auto)
+    (* unsure why i need this *)
+    apply(subgoal_tac "na + (length n + length n') = na + length n + length n'")
+     apply(auto)
+    done
+qed
+  
+
+(* need a lemma relating result of gather_labels
+to result on its descendents *)
+
+lemma gather_ll3_correct2 :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+ (! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+ (! q' b n . y = (q', LLab b (length k - 1 + n)) \<longrightarrow>
+  (! cp . (cp@k) \<in> set (gather_ll3_labels_list ls cp 0 n ))))"
+proof(induction rule:ll3'_descend.induct)
+case (1 c q e ls t)
+  then show ?case 
+    apply(auto)
+    apply(drule_tac cp = cp and off = 0 in gather_ll3_correct2_child) apply(auto)
+done next
+  case (2 t t' n t'' n')
+  then show ?case 
+    apply(auto)
+    apply(rotate_tac 1) apply(frule_tac ll3_hasdesc) apply(auto)
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+    apply(drule_tac x = "cp@n" in spec) apply(auto)
+    apply(frule_tac gather_ll3_fact2)  apply(auto)
+    apply(rotate_tac 1)
+    apply(frule_tac gather_ll3_correct_desc' ) apply(auto)
+    apply(subgoal_tac "length n + na = na + length n") apply(auto)
+    done
+qed
+
+
 (* lemmas we need:
 - generalizing to different nat offsets
 - gather_labels/gather_labels_list never returns [[]] (?) *)
