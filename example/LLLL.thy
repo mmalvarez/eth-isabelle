@@ -4444,6 +4444,8 @@ also, we need to adjust when we are updating the depth
 to compensate for the fact that gather_ll3_labels_list
 is our real entry point
 *)
+(*fun gather_ll3_labels :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
+and gather_ll3_labels_list :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where *)
 fun gather_ll3_labels :: "ll3 \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
 and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where
 "gather_ll3_labels (_, llt.L _ _) _ _ = []"
@@ -4503,6 +4505,7 @@ termination
   apply(rule_tac numnodes_child) apply(auto)
   done
 *)
+(*fun check_ll3 :: "('lix, 'ljx, 'ljix, 'ptx, 'pnx) ll3'  \<Rightarrow> bool" where*)
 fun check_ll3 :: "ll3  \<Rightarrow> bool" where
 "check_ll3 (_, llt.L _ _) = True"
 | "check_ll3 (_, llt.LJmp _ _ _) = True"
@@ -4606,7 +4609,9 @@ lemma gather_ll3_nil_gen' [rule_format]:
    (! off' . gather_ll3_labels_list ls cp' off' n = [])))"
 proof(induction rule:my_ll_induct)
 case (1 q e i)
-  then show ?case by auto
+  then show ?case 
+    
+    by auto
 next
   case (2 q e idx)
   then show ?case by auto
@@ -4640,7 +4645,6 @@ gather_ll3_labels_list ls cp off n = [] \<Longrightarrow>
   apply(blast)
   done
 
-(* TODO: unfinished, two sides should match *)
 lemma gather_ll3_singleton_gen' [rule_format]:
 " 
 (! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
@@ -6508,6 +6512,33 @@ definition pipeline :: "ll1 \<Rightarrow> nat \<Rightarrow> 8 word list option" 
   Some l' \<Rightarrow> Some (codegen l')
   | None \<Rightarrow> None)"
 
+(* NEW pipeline
+pass1 \<Rightarrow> ll3 init \<Rightarrow>
+assign_label \<Rightarrow> check ll3 \<Rightarrow>
+process_jumps_loop \<Rightarrow> (? check ll3?) \<Rightarrow> 
+write_jump_targets \<Rightarrow> check ll3
+*)
+(*
+lemmas we still need:
+- bump preserves ll3 validity, but shifted (qvalidity might suffice)
+- inc_jump preserves ll3 validity (maybe just qvalidity) for overall list (but may expand)
+- process_jumps_loop preserves ll3 validity (maybe just qvalidity)
+- if write_jump_targets succeeds, there was exactly enough room for all jumps
+  (maybe just check this)
+- if write_jump_targets succeeds, the target corresponds to the sequence node represented by the label
+- finally we want a lemma related to the behavior of jumps within the sequence of instrs
+  - ie, jumps resolve to the correct label
+  - is it enough to just to have the previous lemma?
+  - we probably need to relate it to the locations in the buffer occupied by the labels
+
+More ideas:
+jumps always follow push instructions (?)
+*)
+(*
+by the end of this procedure, we should have valid3' as well as the fact that
+jumps are all able to fit
+*)
+
 value "pipeline' src3 20"
 
 
@@ -6529,12 +6560,70 @@ ll1.LLab 1
 
 value "pipeline' progif 30"
 value "pipeline progif 30"
-(* idea: *)
-(* for final codegen pass, use stack_inst.PUSH_N
-   *)
-(* before going further with paths, we need some path utilities
-   (inspired by Huet's Zippers paper)
- *)
-  
-   
+
+(*Semantics for LL1
+leave state parametric for now
+we need an additional argument
+to allow for to a sequence's label
+
+we also need to build up a 
+nat \<Rightarrow> ('a \<Rightarrow> 'a)
+to represent our context
+ *)  
+(*
+idea: semantics of ll1 will just
+scan for the first label they come
+across in that depth
+
+we need to add an argument representing the
+childpaths we've seen?
+*)
+(*
+idea: in "normal" case, sequence nodes will produce 2 continuations, one for normal
+entry and one for entry after the label
+*) 
+(* TODO: are labels truly a noop on this machine *)
+(* TODO: we are using *)
+fun ll1_sem :: 
+  "ll1 \<Rightarrow>
+   (inst \<Rightarrow> 'a \<Rightarrow> 'a) \<Rightarrow> (* inst interpretation *)
+   nat \<Rightarrow> (* fuel *)
+   nat option \<Rightarrow> (* depth, if we are scanning for a label *)
+(* continuations corresponding to enclosing scopes *)
+(* problem: continuations may involve further calls to semantics,
+which may crash
+one approach is to return id or something, but we need to make sure that's the right thing
+another is to have it be None *)
+   (('a \<Rightarrow> 'a) option list) \<Rightarrow>
+   ('a \<Rightarrow> 'a) \<Rightarrow> (* continuation *)
+   (('a \<Rightarrow> 'a) * (('a \<Rightarrow> 'a) option)) option" where
+(* out of fuel *)
+"ll1_sem _ _ 0 _ _ _ = None"
+(* first, deal with scanning cases *)
+| "ll1_sem (ll1.LLab d) _ (Suc n) (Some d) scopes cont =
+   Some(cont, None)"
+(* bail if we can't find a label *)
+| "ll1_sem (ll1.LSeq []) _ (Suc n) (Some d) _ _ = None"
+(* can queries in "scanning mode" ever return a non-None second list? *)
+(* i think no should be the answer *)
+(* not sure if returning None here is right
+or whether this step should modify scopes or not *)
+| "ll1_sem (ll1.LSeq (h#t)) denote (Suc n) (Some d) scopes cont =
+   (case ll1_sem h denote n (Some (Suc d)) (None#scopes)
+       (case ll1_sem (ll1.LSeq t) denote n (Some d) scopes cont of
+                  None \<Rightarrow> None
+                  | Some (c,_) \<Rightarrow> Some (c, None)) of
+    None \<Rightarrow> None
+   | Some (c, _) \<Rightarrow> Some (c, None))"
+| "ll1_sem (_, ll1.L i) denote (Suc n) None scopes cont =
+  Some ((\<lambda> s . cont (denote i s)), None)"
+(* "normal" (non-"scanning") cases *)
+
+
+
+ (* How do we deal with the fact that the semantics of our sequence node
+may well depend on what the jump-semantics are
+idea: maybe we can get the scopes passed in later
+is it better for scopes to be a list or a function? functions are easier to build in
+an ad-hoc way sometimes... *)
 
