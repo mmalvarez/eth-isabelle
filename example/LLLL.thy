@@ -6858,11 +6858,16 @@ definition elle_init_cctx :: constant_ctx
 definition ellest_init :: "int \<Rightarrow> ellest" where
 "ellest_init g = (elle_init_vctx g, elle_init_cctx, Metropolis)"
 
-
-fun elle_sem :: 
+fun elle_sem' :: 
   "ll1 \<Rightarrow>
-   nat \<Rightarrow> (* fuel *)
-(* continuations corresponding to enclosing scopes *)
+   nat \<Rightarrow> (* fuel for elle jumps *)
+  (* continuations corresponding to enclosing scopes *)
    (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
    (ellest \<Rightarrow> ellest option)" where
-"elle_sem x n c = ll1_sem x elle_denote elle_jmpd n None [] c"
+"elle_sem' x n c = ll1_sem x elle_denote elle_jmpd n None [] c"
+
+(* TODO: get the code generator working for sha3_update
+so we can use the normal evaluator for this
+*)
+value [simp] "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
+10 Some (ellest_init 42)"
