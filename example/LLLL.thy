@@ -6612,61 +6612,65 @@ and ll1_list_sem ::
    ('a \<Rightarrow> 'a option)" 
 where
 
-(* out of fuel *)
-"ll1_sem _ _ _ 0 _ _ _ = (\<lambda> _ . None)"
-| "ll1_list_sem _ _ _ 0 _ _ _ = (\<lambda> _ . None)"
-
 (* list_sem cases *)
 
 (* non seeking, nil means noop *)
-| "ll1_list_sem [] denote jmpred (Suc n) None scopes cont = cont"
+ "ll1_list_sem [] denote jmpred n None scopes cont = cont"
 (* when seeking, nil means we failed to find something we should have *)
-| "ll1_list_sem [] denote jmpred (Suc n) (Some _) scopes cont = (\<lambda> _ . None)"
-| "ll1_list_sem (h#t) denote jmpred (Suc n) None scopes cont =
-   ll1_sem h denote jmpred n None scopes
-    (ll1_list_sem t denote jmpred n None scopes cont)"
-| "ll1_list_sem (h#t) denote jmpred (Suc n) (Some d) ctx cont =
+| "ll1_list_sem [] denote jmpred n (Some _) scopes cont = (\<lambda> _ . None)"
+
+| "ll1_list_sem (h#t) denote jmpred n None scopes cont =
+   (if n = 0 then (\<lambda> _ . None)
+    else ll1_sem h denote jmpred (n - 1) None scopes
+    (ll1_list_sem t denote jmpred (n - 1) None scopes cont))"
+
+(* do we need to increment d here? *)
+| "ll1_list_sem (h#t) denote jmpred n (Some d) ctx cont =
+   (if n = 0 then (\<lambda> _ . None) else
    (case gather_ll1_labels h [] d of
-    [] \<Rightarrow> ll1_list_sem t denote jmpred n (Some d) ctx cont
-   | _ \<Rightarrow> ll1_sem h denote jmpred n (Some d) ctx (ll1_list_sem t denote jmpred n None ctx cont))"
+    [] \<Rightarrow> ll1_list_sem t denote jmpred (n - 1) (Some d) ctx cont
+   | _ \<Rightarrow> ll1_sem h denote jmpred (n - 1) (Some d) ctx (ll1_list_sem t denote jmpred (n - 1) None ctx cont)))"
 
 
 (* first, deal with scanning cases *)
 (* TODO we should include semantics of the label itself *)
 
 (* NB we only call ourselves in "seek" mode on a label when we are sure of finding a label *)
-| "ll1_sem (ll1.LLab d) _ _ (Suc n) (Some d') _ cont = 
+| "ll1_sem (ll1.LLab d) _ _ n (Some d') _ cont = 
    (if d = d' then cont
     else (\<lambda> s . None ))"
 
 (* bail if we can't find a label in  the entire thing we were seeking in *)
-(* TODO need to finish this case, it's wrong now *)
-| "ll1_sem (ll1.LSeq ls) denote jmpred (Suc n) (Some d) scopes cont = 
-   ll1_list_sem ls denote jmpred n (Some (Suc d))
-       ((ll1_sem (ll1.LSeq ls) denote jmpred n (Some 0) scopes cont)#scopes)
-       cont"
-(* we should denote h in a world where its continuation is the same recursive call to sem
-(with less fuel)
-will this work, or will this lead to continuations "blowing up"?
-*)
+(* TODO this case may still be messed up *)
+| "ll1_sem (ll1.LSeq ls) denote jmpred n (Some d) scopes cont =
+   (if n = 0 then (\<lambda> _ . None)
+    else 
+    ll1_list_sem ls denote jmpred (n - 1) (Some (Suc d))
+       ((ll1_sem (ll1.LSeq ls) denote jmpred (n - 1) (Some 0) scopes cont)#scopes)
+       cont)"
+
 (* for anything else, seeking is a no op *)
-| "ll1_sem _ _ _ (Suc n) (Some d) _ cont = cont"
+| "ll1_sem _ _ _ n (Some d) _ cont = cont"
 
 (* "normal" (non-"scanning") cases *)
-| "ll1_sem (ll1.L i) denote _ (Suc n) None scopes cont =
+| "ll1_sem (ll1.L i) denote _ n None scopes cont =
   (\<lambda> s . case denote i s of
            Some r \<Rightarrow> cont r
           | None \<Rightarrow> None)"
-| "ll1_sem (ll1.LLab d) denote _ (Suc n) None scopes cont = cont"
-| "ll1_sem (ll1.LJmp d) denote _ (Suc n) None scopes cont = scopes ! d"
-| "ll1_sem (ll1.LJmpI d) denote jmpred (Suc n) None scopes cont =
+| "ll1_sem (ll1.LLab d) denote _ n None scopes cont = cont"
+| "ll1_sem (ll1.LJmp d) denote _ n None scopes cont = scopes ! d"
+| "ll1_sem (ll1.LJmpI d) denote jmpred n None scopes cont =
 (\<lambda> s . if jmpred s then ((scopes ! d) s)
        else cont s)"
 
 (* new idea for Seq case *)
-| "ll1_sem (ll1.LSeq ls) denote jmpred (Suc n) None scopes cont =
-   ll1_list_sem ls denote jmpred n None
-    ((ll1_sem (ll1.LSeq ls) denote jmpred n (Some 0) scopes cont)#scopes) cont"
+(* problem - are we passing the wrong continuation in? *)
+| "ll1_sem (ll1.LSeq ls) denote jmpred n None scopes cont =
+   (if n = 0 then (\<lambda> _ . None)
+    else
+     ll1_list_sem ls denote jmpred (n - 1) None
+      (* this scope continuation was ll1_sem before *)
+      ((ll1_list_sem ls denote jmpred (n - 1) (Some 0) scopes cont)#scopes) cont)"
 
 (* a sample instantiation of the parameters for our semantics *)
 (* state is a single nat, ll1.L increments
@@ -6689,7 +6693,53 @@ fun silly_ll1_sem ::
 "silly_ll1_sem x n c = ll1_sem x silly_denote silly_jmpred n None [] c"
 
 definition ll1_sem_test1 where
-"ll1_sem_test1 = silly_ll1_sem (ll1.LSeq []) 1 (Some)"
+"ll1_sem_test1 f i = silly_ll1_sem (ll1.LSeq [ll1.LLab 0, ll1.LJmpI 0]) f (Some) i"
+
+(* weirdly it seems to crash in the generated code when it loops infinitely? *)
+(* this could be a problem leading to need to better control execution *)
+value "ll1_sem_test1 20 3"
+
+(* "if" statement *)
+(* if 0, add 1. otherwise subtract 1*)
+definition ll1_sem_test2 where
+"ll1_sem_test2 f i = silly_ll1_sem
+  (ll1.LSeq [
+    ll1.LSeq [ ll1.LJmpI 0,
+               ll1.L (Arith SUB),
+               ll1.LJmp 1, 
+               ll1.LLab 0,
+               ll1.L (Arith ADD),
+               ll1.LLab 1 ]]) f (Some) i"
+
+value "ll1_sem_test2 100 0"
+
+(* 1 armed if statement *)
+definition ll1_sem_test2' where
+"ll1_sem_test2' f i = silly_ll1_sem
+  (ll1.LSeq [ll1.LJmpI 0,
+               ll1.L (Arith ADD),
+               ll1.LLab 0]) f (Some) i"
 
 
-value "ll1_sem_test1 0"
+value "ll1_sem_test2' 100 0"
+
+(* "do-while" loop *)
+(* subtract 1 each iteration until 0 is reached *)
+(* if we start at 0 return *)
+(* something is wrong with loop case *)
+definition ll1_sem_test3 where
+"ll1_sem_test3 f i = silly_ll1_sem
+(ll1.LSeq [ll1.LSeq [ll1.LJmpI 1,
+                     ll1.LLab 0,
+                     ll1.L (Arith SUB),
+                     ll1.LJmpI 1,
+                     ll1.LJmp 0, ll1.LLab 1]]) f Some i"
+
+value "ll1_sem_test3 120 4"
+
+(* test to ensure things are being run in correct order *)
+definition ll1_sem_test4 where
+"ll1_sem_test4 f i = silly_ll1_sem
+(ll1.LSeq [ll1.L (Arith SUB), ll1.L (Arith ADD)]) f Some i"
+
+value "ll1_sem_test4 10 0"
