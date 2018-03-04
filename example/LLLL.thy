@@ -6561,69 +6561,135 @@ ll1.LLab 1
 value "pipeline' progif 30"
 value "pipeline progif 30"
 
+
+
+fun gather_ll1_labels :: "ll1 \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
+and gather_ll1_labels_list :: "ll1 list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where
+"gather_ll1_labels (ll1.L _) _ _ = []"
+| "gather_ll1_labels (ll1.LJmp _) _ _ = []"
+| "gather_ll1_labels (ll1.LJmpI _) _ _ = []"
+| "gather_ll1_labels (ll1.LLab n) cp d = 
+     (if n = d then [cp] else [])"
+| "gather_ll1_labels (ll1.LSeq ls) cp d =
+   gather_ll1_labels_list ls cp 0 (d+1)"
+| "gather_ll1_labels_list [] _ _ _ = []"
+| "gather_ll1_labels_list (h#t) cp ofs d =
+   gather_ll1_labels h (cp@[ofs]) (d) @
+   gather_ll1_labels_list t cp (ofs+1) d"
+
+
 (*Semantics for LL1
 leave state parametric for now
-we need an additional argument
-to allow for to a sequence's label
-
-we also need to build up a 
-nat \<Rightarrow> ('a \<Rightarrow> 'a)
-to represent our context
- *)  
-(*
-idea: semantics of ll1 will just
-scan for the first label they come
-across in that depth
-
-we need to add an argument representing the
-childpaths we've seen?
-*)
-(*
-idea: in "normal" case, sequence nodes will produce 2 continuations, one for normal
-entry and one for entry after the label
-*) 
-(* TODO: are labels truly a noop on this machine *)
-(* TODO: we are using *)
+allow for an interpretation of instructions on this state
+as well as for deciding whether to jump *)
+(* we will have to resolve some issues around program counter
+   (probably hiding it completely from the source program) 
+   we can have some kind of bogus injection back into "real" EVM states
+   when we want to run an instruction
+   later on we will probably have to revise
+ *)
+(* TODO: make ll1 parametric in an instruction type? *)
+(* TODO: decrement fuel only for backwards jumps? *)
 fun ll1_sem :: 
   "ll1 \<Rightarrow>
-   (inst \<Rightarrow> 'a \<Rightarrow> 'a) \<Rightarrow> (* inst interpretation *)
+   (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
+   ('a \<Rightarrow> bool) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
-(* problem: continuations may involve further calls to semantics,
-which may crash
-one approach is to return id or something, but we need to make sure that's the right thing
-another is to have it be None *)
-   (('a \<Rightarrow> 'a) option list) \<Rightarrow>
-   ('a \<Rightarrow> 'a) \<Rightarrow> (* continuation *)
-   (('a \<Rightarrow> 'a) * (('a \<Rightarrow> 'a) option)) option" where
+   (('a \<Rightarrow> 'a option) list) \<Rightarrow>
+   ('a \<Rightarrow> 'a option) \<Rightarrow> (* continuation *)
+   ('a \<Rightarrow> 'a option)" 
+and ll1_list_sem ::
+ "ll1 list \<Rightarrow>
+   (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
+   ('a \<Rightarrow> bool) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   nat \<Rightarrow> (* fuel *)
+   nat option \<Rightarrow> (* depth, if we are scanning for a label *)
+(* continuations corresponding to enclosing scopes *)
+   (('a \<Rightarrow> 'a option) list) \<Rightarrow>
+   ('a \<Rightarrow> 'a option) \<Rightarrow> (* continuation *)
+   ('a \<Rightarrow> 'a option)" 
+where
+
 (* out of fuel *)
-"ll1_sem _ _ 0 _ _ _ = None"
+"ll1_sem _ _ _ 0 _ _ _ = (\<lambda> _ . None)"
+| "ll1_list_sem _ _ _ 0 _ _ _ = (\<lambda> _ . None)"
+
+(* list_sem cases *)
+
+(* non seeking, nil means noop *)
+| "ll1_list_sem [] denote jmpred (Suc n) None scopes cont = cont"
+(* when seeking, nil means we failed to find something we should have *)
+| "ll1_list_sem [] denote jmpred (Suc n) (Some _) scopes cont = (\<lambda> _ . None)"
+| "ll1_list_sem (h#t) denote jmpred (Suc n) None scopes cont =
+   ll1_sem h denote jmpred n None scopes
+    (ll1_list_sem t denote jmpred n None scopes cont)"
+| "ll1_list_sem (h#t) denote jmpred (Suc n) (Some d) ctx cont =
+   (case gather_ll1_labels h [] d of
+    [] \<Rightarrow> ll1_list_sem t denote jmpred n (Some d) ctx cont
+   | _ \<Rightarrow> ll1_sem h denote jmpred n (Some d) ctx (ll1_list_sem t denote jmpred n None ctx cont))"
+
+
 (* first, deal with scanning cases *)
-| "ll1_sem (ll1.LLab d) _ (Suc n) (Some d) scopes cont =
-   Some(cont, None)"
-(* bail if we can't find a label *)
-| "ll1_sem (ll1.LSeq []) _ (Suc n) (Some d) _ _ = None"
-(* can queries in "scanning mode" ever return a non-None second list? *)
-(* i think no should be the answer *)
-(* not sure if returning None here is right
-or whether this step should modify scopes or not *)
-| "ll1_sem (ll1.LSeq (h#t)) denote (Suc n) (Some d) scopes cont =
-   (case ll1_sem h denote n (Some (Suc d)) (None#scopes)
-       (case ll1_sem (ll1.LSeq t) denote n (Some d) scopes cont of
-                  None \<Rightarrow> None
-                  | Some (c,_) \<Rightarrow> Some (c, None)) of
-    None \<Rightarrow> None
-   | Some (c, _) \<Rightarrow> Some (c, None))"
-| "ll1_sem (_, ll1.L i) denote (Suc n) None scopes cont =
-  Some ((\<lambda> s . cont (denote i s)), None)"
+(* TODO we should include semantics of the label itself *)
+
+(* NB we only call ourselves in "seek" mode on a label when we are sure of finding a label *)
+| "ll1_sem (ll1.LLab d) _ _ (Suc n) (Some d') _ cont = 
+   (if d = d' then cont
+    else (\<lambda> s . None ))"
+
+(* bail if we can't find a label in  the entire thing we were seeking in *)
+(* TODO need to finish this case, it's wrong now *)
+| "ll1_sem (ll1.LSeq ls) denote jmpred (Suc n) (Some d) scopes cont = 
+   ll1_list_sem ls denote jmpred n (Some (Suc d))
+       ((ll1_sem (ll1.LSeq ls) denote jmpred n (Some 0) scopes cont)#scopes)
+       cont"
+(* we should denote h in a world where its continuation is the same recursive call to sem
+(with less fuel)
+will this work, or will this lead to continuations "blowing up"?
+*)
+(* for anything else, seeking is a no op *)
+| "ll1_sem _ _ _ (Suc n) (Some d) _ cont = cont"
+
 (* "normal" (non-"scanning") cases *)
+| "ll1_sem (ll1.L i) denote _ (Suc n) None scopes cont =
+  (\<lambda> s . case denote i s of
+           Some r \<Rightarrow> cont r
+          | None \<Rightarrow> None)"
+| "ll1_sem (ll1.LLab d) denote _ (Suc n) None scopes cont = cont"
+| "ll1_sem (ll1.LJmp d) denote _ (Suc n) None scopes cont = scopes ! d"
+| "ll1_sem (ll1.LJmpI d) denote jmpred (Suc n) None scopes cont =
+(\<lambda> s . if jmpred s then ((scopes ! d) s)
+       else cont s)"
+
+(* new idea for Seq case *)
+| "ll1_sem (ll1.LSeq ls) denote jmpred (Suc n) None scopes cont =
+   ll1_list_sem ls denote jmpred n None
+    ((ll1_sem (ll1.LSeq ls) denote jmpred n (Some 0) scopes cont)#scopes) cont"
+
+(* a sample instantiation of the parameters for our semantics *)
+(* state is a single nat, ll1.L increments
+except for SUB, which subtracts *)
+
+fun silly_denote :: "inst \<Rightarrow> nat \<Rightarrow> nat option" where
+"silly_denote (Arith SUB) 0 = None"
+|"silly_denote (Arith SUB) (Suc n) = Some n"
+|"silly_denote _ n = Some (Suc n)"
+
+fun silly_jmpred :: "nat \<Rightarrow> bool" where
+"silly_jmpred n = (n = 0)"
+
+fun silly_ll1_sem :: 
+  "ll1 \<Rightarrow>
+   nat \<Rightarrow> (* fuel *)
+(* continuations corresponding to enclosing scopes *)
+   (nat \<Rightarrow> nat option) \<Rightarrow> (* continuation *)
+   (nat \<Rightarrow> nat option)" where
+"silly_ll1_sem x n c = ll1_sem x silly_denote silly_jmpred n None [] c"
+
+definition ll1_sem_test1 where
+"ll1_sem_test1 = silly_ll1_sem (ll1.LSeq []) 1 (Some)"
 
 
-
- (* How do we deal with the fact that the semantics of our sequence node
-may well depend on what the jump-semantics are
-idea: maybe we can get the scopes passed in later
-is it better for scopes to be a list or a function? functions are easier to build in
-an ad-hoc way sometimes... *)
-
+value "ll1_sem_test1 0"
