@@ -6590,10 +6590,13 @@ as well as for deciding whether to jump *)
  *)
 (* TODO: make ll1 parametric in an instruction type? *)
 (* TODO: decrement fuel only for backwards jumps? *)
+(*
+TODO: change jmpred so it can change state
+*)
 fun ll1_sem :: 
   "ll1 \<Rightarrow>
    (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
-   ('a \<Rightarrow> bool) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   ('a \<Rightarrow> (bool * 'a) option) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
@@ -6603,7 +6606,7 @@ fun ll1_sem ::
 and ll1_list_sem ::
  "ll1 list \<Rightarrow>
    (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
-   ('a \<Rightarrow> bool) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   ('a \<Rightarrow> (bool * 'a) option) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
@@ -6615,21 +6618,21 @@ where
 (* list_sem cases *)
 
 (* non seeking, nil means noop *)
- "ll1_list_sem [] denote jmpred n None scopes cont = cont"
+ "ll1_list_sem [] denote jmpd n None scopes cont = cont"
 (* when seeking, nil means we failed to find something we should have *)
-| "ll1_list_sem [] denote jmpred n (Some _) scopes cont = (\<lambda> _ . None)"
+| "ll1_list_sem [] denote jmpd n (Some _) scopes cont = (\<lambda> _ . None)"
 
-| "ll1_list_sem (h#t) denote jmpred n None scopes cont =
+| "ll1_list_sem (h#t) denote jmpd n None scopes cont =
    (if n = 0 then (\<lambda> _ . None)
-    else ll1_sem h denote jmpred (n - 1) None scopes
-    (ll1_list_sem t denote jmpred (n - 1) None scopes cont))"
+    else ll1_sem h denote jmpd (n - 1) None scopes
+    (ll1_list_sem t denote jmpd (n - 1) None scopes cont))"
 
 (* do we need to increment d here? *)
-| "ll1_list_sem (h#t) denote jmpred n (Some d) ctx cont =
+| "ll1_list_sem (h#t) denote jmpd n (Some d) ctx cont =
    (if n = 0 then (\<lambda> _ . None) else
    (case gather_ll1_labels h [] d of
-    [] \<Rightarrow> ll1_list_sem t denote jmpred (n - 1) (Some d) ctx cont
-   | _ \<Rightarrow> ll1_sem h denote jmpred (n - 1) (Some d) ctx (ll1_list_sem t denote jmpred (n - 1) None ctx cont)))"
+    [] \<Rightarrow> ll1_list_sem t denote jmpd (n - 1) (Some d) ctx cont
+   | _ \<Rightarrow> ll1_sem h denote jmpd (n - 1) (Some (Suc d)) ctx (ll1_list_sem t denote jmpd (n - 1) None ctx cont)))"
 
 
 (* first, deal with scanning cases *)
@@ -6637,16 +6640,16 @@ where
 
 (* NB we only call ourselves in "seek" mode on a label when we are sure of finding a label *)
 | "ll1_sem (ll1.LLab d) _ _ n (Some d') _ cont = 
-   (if d = d' then cont
+   (if d + 1 = d' then cont
     else (\<lambda> s . None ))"
 
 (* bail if we can't find a label in  the entire thing we were seeking in *)
 (* TODO this case may still be messed up *)
-| "ll1_sem (ll1.LSeq ls) denote jmpred n (Some d) scopes cont =
+| "ll1_sem (ll1.LSeq ls) denote jmpd n (Some d) scopes cont =
    (if n = 0 then (\<lambda> _ . None)
     else 
-    ll1_list_sem ls denote jmpred (n - 1) (Some (Suc d))
-       ((ll1_sem (ll1.LSeq ls) denote jmpred (n - 1) (Some 0) scopes cont)#scopes)
+    ll1_list_sem ls denote jmpd (n - 1) (Some d)
+       ((ll1_sem (ll1.LSeq ls) denote jmpd (n - 1) (Some 0) scopes cont)#scopes)
        cont)"
 
 (* for anything else, seeking is a no op *)
@@ -6659,18 +6662,20 @@ where
           | None \<Rightarrow> None)"
 | "ll1_sem (ll1.LLab d) denote _ n None scopes cont = cont"
 | "ll1_sem (ll1.LJmp d) denote _ n None scopes cont = scopes ! d"
-| "ll1_sem (ll1.LJmpI d) denote jmpred n None scopes cont =
-(\<lambda> s . if jmpred s then ((scopes ! d) s)
-       else cont s)"
+| "ll1_sem (ll1.LJmpI d) denote jmpd n None scopes cont =
+(\<lambda> s . case (jmpd s) of
+        None \<Rightarrow> None
+        | Some (True, s') \<Rightarrow> ((scopes ! d) s')
+        | Some (False, s') \<Rightarrow> cont s')"
 
 (* new idea for Seq case *)
 (* problem - are we passing the wrong continuation in? *)
-| "ll1_sem (ll1.LSeq ls) denote jmpred n None scopes cont =
+| "ll1_sem (ll1.LSeq ls) denote jmpd n None scopes cont =
    (if n = 0 then (\<lambda> _ . None)
     else
-     ll1_list_sem ls denote jmpred (n - 1) None
+     ll1_list_sem ls denote jmpd (n - 1) None
       (* this scope continuation was ll1_sem before *)
-      ((ll1_list_sem ls denote jmpred (n - 1) (Some 0) scopes cont)#scopes) cont)"
+      ((ll1_sem (ll1.LSeq ls) denote jmpd (n - 1) (Some 0) scopes cont)#scopes) cont)"
 
 (* a sample instantiation of the parameters for our semantics *)
 (* state is a single nat, ll1.L increments
@@ -6697,6 +6702,7 @@ definition ll1_sem_test1 where
 
 (* weirdly it seems to crash in the generated code when it loops infinitely? *)
 (* this could be a problem leading to need to better control execution *)
+value "ll1_sem_test1 20 0"
 value "ll1_sem_test1 20 3"
 
 (* "if" statement *)
@@ -6712,6 +6718,8 @@ definition ll1_sem_test2 where
                ll1.LLab 1 ]]) f (Some) i"
 
 value "ll1_sem_test2 100 0"
+value "ll1_sem_test2 100 1"
+value "ll1_sem_test2 100 2"
 
 (* 1 armed if statement *)
 definition ll1_sem_test2' where
@@ -6722,6 +6730,7 @@ definition ll1_sem_test2' where
 
 
 value "ll1_sem_test2' 100 0"
+value "ll1_sem_test2' 100 27"
 
 (* "do-while" loop *)
 (* subtract 1 each iteration until 0 is reached *)
@@ -6736,10 +6745,124 @@ definition ll1_sem_test3 where
                      ll1.LJmp 0, ll1.LLab 1]]) f Some i"
 
 value "ll1_sem_test3 120 4"
+value "ll1_sem_test3 120 0"
 
-(* test to ensure things are being run in correct order *)
+(* NB *)
+value "ll1_sem_test3 20 15"
+value "ll1_sem_test3 21 15"
+
+(* test to ensure things are being run in correct order,
+as well as check correctness for sequences without labels *)
 definition ll1_sem_test4 where
 "ll1_sem_test4 f i = silly_ll1_sem
 (ll1.LSeq [ll1.L (Arith SUB), ll1.L (Arith ADD)]) f Some i"
 
 value "ll1_sem_test4 10 0"
+value "ll1_sem_test4 10 1"
+
+(* ensure invalid jumps crash *)
+definition ll1_sem_test5 where
+"ll1_sem_test5 f i = silly_ll1_sem
+(ll1.LSeq [ll1.LJmpI 0]) f Some i"
+
+value "ll1_sem_test5 10 0"
+
+(*
+NB doing a small step version of this semantics would be hard
+because the state is transiently different in terms of stack contents
+*)
+
+(* for now we are just passing constant context around too *)
+type_synonym ellest = "variable_ctx * constant_ctx * network"
+
+(* TODO: check that instruction is allowed *)
+(* TODO: actually deal with InstructionToEnvironment reasonably *)
+fun elle_denote :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
+"elle_denote i (vc, cc, n) =
+ (case instruction_sem vc cc i n of
+  InstructionContinue vc' \<Rightarrow>
+    Some(vc', cc, n)
+  | InstructionToEnvironment _ vc' _ \<Rightarrow>
+    Some(vc', cc, n))"
+
+(* TODO need to unpack correctly *)
+(* NB we make no update to keep the PC correct *)
+fun elle_jmpd :: "ellest \<Rightarrow> (bool * ellest) option" where
+"elle_jmpd (v, c, n) =
+ (case (vctx_stack v) of
+   cond # rest \<Rightarrow>
+    (let new_env = (( v (| vctx_stack := (rest) |))) in
+    strict_if (cond =(((word_of_int 0) ::  256 word)))
+           (\<lambda> _ . Some (True, (new_env, c, n) ))
+           (\<lambda> _ .Some (False, (new_env, c, n))))
+  | _ \<Rightarrow> None)"
+
+definition w256_0 where "w256_0 = word256FromNat 0"
+definition w160_0 where "w160_0 = word160FromNatural 0"
+
+(* now we need to get our hands on a valid initial state *)
+(* body of this copied from Evm.thy *)
+(* can we get away with this? *)
+(* need to marshal things to w256 *)
+(* TODO:
+variable context:
+- gas (supply this as an argument)
+- block
+*)
+
+definition elle_init_block :: "block_info"
+  where
+"elle_init_block =\<lparr>
+block_blockhash = (\<lambda> x . x),
+  block_coinbase = w160_0,
+  block_timestamp = w256_0,
+  block_number = w256_0,
+  block_difficulty = w256_0,
+  block_gaslimit = w256_0 
+\<rparr>"
+
+definition elle_init_vctx :: "int \<Rightarrow> variable_ctx"
+  where "elle_init_vctx gas_in = 
+\<lparr> vctx_stack = ([]), (* The stack is initialized for every invocation *)
+    vctx_memory = empty_memory, (* The memory is also initialized for every invocation *)
+     vctx_memory_usage =(( 0 :: int)), (* The memory usage is initialized. *)
+     vctx_storage = empty_storage, (* The storage is taken from the account state *)
+     vctx_pc =(( 0 :: int)), (* The program counter is initialized to zero *)
+     vctx_balance = (\<lambda> (addr::address) . 
+                         w256_0 (* can we get away with this *)),
+     vctx_caller = w160_0, (* the caller is specified by the environment *)
+     vctx_value_sent = w256_0, (* the sent value is specified by the environment *)
+     vctx_data_sent = [], (* the sent data is specified by the environment *)
+     vctx_storage_at_call = empty_storage, (* the snapshot of the storage is remembered in case of failure *)
+     vctx_balance_at_call = (\<lambda> (addr::address) . 
+                         w256_0 (* can we get away with this *)), (* the snapshot of the balance is remembered in case of failure *)
+     vctx_origin = w160_0, (* assume a 0 gas price *)
+     vctx_ext_program = (\<lambda> _ . empty_program), (* external programs are empty. *)
+     vctx_block = elle_init_block, (* bogus block. *)
+     vctx_gas = gas_in, (* parameter. *)
+     vctx_account_existence = (\<lambda> _ . False), (* existence is chosen arbitrarily *)
+     vctx_touched_storage_index = ([]),
+     vctx_logs = ([]),
+     vctx_refund =(( 0 :: int)), (* the origin of the transaction is arbitrarily chosen *)
+     vctx_gasprice = w256_0
+   \<rparr>"
+
+definition elle_init_cctx :: constant_ctx
+  where
+"elle_init_cctx =
+\<lparr> cctx_program = empty_program,
+  cctx_this = w160_0,
+  cctx_hash_filter = (\<lambda> _ . False)
+\<rparr>"
+
+definition ellest_init :: "int \<Rightarrow> ellest" where
+"ellest_init g = (elle_init_vctx g, elle_init_cctx, Metropolis)"
+
+
+fun elle_sem :: 
+  "ll1 \<Rightarrow>
+   nat \<Rightarrow> (* fuel *)
+(* continuations corresponding to enclosing scopes *)
+   (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
+   (ellest \<Rightarrow> ellest option)" where
+"elle_sem x n c = ll1_sem x elle_denote elle_jmpd n None [] c"
