@@ -6855,6 +6855,7 @@ definition elle_init_cctx :: constant_ctx
   cctx_hash_filter = (\<lambda> _ . False)
 \<rparr>"
 
+
 definition ellest_init :: "int \<Rightarrow> ellest" where
 "ellest_init g = (elle_init_vctx g, elle_init_cctx, Metropolis)"
 
@@ -6871,3 +6872,23 @@ so we can use the normal evaluator for this
 *)
 value [simp] "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
 10 Some (ellest_init 42)"
+
+value [simp] "elle_sem' (ll1.LSeq [ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
+                                   ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
+                                   ll1.L (Arith ADD)])
+10 Some (ellest_init 42)"
+
+(* next: use program:sem to see what happens when we run the compiled programs *)
+
+definition prog_init_cctx :: "inst list \<Rightarrow> constant_ctx"
+  where
+"prog_init_cctx p =
+\<lparr> cctx_program = Evm.program_of_lst p ProgramInAvl.program_content_of_lst,
+  cctx_this = w160_0,
+  cctx_hash_filter = (\<lambda> _ . False)
+\<rparr>"
+
+value [simp] "program_sem (\<lambda> _ . ()) (prog_init_cctx [Stack (PUSH_N [byteFromNat 0])]) 20 Metropolis
+(InstructionContinue (elle_init_vctx 42))"
+
+(* TODO: make elle_init_cctx take and include a program *)
