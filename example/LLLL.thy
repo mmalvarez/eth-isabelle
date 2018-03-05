@@ -6512,6 +6512,12 @@ definition pipeline :: "ll1 \<Rightarrow> nat \<Rightarrow> 8 word list option" 
   Some l' \<Rightarrow> Some (codegen l')
   | None \<Rightarrow> None)"
 
+definition pipeline'' :: "ll1 \<Rightarrow> nat \<Rightarrow> inst list option" where
+"pipeline'' l n = 
+ (case pipeline' l n of
+  Some l' \<Rightarrow> Some (codegen' l')
+  | None \<Rightarrow> None)"
+
 (* NEW pipeline
 pass1 \<Rightarrow> ll3 init \<Rightarrow>
 assign_label \<Rightarrow> check ll3 \<Rightarrow>
@@ -6870,7 +6876,8 @@ fun elle_sem' ::
 (* TODO: get the code generator working for sha3_update
 so we can use the normal evaluator for this
 *)
-value [simp] "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
+export_code sha3_update
+value [simp]  "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
 10 Some (ellest_init 42)"
 
 value [simp] "elle_sem' (ll1.LSeq [ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
@@ -6891,4 +6898,17 @@ definition prog_init_cctx :: "inst list \<Rightarrow> constant_ctx"
 value [simp] "program_sem (\<lambda> _ . ()) (prog_init_cctx [Stack (PUSH_N [byteFromNat 0])]) 20 Metropolis
 (InstructionContinue (elle_init_vctx 42))"
 
+definition elle_compile_cctx :: "ll1 \<Rightarrow> nat \<Rightarrow> constant_ctx option" where
+"elle_compile_cctx t n = (case pipeline'' t n of
+  None \<Rightarrow> None
+  | Some p \<Rightarrow> Some (prog_init_cctx p))"
+
 (* TODO: make elle_init_cctx take and include a program *)
+definition elle_run :: "ll1 \<Rightarrow> nat \<Rightarrow> instruction_result option"
+  where
+"elle_run t n = (case elle_compile_cctx t n of
+  None \<Rightarrow> None
+ | Some c \<Rightarrow> Some (program_sem (\<lambda> _ . ()) (c) 20 Metropolis
+(InstructionContinue (elle_init_vctx 42))))"
+
+value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0]))]) 100"
