@@ -6909,4 +6909,4 @@ definition elle_run :: "ll1 \<Rightarrow> nat \<Rightarrow> instruction_result o
 
 value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0]))]) 100"
 value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0])), ll1.LJmpI 0]) 100"
-value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 1])), ll1.LJmpI 0]) 100"
+value [simp] "elle_run (ll1.LSeq [ ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0])) , ll1.LJmpI 0 ]) 100"
