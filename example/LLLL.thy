@@ -6633,7 +6633,6 @@ where
     else ll1_sem h denote jmpd (n - 1) None scopes
     (ll1_list_sem t denote jmpd (n - 1) None scopes cont))"
 
-(* do we need to increment d here? *)
 | "ll1_list_sem (h#t) denote jmpd n (Some d) ctx cont =
    (if n = 0 then (\<lambda> _ . None) else
    (case gather_ll1_labels h [] d of
@@ -6649,8 +6648,6 @@ where
    (if d + 1 = d' then cont
     else (\<lambda> s . None ))"
 
-(* bail if we can't find a label in  the entire thing we were seeking in *)
-(* TODO this case may still be messed up *)
 | "ll1_sem (ll1.LSeq ls) denote jmpd n (Some d) scopes cont =
    (if n = 0 then (\<lambda> _ . None)
     else 
@@ -6675,7 +6672,6 @@ where
         | Some (False, s') \<Rightarrow> cont s')"
 
 (* new idea for Seq case *)
-(* problem - are we passing the wrong continuation in? *)
 | "ll1_sem (ll1.LSeq ls) denote jmpd n None scopes cont =
    (if n = 0 then (\<lambda> _ . None)
     else
@@ -6692,8 +6688,8 @@ fun silly_denote :: "inst \<Rightarrow> nat \<Rightarrow> nat option" where
 |"silly_denote (Arith SUB) (Suc n) = Some n"
 |"silly_denote _ n = Some (Suc n)"
 
-fun silly_jmpred :: "nat \<Rightarrow> bool" where
-"silly_jmpred n = (n = 0)"
+fun silly_jmpred :: "nat \<Rightarrow> (bool * nat) option" where
+"silly_jmpred n = (Some (n \<noteq> 0, n))"
 
 fun silly_ll1_sem :: 
   "ll1 \<Rightarrow>
@@ -6771,7 +6767,7 @@ definition ll1_sem_test5 where
 "ll1_sem_test5 f i = silly_ll1_sem
 (ll1.LSeq [ll1.LJmpI 0]) f Some i"
 
-value "ll1_sem_test5 10 0"
+value "ll1_sem_test5 10 1"
 
 (*
 NB doing a small step version of this semantics would be hard
@@ -6912,3 +6908,5 @@ definition elle_run :: "ll1 \<Rightarrow> nat \<Rightarrow> instruction_result o
 (InstructionContinue (elle_init_vctx 42))))"
 
 value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0]))]) 100"
+value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0])), ll1.LJmpI 0]) 100"
+value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 1])), ll1.LJmpI 0]) 100"
