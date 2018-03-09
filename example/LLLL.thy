@@ -868,8 +868,6 @@ type_synonym consume_label_result = "(ll3 list * childpath) option"
 (* this prevents multiple locations for the same label name
    because it will only "consume" one label per name
    and then it will fail later on the other one *)
-(* modify this to pass around root?
-   modify this to take a node instead of a node list? *)
 (* subroutine for assign_label, marks label as consumed *)
 fun ll3_consume_label :: "childpath \<Rightarrow> nat  \<Rightarrow> ll3 list \<Rightarrow> consume_label_result" where
  "ll3_consume_label p n [] = Some ([], [])"
@@ -6872,11 +6870,10 @@ fun elle_sem' ::
 (* TODO: get the code generator working for sha3_update
 so we can use the normal evaluator for this
 *)
-export_code sha3_update
-value [simp]  "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
+value   "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
 10 Some (ellest_init 42)"
 
-value [simp] "elle_sem' (ll1.LSeq [ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
+value  "elle_sem' (ll1.LSeq [ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
                                    ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
                                    ll1.L (Arith ADD)])
 10 Some (ellest_init 42)"
@@ -6891,7 +6888,7 @@ definition prog_init_cctx :: "inst list \<Rightarrow> constant_ctx"
   cctx_hash_filter = (\<lambda> _ . False)
 \<rparr>"
 
-value [simp] "program_sem (\<lambda> _ . ()) (prog_init_cctx [Stack (PUSH_N [byteFromNat 0])]) 20 Metropolis
+value  "program_sem (\<lambda> _ . ()) (prog_init_cctx [Stack (PUSH_N [byteFromNat 0])]) 20 Metropolis
 (InstructionContinue (elle_init_vctx 42))"
 
 definition elle_compile_cctx :: "ll1 \<Rightarrow> nat \<Rightarrow> constant_ctx option" where
@@ -6907,6 +6904,6 @@ definition elle_run :: "ll1 \<Rightarrow> nat \<Rightarrow> instruction_result o
  | Some c \<Rightarrow> Some (program_sem (\<lambda> _ . ()) (c) 20 Metropolis
 (InstructionContinue (elle_init_vctx 42))))"
 
-value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0]))]) 100"
-value [simp] "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0])), ll1.LJmpI 0]) 100"
-value [simp] "elle_run (ll1.LSeq [ ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0])) , ll1.LJmpI 0 ]) 100"
+value "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0]))]) 100"
+value "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 1])), ll1.LJmpI 0]) 100"
+value "elle_run (ll1.LSeq [ll1.LLab 0, ll1.L (Stack (PUSH_N [byteFromNat 0])) , ll1.LJmpI 0 ]) 100"

@@ -1,8 +1,5 @@
 # Formalization of Ethereum Virtual Machine in Lem
 
-[![Build Status](https://travis-ci.org/pirapira/eth-isabelle.svg?branch=master)](https://travis-ci.org/pirapira/eth-isabelle)
-[![CircleCI](https://circleci.com/gh/pirapira/eth-isabelle/tree/master.svg?style=svg)](https://circleci.com/gh/pirapira/eth-isabelle/tree/master)
-
 This repository contains
 
 * an EVM implementation in Lem `lem/evm.lem`
@@ -11,10 +8,50 @@ This repository contains
 * a relational semantics that captures the environment's nondeterministic behavior `RelationalSem.thy`
 * some example verified contracts in `example`
 * a parser that parses hex code and emits an Isabelle/HOL expression representing the program `parser/hexparser.rb`
+* Elle, a work-in-progress verified compiler from a structured language to EVM in `elle`
 
 When you see `\<Rightarrow>` in the source, try using the [Isabelle2017](https://isabelle.in.tum.de/index.html) interface.  There you see `⇒` instead.
 
-## Lem?
+## Elle
+
+This fork of eth-isabelle contains Elle, a compiler targeting EVM implemented in Isabelle that aims to be foundationally verified somewhat along the lines of CompCert[http://compcert.inria.fr/]
+
+### Elle Syntax
+
+`elle/ElleSyntax.thy`
+
+### Elle Semantics
+
+`elle/ElleSemantics.thy`
+
+### Elle Compiler
+
+`elle/ElleCompiler.thy`
+
+### Compiler Correctness
+
+### Roadmap
+
+### Warning
+
+Though it aims for ironclad correctness stemming from foundational guarantees, Elle's correctness proofs are
+not yet complete, and it has not been thoroughly tested. Therefore it should not be considered production-quality
+at this time.
+
+That said, if you're interested in learning more about the compiler and being part of the testing or development process, please [contact Mario on Gitter](https://gitter.im/mmalvarez).
+
+### Acknowledgement
+
+The development of the Elle project is generously funded by ConsenSys.
+
+### Legacy Version
+
+A previous version of the compiler exists in `examples/LLLL.thy`. It contains a number of lemmas that have ended up
+being unnecessary so far but may prove useful or educational.
+
+## The original readme follows:
+
+### Lem?
 
 [Lem](https://www.cl.cam.ac.uk/~pes20/lem/) is a language that can be translated into [Coq](https://coq.inria.fr/), [Isabelle/HOL](https://isabelle.in.tum.de/), [HOL4](https://hol-theorem-prover.org/), [OCaml](http://www.ocaml.org/), HTML and [LaTeX](https://www.latex-project.org/).
 
