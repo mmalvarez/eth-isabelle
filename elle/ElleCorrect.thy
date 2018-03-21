@@ -1445,12 +1445,1150 @@ lemma ll3_assign_label_qvalid2 :
   apply(auto)
   done
 
-(* next up: how much of the machinery around
-assign_labels ("preserves" lemmas etc) is 
-really needed anymore? *)
+lemma ll3_assign_label_length [rule_format]:
+" (! ls' . ll3_assign_label_list ls = Some ls' \<longrightarrow> length ls = length ls')
+"
+proof (induction ls)
+  case Nil thus ?case by auto next
+  case (Cons h t) thus ?case
+    apply(auto)
+    apply(case_tac "ll3_assign_label h", auto)
+    apply(case_tac "ll3_assign_label_list t", auto)
+    done qed
 
-(*
-Finally, we want to copy in the validator to round out what we have so far of the proof
-*)
+lemma ll3_hasdesc :
+"(t, t', k) \<in> ll3'_descend  \<Longrightarrow>
+  (? q e ls . t = (q, LSeq e ls))
+"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto)
+  done
+
+lemma ll3_hasdesc2 :
+"(t, t', k) \<in> ll3'_descend  \<Longrightarrow>
+  (? q e hd tl . t = (q, LSeq e (hd#tl)))
+"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto)
+  apply(case_tac ls) apply(auto)
+  done
+
+
+lemma ll3'_descend_relabel [rule_format] :
+" (x, y, k) \<in> ll3'_descend \<Longrightarrow>
+(! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+(! e' . ((q, LSeq e' ls), y, k) \<in> ll3'_descend))"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto simp add: ll3'_descend.intros)
+  apply(case_tac bc, auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+   apply(drule_tac[1] ll3_hasdesc)  apply(auto)
+  apply(rule_tac [1] ll3'_descend.intros) apply(auto)
+  done
+
+lemma ll3'_descend_relabelq [rule_format] :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+  (! q t . x = (q, t) \<longrightarrow>
+    (! q' . ((q', t), y, k) \<in> ll3'_descend))"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto simp add:ll3'_descend.intros)
+  apply(rule_tac ll3'_descend.intros) apply(auto)
+  done
+
+lemma ll3'_descend_cons :
+"(t1, t2, k) \<in> ll3'_descend \<Longrightarrow>
+ (? q e l . t1 = (q, LSeq e l) \<and> (? kh kt . k = kh # kt \<and>
+  (! q' e' h . ((q', LSeq e' (h#l)), t2, (kh+1)#kt) \<in> ll3'_descend)))
+"
+proof(induction rule:ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case
+    apply(auto simp add:ll3'_descend.intros) done
+next
+  case (2 t t' n t'' n')
+  then show ?case 
+    apply(auto)
+    apply(subgoal_tac " (((ab, bb), llt.LSeq e' (((ac, bc), bd) # l)),
+        t'', (Suc kh # kt) @ (kha # kta))
+       \<in> ll3'_descend"
+)
+    apply(rule_tac[2] ll3'_descend.intros(2)) apply(auto)
+done qed
+
+
+lemma ll3_descend_singleton [rule_format] :
+"(t1, t2, k) \<in> ll3'_descend \<Longrightarrow>
+(! x . k = [x] \<longrightarrow>
+  (? q1 e1 ls . t1 = (q1, LSeq e1 ls) \<and> ls ! x = t2))"
+  apply(induction rule:ll3'_descend.induct)
+   apply(auto)
+  apply(case_tac n, auto) apply(drule_tac[1] ll3_descend_nonnil, auto)
+    apply(drule_tac[1] ll3_descend_nonnil, auto)
+    apply(drule_tac[1] ll3_descend_nonnil, auto)
+   apply(drule_tac[1] ll3_descend_nonnil, auto) apply(drule_tac[1] ll3_descend_nonnil, auto)
+  apply(drule_tac[1] ll3_descend_nonnil, auto) apply(drule_tac[1] ll3_descend_nonnil, auto)
+  done
+
+lemma ll_get_node_comp2 [rule_format] :
+"(! p1 . ll_get_node t (p1@p2) = Some t'' \<longrightarrow>
+ (? t' . ll_get_node t p1 = Some t' \<and>
+         ll_get_node t' p2 = Some t''))
+"     
+proof(induction p2)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons a k2t)
+  then show ?case
+    apply(auto)
+    apply(drule_tac[1] x = "p1@[a]" in spec) apply(auto)
+    apply(drule_tac[1] ll_get_node_last) apply(auto)
+    apply(subgoal_tac[1] " ll_get_node ((aaa, bb), bc) ([a] @ k2t) =
+       Some t''")
+     apply(rule_tac[2] ll_get_node_comp) apply(auto)
+    done
+qed
+  
+
+lemma ll3_descend_splitpath :
+"(t1, t3, k1@k2) \<in> ll3'_descend \<Longrightarrow>
+( case k1 of
+   [] \<Rightarrow> (case k2 of [] \<Rightarrow> False | _ \<Rightarrow> (t1, t3, k2) \<in> ll3'_descend)
+   |  _ \<Rightarrow> (case k2 of [] \<Rightarrow> (t1, t3, k1) \<in> ll3'_descend
+                    | _ \<Rightarrow> (? t2 . (t1, t2, k1) \<in> ll3'_descend \<and> (t2, t3, k2) \<in> ll3'_descend)))"
+  apply(drule_tac ll_descend_eq_r2l2)
+  apply(drule_tac ll3'_descend_alt.cases) apply(auto)
+  apply(case_tac k1, auto)
+   apply(rule_tac ll_descend_eq_l2r2) apply(auto simp add:ll3'_descend_alt.intros)
+
+  apply(case_tac k2, auto)
+   apply(rule_tac ll_descend_eq_l2r2) apply(auto simp add:ll3'_descend_alt.intros)
+
+(* ll_get_node_comp2 here *)
+  apply(subgoal_tac " ll_get_node ((a, b), ba)
+        ((kh # list) @ (ab # lista)) = Some ((aa, bb), bc)")
+   apply(drule_tac ll_get_node_comp2) apply(auto)
+  apply(thin_tac "ll_get_node ((a, b), ba)
+        (kh # list @ ab # lista) =
+       Some ((aa, bb), bc)")
+  apply(drule_tac ll3'_descend_alt.intros)
+  apply(drule_tac ll3'_descend_alt.intros)
+  apply(drule_tac ll_descend_eq_l2r2)
+  apply(drule_tac ll_descend_eq_l2r2)
+  apply(auto)
+  done
+
+lemma ll3_descend_unique :
+"(t1, t2, k) \<in> ll3'_descend \<Longrightarrow>
+ (t1, t2', k) \<in> ll3'_descend \<Longrightarrow>
+  t2 = t2'"
+  apply(drule_tac[1] ll_descend_eq_r2l2)
+apply(drule_tac[1] ll3'_descend_alt.cases, auto)
+  apply(drule_tac[1] ll_descend_eq_r2l2)
+  apply(drule_tac[1] ll3'_descend_alt.cases, auto)
+  done
+
+lemma my_rev_conv :
+"l1 = l2 \<Longrightarrow>
+rev l1 = rev l2"
+  apply(insert List.rev_is_rev_conv)
+  apply(auto)
+  done
+
+lemma numnodes_child [rule_format] :
+"((a, b), ba) \<in> set ls \<Longrightarrow>
+       numnodes ((a, b), ba)
+       < Suc (numnodes_l ls)"
+  apply(induction ls)
+   apply(auto)
+  done
+
+
+lemma gather_ll3_fact [rule_format] :
+" (! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! x cp off d . x \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+    (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost)))
+\<and> (! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ll3 list) cp off d) \<longrightarrow>
+    (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost))"
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case by auto
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case 
+    apply(auto)
+     apply(case_tac h, auto) apply(case_tac ba, auto)
+     apply(drule_tac x = x in spec)
+     apply(rotate_tac -1)
+     apply(drule_tac x = "cp@[off]" in spec) apply(drule_tac x = 0 in spec) apply(auto)
+
+    apply(drule_tac x = x in spec) apply(rotate_tac -1)
+    apply(drule_tac x = cp in spec) apply(drule_tac x = "Suc off" in spec)
+    apply(auto)
+    done qed
+
+lemma gather_ll3_fact2 [rule_format] :
+"(! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ll3 list) cp off d) \<longrightarrow>
+    (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost))"
+  apply(insert gather_ll3_fact)
+  apply(blast)
+  done
+
+(* I am not even sure if we need the length argument! *)
+lemma gather_ll3_nil_gen' [rule_format]:
+" 
+(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! cp off n . gather_ll3_labels_list ls cp off n = [] \<longrightarrow>
+   (! cp' . length cp' = length cp \<longrightarrow>
+   (! off' . gather_ll3_labels_list ls cp' off' n = []))))
+\<and>
+(! cp off n . gather_ll3_labels_list ls cp off n = [] \<longrightarrow>
+   (! cp' . length cp' = length cp \<longrightarrow>
+   (! off' . gather_ll3_labels_list ls cp' off' n = [])))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case 
+    
+    by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+    apply(case_tac h, auto)
+    apply(case_tac ba, auto)
+    done
+qed
+
+lemma gather_ll3_nil_gen2 [rule_format]:
+" 
+gather_ll3_labels_list ls cp off n = [] \<Longrightarrow>
+   length cp' = length cp \<Longrightarrow>
+   gather_ll3_labels_list ls cp' off' n = []"
+  apply(insert gather_ll3_nil_gen')
+  apply(blast)
+  done
+
+lemma gather_ll3_singleton_gen' [rule_format]:
+" 
+(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! cp x off cpost n . gather_ll3_labels_list ls cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
+   (! cp' . length cp' = length cp \<longrightarrow>
+   (! off' . gather_ll3_labels_list ls cp' off' n = [cp'@[x+off']@cpost]))))
+\<and>
+(! cp x off cpost n . gather_ll3_labels_list ls cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
+   (! cp' . length cp' = length cp \<longrightarrow>
+   (! off' . gather_ll3_labels_list ls cp' off' n = [cp'@[x+off']@cpost])))"
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case 
+    apply(clarify)
+    apply(drule_tac x = cp in spec)
+    apply(drule_tac x = x in spec)
+    apply(drule_tac x = off in spec) apply(drule_tac x = cpost in spec)
+    apply(drule_tac x = n in spec) apply(clarify)
+    apply(drule_tac x = cp' in spec) apply(clarify) apply(drule_tac x = off' in spec) apply(auto)
+    done
+  next
+  case 6
+  then show ?case 
+    apply(clarify) apply(simp)
+    done
+next
+  case (7 h l)
+  then show ?case 
+    apply(clarify)
+    apply(case_tac h)
+    apply(safe) 
+    apply(case_tac ba) 
+    
+(* L case*)
+    apply(safe) 
+        apply(simp (no_asm_use))
+    apply(subgoal_tac "cp @ (x + off) # cpost \<in>  set (gather_ll3_labels_list l cp (Suc off) n)")
+         apply(frule_tac gather_ll3_fact2) apply(clarify) apply(simp (no_asm_use)) apply(clarify)
+         apply(drule_tac x = cp in spec) apply(drule_tac x = na in spec) apply(drule_tac x = "Suc off" in spec)
+    apply(simp) apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))") apply(simp)
+
+
+(* Lab case *)
+    apply(simp (no_asm_use))
+       apply(case_tac "x22 = n") apply(clarify) apply(simp (no_asm_use))
+    apply(clarify) apply(simp (no_asm_use))
+         apply(frule_tac off' = "Suc off'" and cp' = cp' in gather_ll3_nil_gen2) apply(simp (no_asm_use)) 
+         apply(clarify)
+
+       apply(rule_tac conjI) apply(clarify)
+       apply(subgoal_tac "cp @ (x + off) # cpost \<in> set (gather_ll3_labels_list l cp (Suc off) n)")
+        apply(frule_tac gather_ll3_fact2) apply(clarify) apply(simp (no_asm_use)) apply(clarify)
+        apply(drule_tac x = cp in spec) apply(drule_tac x = na in spec) apply(drule_tac x = "Suc off" in spec)
+        apply(drule_tac x = cposta in spec) apply(simp)
+
+    apply(thin_tac " \<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+       apply(simp)
+
+(* LJmp case *)
+        apply(simp (no_asm_use))
+    apply(subgoal_tac "cp @ (x + off) # cpost \<in>  set (gather_ll3_labels_list l cp (Suc off) n)")
+         apply(frule_tac gather_ll3_fact2) apply(clarify) apply(simp (no_asm_use)) apply(clarify)
+         apply(drule_tac x = cp in spec) apply(drule_tac x = na in spec) apply(drule_tac x = "Suc off" in spec)
+    apply(simp) apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))") apply(simp)
+
+
+
+(* JmpI case *)
+        apply(simp (no_asm_use))
+    apply(subgoal_tac "cp @ (x + off) # cpost \<in>  set (gather_ll3_labels_list l cp (Suc off) n)")
+         apply(frule_tac gather_ll3_fact2) apply(clarify) apply(simp (no_asm_use)) apply(clarify)
+         apply(drule_tac x = cp in spec) apply(drule_tac x = na in spec) apply(drule_tac x = "Suc off" in spec)
+    apply(simp) apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))") apply(simp)
+
+
+
+(* Seq case *)
+     apply(simp (no_asm_use))
+     apply(case_tac "gather_ll3_labels_list x52 (cp @ [off]) 0 (Suc n)") 
+        (* case 1, found in tail *)
+     apply(subgoal_tac "cp @ (x+off) # cpost \<in> set (gather_ll3_labels_list l cp (Suc off) n)")
+    apply(frule_tac gather_ll3_fact2) apply(clarify)
+       apply(thin_tac " \<forall>cp x off cpost n.
+          gather_ll3_labels_list x52 cp off n =
+          [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'.
+                     gather_ll3_labels_list x52 cp' off' n =
+                     [cp' @ (x + off') # cpost]))")
+    apply(subgoal_tac "gather_ll3_labels_list l cp (Suc off) n =
+       [cp @ (na + Suc off) # cpost]")
+       apply(drule_tac x = cp in spec)
+       apply(drule_tac x = na in spec) apply(drule_tac x = "Suc off" in spec) apply(simp)
+       apply(drule_tac x = cposta in spec) apply(drule_tac x = n in spec) apply(simp)
+       apply(rule_tac gather_ll3_nil_gen2) apply(simp)
+       apply(case_tac cp') apply(simp) apply(simp)
+
+    apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))") apply(simp)
+
+    
+    apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+     apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list x52 cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list x52 cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+     apply(simp)
+
+    apply(subgoal_tac " gather_ll3_labels_list x52 (cp @ [off]) 0 (Suc n) = [cp @ (x + off) # cpost]")
+    apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+     apply(subgoal_tac "cp @ (x + off) # cpost \<in> set(gather_ll3_labels_list x52 (cp @ [off]) 0 (Suc n))")
+    apply(frule_tac gather_ll3_fact2) apply(clarify) 
+
+     apply(drule_tac x = "cp @ [off]" in spec) apply(drule_tac x = na in spec)
+      apply(drule_tac x = 0 in spec) apply(drule_tac x = cposta in spec)
+      apply(drule_tac x = "Suc n" in spec) apply(simp) apply(clarify)
+      apply(rule_tac gather_ll3_nil_gen2) apply(simp) apply(simp)
+
+    (*clearing subgoals *)
+    apply(thin_tac " \<forall>cp x off cpost n.
+          gather_ll3_labels_list x52 cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list x52 cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+     apply(simp)
+
+    apply(thin_tac "\<forall>cp x off cpost n.
+          gather_ll3_labels_list x52 cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list x52 cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+    apply(thin_tac " \<forall>cp x off cpost n.
+          gather_ll3_labels_list l cp off n = [cp @ (x + off) # cpost] \<longrightarrow>
+          (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                 (\<forall>off'. gather_ll3_labels_list l cp' off' n =
+                         [cp' @ (x + off') # cpost]))")
+    apply(simp)
+    done qed
+
+lemma gather_ll3_singleton_gen2 [rule_format]:
+"(! cp x off cpost n . gather_ll3_labels_list ls cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
+   (! cp' . length cp' = length cp \<longrightarrow>
+   (! off' . gather_ll3_labels_list ls cp' off' n = [cp'@[x+off']@cpost])))"
+  apply(insert gather_ll3_singleton_gen'[of "((0,0),LSeq [] [])" ls])
+  apply(clarify)
+  apply(thin_tac " \<forall>q e ls.
+          ((0, 0), llt.LSeq [] []) = (q, llt.LSeq e ls) \<longrightarrow>
+          (\<forall>cp x off cpost n.
+              gather_ll3_labels_list ls cp off n = [cp @ [x + off] @ cpost] \<longrightarrow>
+              (\<forall>cp'. length cp' = length cp \<longrightarrow>
+                     (\<forall>off'. gather_ll3_labels_list ls cp' off' n =
+                             [cp' @ [x + off'] @ cpost])))")
+  apply(blast)
+done
+
+lemma gather_ll3_correct2_child [rule_format]:
+"  (! c . c < length ls \<longrightarrow>
+       (! a b ba n . ls ! c = ((a, b), llt.LLab ba n) \<longrightarrow>
+       (! cp off . cp @ [c+off] \<in> set (gather_ll3_labels_list ls cp off n))))"
+proof(induction ls)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons a ls)
+  then show ?case 
+    apply(auto)
+    apply(case_tac c, auto)
+
+    apply(drule_tac x = nat in spec) apply(auto)
+    apply(drule_tac x = cp in spec) apply(drule_tac x = "Suc off" in spec) apply(auto)
+    done
+qed
+
+lemma gather_ll3_correct2_child2' [rule_format] :
+"
+(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! c . c < length ls \<longrightarrow>
+  (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
+   (! d cp off1 off2 post . (cp@[c+off1]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off1]) 0 (Suc d))  \<longrightarrow>
+          (cp@[c+off1]@post) \<in> set (gather_ll3_labels_list ls cp off1 d)
+))))
+\<and>
+(! c . c < length ls \<longrightarrow>
+  (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
+   (! d cp off1 off2 post . (cp@[c+off1]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off1]) 0 (Suc d))  \<longrightarrow>
+          (cp@[c+off1]@post) \<in> set (gather_ll3_labels_list ls cp off1 d)
+)))"
+(* we need a "gen" lemma to deal with offset discrepancies *)
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+    apply(case_tac c, auto)
+    apply(rotate_tac 1)
+    apply(drule_tac x = nat in spec) apply(auto)
+    apply(rotate_tac -1)
+    apply(drule_tac x = d in spec) apply(rotate_tac -1)
+    apply(drule_tac x = cp in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "Suc off1" in spec) apply(auto)
+    done
+qed
+(* how are we going to handle changes of offset? *)
+(* idea: off is our starting offset, want off+c *)
+lemma gather_ll3_correct2_child2 [rule_format] :
+"(! c . c < length ls \<longrightarrow>
+  (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
+   (! d cp off post . (cp@[c+off]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off]) 0 (Suc d))  \<longrightarrow>
+          (cp@[c+off]@post) \<in> set (gather_ll3_labels_list ls cp off d)
+)))
+"
+(* bogus first argument to induction principle *)
+  apply(insert gather_ll3_correct2_child2'[of "((0,0),LSeq [] [])" ls])
+  apply(auto)
+  done
+
+(* this needs to account for post *)
+lemma gather_ll3_correct_desc' [rule_format] :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+ (! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+ (! q' e' lsdec . y = (q', LSeq e' lsdec) \<longrightarrow>
+  (! cp n post . (cp@k@post) \<in> set (gather_ll3_labels_list lsdec (cp@k) 0 (n + length k) ) \<longrightarrow>
+     (cp@k@post) \<in> set (gather_ll3_labels_list ls cp 0 n))))"
+proof(induction rule: ll3'_descend.induct)
+  case (1 c q e ls t)
+  then show ?case
+    apply(auto)
+    apply(frule_tac gather_ll3_fact2) apply(auto)
+    apply(drule_tac post = "na#cpost" and cp = cp and d = n and off = 0 in gather_ll3_correct2_child2) apply(auto)
+    done
+next
+  case (2 t t' n t'' n')
+  then show ?case
+    apply(auto)
+    apply(rotate_tac 1)
+    apply(frule_tac ll3_hasdesc) apply(auto)
+    apply(rotate_tac 2)
+    apply(drule_tac x = "cp@n" in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "na + length n" in spec) apply(auto)
+    apply(rotate_tac -1)
+    apply(drule_tac x = post in spec) apply(auto)
+    (* unsure why i need this *)
+    apply(subgoal_tac "na + (length n + length n') = na + length n + length n'")
+     apply(auto)
+    done
+qed
+
+
+(* need a lemma relating result of gather_labels
+to result on its descendents *)
+
+lemma gather_ll3_correct2 :
+"(x, y, k) \<in> ll3'_descend \<Longrightarrow>
+ (! q e ls . x = (q, LSeq e ls) \<longrightarrow>
+ (! q' b n . y = (q', LLab b (length k - 1 + n)) \<longrightarrow>
+  (! cp . (cp@k) \<in> set (gather_ll3_labels_list ls cp 0 n ))))"
+proof(induction rule:ll3'_descend.induct)
+case (1 c q e ls t)
+  then show ?case 
+    apply(auto)
+    apply(drule_tac cp = cp and off = 0 in gather_ll3_correct2_child) apply(auto)
+done next
+  case (2 t t' n t'' n')
+  then show ?case 
+    apply(auto)
+    apply(rotate_tac 1) apply(frule_tac ll3_hasdesc) apply(auto)
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+    apply(drule_tac x = "cp@n" in spec) apply(auto)
+    apply(frule_tac gather_ll3_fact2)  apply(auto)
+    apply(rotate_tac 1)
+    apply(frule_tac gather_ll3_correct_desc' ) apply(auto)
+    apply(subgoal_tac "length n + na = na + length n") apply(auto)
+    done
+qed
+
+
+
+lemma gather_ll3_correct1' [rule_format] :
+"
+(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+   (? q' b . ((q, LSeq e ls), (q', LLab b (d + length post)), (n)#post) \<in> ll3'_descend)))
+\<and>
+(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+   (? q' b . (! q e . ((q, LSeq e ls), (q', LLab b (d + length post)), (n)#post) \<in> ll3'_descend))
+)"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+then show ?case by auto
+next
+case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case 
+    apply(auto) apply(drule_tac x = d in spec) apply(drule_tac x = cp in spec) apply(drule_tac x = n in spec)
+    apply(drule_tac x = off in spec) apply(drule_tac x = post in spec)
+    apply(auto)
+    apply(rule_tac x = a in exI)
+    apply(rule_tac x = b in exI)
+    apply(rule_tac x = ba in exI)
+    apply(case_tac q, auto)
+    done
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+     apply(case_tac h, auto)
+     apply(case_tac ba, auto)
+    apply(rule_tac x = a in exI) apply(rule_tac x = b in exI) apply(rule_tac x = x21 in exI)
+      apply(auto simp add:ll3'_descend.intros)
+
+     apply(frule_tac gather_ll3_fact2, auto)
+    apply(thin_tac "\<forall>d cp n off post.
+          cp @ (n + off) # post \<in> set (gather_ll3_labels_list l cp off d) \<longrightarrow>
+          (\<exists>a b ba.
+              \<forall>aa bb e.
+                 (((aa, bb), llt.LSeq e l),
+                  ((a, b), llt.LLab ba (d + length post)), n # post)
+                 \<in> ll3'_descend)")
+     apply(drule_tac x = "Suc d" in spec) apply(drule_tac x = "cp @ [off]" in spec)
+     apply(drule_tac x = na in spec) apply(drule_tac x = 0 in spec) apply(drule_tac x = cpost in spec)
+    apply(auto)
+     apply(rule_tac x = aa in exI) apply(rule_tac x = ba in  exI)
+     apply(rule_tac x = bb in  exI) apply(auto)
+     apply(rule_tac ll_descend_eq_l2r) apply(auto)
+     apply(drule_tac ll_descend_eq_r2l) apply(auto)
+
+    apply(thin_tac "\<forall>a b e ls.
+          h = ((a, b), llt.LSeq e ls) \<longrightarrow>
+          (\<forall>d cp n off post.
+              cp @ (n + off) # post
+              \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+              (\<exists>aa ba bb.
+                  (((a, b), llt.LSeq e ls),
+                   ((aa, ba), llt.LLab bb (d + length post)), n # post)
+                  \<in> ll3'_descend))")
+     apply(frule_tac gather_ll3_fact2, auto)
+    apply(drule_tac x = d in spec)
+    apply(drule_tac x = cp in spec)
+    apply(drule_tac x = na in spec)
+    apply(drule_tac x = "Suc off" in spec)
+    apply(drule_tac x = post in spec) apply(auto)
+     apply(rule_tac x = a in exI) apply(rule_tac x = b in  exI)
+    apply(rule_tac x = ba in  exI) apply(auto)
+    apply(rule_tac ll_descend_eq_l2r) apply(auto)
+  (* bogus *)
+    apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+    apply(drule_tac x = "[]" in spec) apply(drule_tac ll_descend_eq_r2l) apply(auto)
+    done 
+qed
+
+lemma gather_ll3_correct1 [rule_format]:
+"(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+   (? q' b . (! q e . ((q, LSeq e ls), (q', LLab b (d + length post)), (n)#post) \<in> ll3'_descend))
+)"
+  apply(insert gather_ll3_correct1'[of "((0,0),LSeq [] [])" ls])
+  apply(auto)
+  done
+
+lemma ll3_descend_splitpath_cons :
+"(t1, t3, k1#k2) \<in> ll3'_descend \<Longrightarrow>
+( case k2 of
+   [] \<Rightarrow> ((t1, t3, [k1]) \<in> ll3'_descend)
+   |  _ \<Rightarrow> (? t2 . (t1, t2, [k1]) \<in> ll3'_descend \<and> (t2, t3, k2) \<in> ll3'_descend))"
+  apply(insert ll3_descend_splitpath[of t1 t3 "[k1]" k2]) apply(auto)
+  done
+
+lemma ll_descend_eq_l2r_list :
+" ll_get_node_list (l) (kh#kt) = Some t \<Longrightarrow>
+    ((q, LSeq e l), t, kh#kt) \<in> ll3'_descend"
+  apply(case_tac l, auto)
+  apply(rule_tac ll_descend_eq_l2r) apply(auto)
+  done
+
+
+lemma ll_valid3'_desc [rule_format] :
+"(q, t) \<in> ll_valid3' \<Longrightarrow>
+ (! q' k b n . ((q, t), (q', LLab b n), k) \<in> ll3'_descend \<longrightarrow>
+  b = True 
+)
+"
+proof(induction rule:ll_valid3'.induct)
+case (1 i e x)
+  then show ?case
+    apply(auto)
+    apply(drule_tac ll3_hasdesc) apply(auto)
+    done
+next
+  case (2 x d)
+  then show ?case
+    apply(auto)
+    apply(drule_tac ll3_hasdesc) apply(auto)
+    done
+next
+  case (3 e x d s)
+  then show ?case
+    apply(auto)
+    apply(drule_tac ll3_hasdesc) apply(auto)
+    done
+next
+  case (4 e x d s)
+then show ?case
+    apply(auto)
+    apply(drule_tac ll3_hasdesc) apply(auto)
+  done
+next
+  case (5 x l e)
+then show ?case
+  apply(auto)
+  apply(frule_tac ll3_descend_nonnil) apply(auto)
+apply(frule_tac ll_descend_eq_r2l) apply(auto)
+
+  apply(case_tac l, auto)
+  apply(case_tac hd, auto)
+  apply(thin_tac " \<forall>k a b e'.
+          ((x, llt.LSeq e (((aa, bb), bc) # list)),
+           ((a, b), llt.LLab e' (length k - Suc 0)), k)
+          \<notin> ll3'_descend")
+
+   apply(drule_tac x = aa in spec) apply(drule_tac x = bb in spec)
+   apply(drule_tac x = bc in spec) apply(auto)
+    apply(case_tac tl, auto)
+  apply(drule_tac ll_valid3'.cases, auto)
+  apply(drule_tac ll_descend_eq_l2r) 
+    apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+    apply(drule_tac x = "ab # lista" in spec) apply(drule_tac x = ba in spec)
+    apply(auto)
+
+    apply(case_tac tl, auto)
+  apply(drule_tac ll_valid3'.cases, auto)
+   apply(drule_tac ll_descend_eq_l2r) 
+  apply(thin_tac "\<forall>a b k ba.
+          (\<exists>n. (((aa, bb), bc), ((a, b), llt.LLab ba n), k) \<in> ll3'_descend) \<longrightarrow> ba")
+  apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+    apply(drule_tac x = "ab # lista" in spec) apply(drule_tac x = ba in spec)
+   apply(auto)
+
+  apply(thin_tac "\<forall>k a b e'.
+          ((x, llt.LSeq e (((aa, bb), bc) # list)),
+           ((a, b), llt.LLab e' (length k - Suc 0)), k)
+          \<notin> ll3'_descend")
+  apply(drule_tac ll3_descend_splitpath_cons) apply(case_tac tl, auto)
+   apply(drule_tac ll3'_descend.cases) apply(auto)
+    apply(drule_tac x = ac in spec) apply(drule_tac x = be in spec)
+    apply(drule_tac x = " llt.LLab ba n" in spec) apply(clarify)
+    apply(frule_tac List.nth_mem) apply(auto)
+       apply(drule_tac ll_valid3'.cases) apply(auto)
+      apply(drule_tac ll_valid3'.cases) apply(auto)
+     apply(drule_tac ll_valid3'.cases) apply(auto)
+     apply(drule_tac ll_valid3'.cases) apply(auto)
+   apply(case_tac na, auto) apply(drule_tac ll3_descend_nonnil, auto)
+  apply(rotate_tac -2)
+   apply(drule_tac ll3_descend_nonnil, auto)
+
+     apply(drule_tac ll3'_descend.cases) apply(auto)
+   apply(drule_tac x = ae in spec) apply(drule_tac x = bg in spec)
+   apply(drule_tac x = " bh" in spec) apply(clarify)
+  apply(thin_tac " ae = aa \<and> bg = bb \<and> bh = bc \<longrightarrow>
+       ((aa, bb), bc) \<in> ll_valid3' \<and>
+       (\<forall>a b k ba.
+           (\<exists>n. (((aa, bb), bc), ((a, b), llt.LLab ba n), k) \<in> ll3'_descend) \<longrightarrow> ba)")
+   apply(frule_tac List.nth_mem) apply(auto)
+   apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+   apply(drule_tac x = "ab#lista" in spec) apply(drule_tac x = ba in spec)
+   apply(auto)
+
+  apply(case_tac na, auto)
+  apply(rotate_tac -3)
+   apply(drule_tac ll3_descend_nonnil, auto)
+  apply(rotate_tac -2)
+   apply(drule_tac ll3_descend_nonnil, auto)
+    done
+next
+next
+  case (6 x l e k y)
+  then show ?case
+    apply(auto)
+    apply(rotate_tac -1)
+  apply(frule_tac ll3_descend_nonnil) apply(auto)
+apply(frule_tac ll_descend_eq_r2l) apply(auto)
+
+  apply(case_tac l, auto)
+  apply(case_tac hd, auto)
+  apply(thin_tac " \<forall>k'. (\<exists>a b ba.
+                ((x, llt.LSeq e (((aa, bb), bc) # list)),
+                 ((a, b), llt.LLab ba (length k' - Suc 0)), k')
+                \<in> ll3'_descend) \<longrightarrow>
+            k = k'")
+
+     apply(case_tac tl, auto)
+      apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+      apply(drule_tac x = "llt.LLab ba n" in spec)
+      apply(clarify)
+      apply(drule_tac ll3'_descend.cases, auto)
+         apply(drule_tac ll_valid3'.cases, auto)
+        apply(drule_tac ll_valid3'.cases, auto)
+       apply(drule_tac ll_valid3'.cases, auto)
+      apply(drule_tac ll_valid3'.cases, auto)
+
+      apply(drule_tac x = aa in spec) apply(drule_tac x = bb in spec)
+     apply(drule_tac x = "bc" in spec) apply(clarify)
+    apply(thin_tac "((aa, bb), bc) \<in> set list \<longrightarrow>
+       ((aa, bb), bc) \<in> ll_valid3' \<and>
+       (\<forall>a b k ba.
+           (\<exists>n. (((aa, bb), bc), ((a, b), llt.LLab ba n), k) \<in> ll3'_descend) \<longrightarrow> ba)")
+     apply(auto)
+     apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+    apply(drule_tac ll_descend_eq_l2r)
+     apply(drule_tac x = "ab#lista" in spec) apply(drule_tac x = ba in spec)
+     apply(auto)
+
+    apply(thin_tac " \<forall>k'. (\<exists>a b ba.
+                ((x, llt.LSeq e (((aa, bb), bc) # list)),
+                 ((a, b), llt.LLab ba (length k' - Suc 0)), k')
+                \<in> ll3'_descend) \<longrightarrow>
+            k = k'")
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+    apply(case_tac x) apply(auto)
+    apply(drule_tac ll_descend_eq_r2l) apply(auto)
+    apply(drule_tac ll_descend_eq_l2r_list)
+    apply(drule_tac ll3_descend_splitpath_cons)
+    apply(case_tac tl, auto)
+    apply(rotate_tac -1)
+    apply(drule_tac ll3'_descend.cases) apply(auto)
+      apply(drule_tac x = ad in spec) apply(drule_tac x = bf in spec)
+      apply(drule_tac x = "llt.LLab ba n" in spec) apply(clarify)
+    apply(thin_tac  "ad = aa \<and> bf = bb \<and> llt.LLab ba n = bc \<longrightarrow>
+       ((aa, bb), bc) \<in> ll_valid3' \<and>
+       (\<forall>a b k ba.
+           (\<exists>n. (((aa, bb), bc), ((a, b), llt.LLab ba n), k) \<in> ll3'_descend) \<longrightarrow> ba)")  
+    apply(frule_tac List.nth_mem)
+      apply(auto)
+      apply(drule_tac ll_valid3'.cases, auto)
+     apply(case_tac na, auto) apply(rotate_tac -3)
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+     apply(rotate_tac -2)
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+
+    apply(rotate_tac -2)
+    apply(drule_tac ll3'_descend.cases, auto)
+     apply(drule_tac x = af in spec) apply(drule_tac x = bh in spec)
+     apply(drule_tac x = bi in spec) apply(clarify)
+    apply(thin_tac " af = aa \<and> bh = bb \<and> bi = bc \<longrightarrow>
+       ((aa, bb), bc) \<in> ll_valid3' \<and>
+       (\<forall>a b k ba.
+           (\<exists>n. (((aa, bb), bc), ((a, b), llt.LLab ba n), k) \<in> ll3'_descend) \<longrightarrow> ba)")
+        apply(frule_tac List.nth_mem)
+     apply(auto)
+     apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+     apply(drule_tac x = "ac#lista" in spec) apply(drule_tac x = ba in spec) apply(auto)
+
+    apply(case_tac na, auto)
+    apply(rotate_tac -3)
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+     apply(rotate_tac -2)
+    apply(frule_tac ll3_descend_nonnil) apply(auto)
+
+    done
+qed
+
+lemma ll_valid3'_child :
+"(q, LSeq p l) \<in> ll_valid3' \<Longrightarrow>
+ x \<in> set l \<Longrightarrow>
+ x \<in> ll_valid3'"
+  apply(drule_tac ll_valid3'.cases, auto)
+   apply(case_tac x, auto)
+  apply(case_tac x, auto)
+  done
+
+
+lemma check_ll3_valid :
+"((q,t) \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
+\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
+     (! e . check_ll3 ((x,x'), LSeq e ls) = True \<longrightarrow> ((x,x'), LSeq e ls) \<in> ll_valid3'))"
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+case (1 i x e)
+  then show ?case
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (2 x d e)
+  then show ?case
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (3 x d e s)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (4 x d e s)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (5 n l n' e)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros) done
+next
+  case (6 n)
+  then show ?case 
+    apply(auto simp add:ll_valid3'.intros)
+    apply(case_tac e, auto)
+    apply(rule_tac ll_valid3'.intros) apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k) apply(auto)
+    done
+next
+  case (7 n h n' t n'')
+  then show ?case
+    apply(clarify)
+    apply(auto)
+     apply(case_tac e, auto)
+
+    apply(case_tac e, auto)
+    apply(rule_tac ll_valid3'.intros, auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+      apply(case_tac "check_ll3 ((n', n''), llt.LSeq [] t)")
+       apply(drule_tac x = "[]" in spec) apply(auto)
+       apply(drule_tac ll_valid3'_child, auto)
+    apply(drule_tac gather_ll3_nil_gen2, auto)
+
+      apply(drule_tac gather_ll3_correct2) apply(auto)
+    apply(rotate_tac -1)
+      apply(drule_tac x = "[]" in spec) apply(auto)
+
+
+(* speculative work *)
+    apply(case_tac a, auto)
+
+     apply(case_tac "gather_ll3_labels_list t [] (Suc 0) 0", auto)
+    apply(case_tac h, auto) apply(case_tac "x22 = 0", auto)
+        apply(rule_tac y = "(n,n')" in ll_valid3'.intros(6), auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+       apply(drule_tac x = "[]" in spec) apply(auto)
+        apply(frule_tac gather_ll3_nil_gen2) apply(auto)
+         apply(drule_tac ll_valid3'_child, auto)
+        apply(rule_tac ll_descend_eq_l2r) apply(auto)
+       apply(frule_tac ll3_descend_nonnil, auto) apply(case_tac hd, auto)
+        apply(drule_tac ll_descend_eq_r2l) apply(auto)
+        apply(drule_tac ll_descend_eq_l2r_list) apply(drule_tac gather_ll3_correct2) apply(auto)
+        apply(drule_tac x = "[]" in spec) apply(auto)
+         apply(drule_tac gather_ll3_nil_gen2) apply(auto)
+    apply(drule_tac x = "[]" in spec)
+        apply(drule_tac off' = 0 in gather_ll3_nil_gen2) apply(auto)
+apply(case_tac hd, auto)
+        apply(drule_tac ll_descend_eq_r2l) apply(auto)
+        apply(case_tac tl, auto)
+       apply(case_tac tl, auto)
+       apply(drule_tac gather_ll3_correct2) apply(auto)
+apply(drule_tac x = "[]" in spec)
+        apply(drule_tac x = "[]" in spec) apply(auto)
+      apply(drule_tac gather_ll3_nil_gen2) apply(auto)
+
+
+    apply(drule_tac x = "[]" in spec)
+      apply(drule_tac off' = 0 in gather_ll3_nil_gen2) apply(auto)
+      apply(subgoal_tac "0#list \<in> set (gather_ll3_labels_list x52 [0] 0 (Suc 0))")
+       apply(frule_tac gather_ll3_fact2) apply(auto)
+      apply(subgoal_tac "[0]@[na + 0]@cpost \<in> set (gather_ll3_labels_list x52 [0] 0 (Suc 0))")
+    apply(frule_tac gather_ll3_correct1) apply(auto)
+    apply(rule_tac y = "(a, b)" in ll_valid3'.intros(6), auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    apply(thin_tac "((n, n'), llt.LSeq x51 x52) \<in> ll_valid3'")
+        apply(drule_tac ll_valid3'_child, auto)
+
+       apply(rule_tac ll_descend_eq_l2r) apply(auto)
+      (* bogus *)
+       apply(drule_tac x = 0 in spec) apply(drule_tac x = 0 in spec) apply(drule_tac x = "[]" in spec)
+    apply(drule_tac ll_descend_eq_r2l) apply(auto)
+
+    
+       apply(drule_tac ll_descend_eq_l2r_list)
+       apply(drule_tac ll_valid3'_desc) apply(auto)
+
+      apply(frule_tac ll3_descend_nonnil, auto)
+       apply(case_tac hd, auto)
+       apply(frule_tac ll_descend_eq_r2l) apply(auto)
+       apply(drule_tac ll_descend_eq_l2r_list) 
+    apply(rotate_tac -1)
+       apply(drule_tac gather_ll3_correct2) apply(auto)
+       apply(drule_tac x = "[]" in spec) apply(auto)
+
+
+    apply(case_tac hd, auto)
+       apply(frule_tac ll_descend_eq_r2l) apply(auto)
+       apply(case_tac tl, auto)
+        apply(drule_tac ll_descend_eq_l2r_list) 
+    apply(rotate_tac -1)
+        apply(drule_tac gather_ll3_correct2) apply(auto)
+    apply(drule_tac x = "[0]" in spec) apply(auto)
+    apply(rotate_tac -1)
+       apply(drule_tac gather_ll3_correct2) apply(auto)
+       apply(drule_tac x = "[]" in spec) apply(auto)
+        apply(drule_tac ll_descend_eq_l2r_list) 
+            apply(drule_tac gather_ll3_correct2) apply(auto)
+    apply(drule_tac x = "[0]" in spec) apply(auto)
+       apply(frule_tac ll_descend_eq_r2l) apply(auto)
+      apply(drule_tac ll_descend_eq_l2r_list) 
+    apply(rotate_tac -1)
+      apply(drule_tac gather_ll3_correct2) apply(auto)
+
+    apply(subgoal_tac "gather_ll3_labels_list x52 [0] 0 (Suc 0) = [[0] @ [na + 0] @ cpost]")
+       apply(frule_tac cp' = "[0]" in gather_ll3_singleton_gen2) apply(auto)
+      apply(drule_tac x = "[]" in spec) apply(auto)
+
+    apply(rule_tac ll_valid3'.intros(6)) apply(auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+       apply(case_tac "gather_ll3_labels ((n, n'), h) [0] 0", auto)
+    apply(subgoal_tac "0 # list \<in> set (gather_ll3_labels_list t [] (Suc 0) 0)")
+        apply(drule_tac gather_ll3_fact2) apply(auto)
+
+       apply(case_tac "gather_ll3_labels ((n, n'), h) [0] 0", auto)
+      apply(rule_tac ll_descend_eq_l2r) apply(auto)
+    apply(subgoal_tac "0 # list \<in> set (gather_ll3_labels_list t [] (Suc 0) 0)")
+       apply(drule_tac gather_ll3_fact2) apply(auto)
+
+     apply(frule_tac ll3_descend_nonnil, auto)
+      apply(case_tac hd, auto)
+       apply(frule_tac ll_descend_eq_r2l) apply(auto)
+      apply(drule_tac ll_descend_eq_l2r_list) 
+      apply(case_tac "gather_ll3_labels ((n, n'), h) [0] 0", auto)
+    apply(subgoal_tac "0 # list \<in> set (gather_ll3_labels_list t [] (Suc 0) 0)")
+       apply(drule_tac gather_ll3_fact2) apply(auto)
+
+     apply(case_tac "gather_ll3_labels ((n, n'), h) [0] 0", auto)
+         apply(subgoal_tac "0 # list \<in> set (gather_ll3_labels_list t [] (Suc 0) 0)")
+      apply(drule_tac gather_ll3_fact2) apply(auto)
+
+    apply(case_tac "gather_ll3_labels_list t [] (Suc 0) 0") apply(auto)
+     apply(case_tac h, auto)
+      apply(case_tac "x22 = 0") apply(auto)
+
+     apply(subgoal_tac "Suc nat # list \<in> set (gather_ll3_labels_list x52 [0] (0) (Suc 0))")
+      apply(drule_tac gather_ll3_fact2) apply(auto)
+
+        apply(case_tac "gather_ll3_labels ((n, n'), h) [0] 0") apply(auto)
+     apply(subgoal_tac "Suc nat # list \<in> set (gather_ll3_labels_list t [] (Suc 0) (0))")
+     apply(drule_tac gather_ll3_fact2) apply(auto)
+
+    apply(subgoal_tac "[] @ [nat + Suc 0] @ list \<in> set (gather_ll3_labels_list t [] (Suc 0) 0)")
+     apply(drule_tac gather_ll3_correct1, auto)
+
+    apply(rule_tac ll_valid3'.intros(6), auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+      apply(drule_tac x = "nat#list" in spec) apply(auto)
+       apply(subgoal_tac "gather_ll3_labels_list t [] (Suc 0) 0 = [[]@[nat + Suc 0] @list]")
+        apply(drule_tac off'=0 in gather_ll3_singleton_gen2) apply(auto)
+      apply(drule_tac ll_valid3'_child) apply(auto)
+     apply(rule_tac ll_descend_eq_l2r) apply(auto)
+     apply(drule_tac x = a in spec) apply(drule_tac x = b in spec)
+    apply(rotate_tac -2)
+     apply(drule_tac x = "[]" in spec)
+     apply(drule_tac ll_descend_eq_r2l) apply(auto)
+     apply(drule_tac x = "nat # list" in spec) apply(auto)
+       apply(subgoal_tac "gather_ll3_labels_list t [] (Suc 0) 0 = [[]@[nat + Suc 0] @list]")
+       apply(drule_tac off'=0 in gather_ll3_singleton_gen2) apply(auto)
+     apply(case_tac t, auto)
+      
+    apply(drule_tac ll_descend_eq_l2r_list) apply(rotate_tac -5)
+     apply(drule_tac ll_valid3'_desc) apply(auto)
+
+    apply(frule_tac ll3_descend_nonnil, auto)
+     apply(case_tac hd, auto)
+      apply(drule_tac ll_descend_eq_r2l) apply(auto)
+      apply(case_tac tl, auto)
+      apply(drule_tac ll_descend_eq_l2r)
+      apply(rotate_tac -1)
+    apply(frule_tac ll3_hasdesc, auto)
+      apply(drule_tac gather_ll3_correct2) apply(auto) apply(rotate_tac -1)
+      apply(drule_tac x = "[0]" in spec) apply(auto)
+
+    apply(rotate_tac -1)
+     apply(frule_tac ll_descend_eq_r2l) apply(auto)
+     apply(case_tac t, auto)
+     apply(case_tac "gather_ll3_labels ((ab, bd), be) [Suc 0] 0", auto)
+      apply(drule_tac ll_descend_eq_l2r_list) 
+      apply(rotate_tac -1)
+      apply(drule_tac gather_ll3_correct2) apply(auto)
+    apply(rotate_tac -1) apply(drule_tac x = "[]" in spec)
+      apply(auto)
+    apply(case_tac be, auto)
+       apply(drule_tac off' = 0 and cp' = "[0]" in gather_ll3_nil_gen2) apply(auto)
+    apply(case_tac nat, auto)
+       apply(subgoal_tac "Suc 0 # list \<in> set (gather_ll3_labels_list lista [] (Suc (Suc 0)) 0)")
+    apply(rotate_tac -1)
+        apply(frule_tac gather_ll3_fact2) apply(auto)
+    apply(subgoal_tac "gather_ll3_labels_list lista [] (Suc (Suc 0)) 0 = [[]@ [natb + Suc (Suc 0)] @ list]")
+       apply(drule_tac off' = 1 in gather_ll3_singleton_gen2) apply(auto) 
+     apply(drule_tac ll_descend_eq_l2r_list)
+     apply(drule_tac gather_ll3_correct2) apply(auto)
+     apply(rotate_tac -1) apply(drule_tac x = "[]" in spec) apply(auto)
+
+
+    apply(rotate_tac -1)
+     apply(frule_tac ll_descend_eq_r2l) apply(auto)
+     apply(case_tac t, auto)
+     apply(case_tac "gather_ll3_labels ((ab, bd), be) [Suc 0] 0", auto)
+      apply(drule_tac ll_descend_eq_l2r_list) 
+      apply(rotate_tac -1)
+      apply(drule_tac gather_ll3_correct2) apply(auto)
+    apply(rotate_tac -1) apply(drule_tac x = "[]" in spec)
+     apply(auto)
+
+    apply(case_tac hd, auto)
+    apply(case_tac tl, auto)
+     apply(frule_tac ll_descend_eq_l2r) apply(rotate_tac -1)
+     apply(drule_tac gather_ll3_correct2) apply(auto)
+     apply(case_tac h, auto) apply(rotate_tac -2)
+     apply(drule_tac x = "[0]" in spec) apply(auto)
+
+    apply(case_tac nata, auto)
+     apply(case_tac tl, auto)
+     apply(frule_tac ll_descend_eq_l2r)
+     apply(rotate_tac -1)
+     apply(drule_tac ll_descend_eq_l2r)
+    apply(frule_tac ll3_hasdesc) apply(auto)
+     apply(drule_tac gather_ll3_correct2) apply(auto)
+     apply(rotate_tac -1) apply(drule_tac x = "[]" in spec) apply(auto)
+
+    apply(drule_tac ll_descend_eq_l2r_list)
+    apply(rotate_tac -1)
+    apply(drule_tac gather_ll3_correct2) apply(auto)
+    apply(rotate_tac -1) apply(drule_tac x = "[]" in spec)
+    apply(auto)
+    apply(rotate_tac -2)
+    apply(drule_tac off' = 0 in gather_ll3_nil_gen2) apply(auto)
+    done
+qed
 
 end
