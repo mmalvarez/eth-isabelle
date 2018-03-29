@@ -367,7 +367,7 @@ lemma divmod_decrease [rule_format]:
    apply(auto)
   done
 
-
+(* are we outputting these bytes backwards? *)
 function output_address :: "nat \<Rightarrow> 8 word list" where
     "output_address n = (case Divides.divmod_nat n 256 of
                          (0, mo) \<Rightarrow> [Evm.byteFromNat mo]

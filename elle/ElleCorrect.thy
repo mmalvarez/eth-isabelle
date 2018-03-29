@@ -2639,7 +2639,7 @@ next
     done
 qed 
 
-lemma ll3_bump_qvalid [rule_format]:
+lemma ll3_bump_qvalid' [rule_format]:
   "((x, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow> 
       (! e ls . t = LSeq e ls \<longrightarrow>
       (! b .  ((fst x+b,snd x+b), LSeq e (ll3_bump b ls)) \<in> ll_valid_q))) \<and>
@@ -2688,17 +2688,31 @@ done next
 qed
 
 
+lemma ll3_bump_qvalid [rule_format]:
+"(((m,m'), (l :: ll3 list)) \<in> ll_validl_q \<longrightarrow>
+      (! b . ((m+b, m'+b), ll3_bump b l) \<in> ll_validl_q))"
+  apply(insert ll3_bump_qvalid')
+  apply(blast)
+  done
+
 (*
 prove ll3 bump is equal to ll bump
 (TODO - i think we get all we need out of the qvalidity proof *)
 (*
 - ll4 init preserves q validity (done)
 - ll3 bump (done)
-- inc jump/inc jump wrap
-- process jumps loop
+- inc jump (done)
+- inc jump wrap (done)
+- process jumps loop (done)
 (later we'll need to 
 prove properties about resolve_jump)
 - what about write_jump_targets?
+  - prove it doesn't overflow available space, IF jump check succeeds 
+  - need a jump space-validity predicate?
+*)
+(*
+now we need a validity predicate for ll3s that are ready to become ll4s
+(that is, ll3s output by successfully running inc_jumps)
 *)
 
 lemma ll3_inc_jump_nil [rule_format] :
@@ -2709,15 +2723,51 @@ lemma ll3_inc_jump_nil [rule_format] :
   done
 
 (* do we need my_ll_induct? *)
-lemma ll3_inc_jump_nilcp [rule_format] :
-"(! n l' b . ll3_inc_jump l na [] = (l', b) \<longrightarrow>
-  l' = [] \<and> b = False)"
-  apply(induction l, auto)
-   apply(case_tac "ll3_inc_jump l (Suc na) []", auto)
-  apply(simp)
+lemma ll3_inc_jump_nilcp' [rule_format] :
+"((x, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow>
+  (! e ls . t = LSeq e ls \<longrightarrow>
+   (! n ls' b . ll3_inc_jump ls n [] = (ls', b) \<longrightarrow>
+    b = False))) \<and>
+  (((m,m'), (l :: ll3 list)) \<in> ll_validl_q \<longrightarrow>
+    (! n l' b . ll3_inc_jump l n [] = (l', b) \<longrightarrow>
+    b = False))"
+proof(induction rule: ll_valid_q_ll_validl_q.induct)
+  case (1 i x e)
+  then show ?case by auto
+next
+case (2 x d e)
+  then show ?case by auto
+next
+  case (3 x d e s)
+  then show ?case by auto
+next
+  case (4 x d e s)
+  then show ?case by auto
+next
+  case (5 n l n' e)
+  then show ?case by auto
+next
+  case (6 n)
+  then show ?case by auto
+next
+  case (7 n h n' t n'')
+  then show ?case
+    apply(auto)
+    apply(case_tac "ll3_inc_jump t (Suc na) []", auto)
+    apply(drule_tac x = "Suc na" in spec)
+    apply(drule_tac x = a in spec) apply(auto)
+    done
+qed
 
-(* TODO: is this the correct ind princc? *)
-lemma ll3_inc_jump_qvalid[rule_format]:
+lemma ll3_inc_jump_nilcp [rule_format] :
+"(((m,m'), (l :: ll3 list)) \<in> ll_validl_q \<longrightarrow>
+    (! n l' b . ll3_inc_jump l n [] = (l', b) \<longrightarrow>
+    b = False))"
+  apply(insert ll3_inc_jump_nilcp')
+  apply(auto) apply(blast)
+  done
+
+lemma ll3_inc_jump_qvalid'[rule_format]:
   "((x, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow> 
       (! e ls . t = LSeq e ls \<longrightarrow>
       (! n p b ls' . ll3_inc_jump ls n p = (ls', b) \<longrightarrow>
@@ -2776,26 +2826,190 @@ next
              apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = p in spec)
           apply(drule_tac x = False in spec) apply(drule_tac x = a in spec) apply(auto)
              apply(auto simp add:ll_valid_q_ll_validl_q.intros)
- 
+
+      (* LJmp, LJmpI cases *)
          apply(case_tac p, auto)
           apply(case_tac "ll3_inc_jump t (Suc na) []", auto)
              apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[]" in spec)
           apply(drule_tac x = False in spec) apply(drule_tac x = a in spec) apply(auto)
 (* need a lemma about nil childpath *)
-             apply(auto simp add:ll_valid_q_ll_validl_q.intros)
-(* need a case split on l?  *)
+          apply(drule_tac ll3_inc_jump_nilcp) apply(auto)
+         apply(case_tac list, auto)
+          apply(case_tac "na = a", auto) 
+    apply(drule_tac b = 1 in ll3_bump_qvalid)
+           apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+           apply(rule_tac ll_valid_q_ll_validl_q.intros) apply(auto)
+    apply(drule_tac ll_valid_q.cases)
+                apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+          apply(case_tac " ll3_inc_jump t (Suc na) [a]", auto)
+          apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[a]" in spec) apply(auto)
+                    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+         apply(case_tac "ll3_inc_jump t (Suc na) (a # aa # lista)", auto)
+         apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "a#aa#lista" in spec) apply(auto)
+         apply(drule_tac ll_valid_q.cases) apply(auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+        apply(case_tac p, auto)
+          apply(case_tac "ll3_inc_jump t (Suc na) []", auto)
+             apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[]" in spec)
+          apply(drule_tac x = False in spec) apply(drule_tac x = a in spec) apply(auto)
+         apply(drule_tac ll3_inc_jump_nilcp) apply(auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+      
+         apply(case_tac list, auto)
+          apply(case_tac "na = a", auto) 
+         apply(drule_tac b = 1 in ll3_bump_qvalid)
+          apply(case_tac " ll3_inc_jump t (Suc na) [a]", auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+         apply(case_tac "ll3_inc_jump t (Suc na) (a # aa # lista)", auto)
+         apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "a#aa#lista" in spec) apply(auto)
+         apply(drule_tac ll_valid_q.cases) apply(auto)
+        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+        
+        apply(case_tac p, auto)
+          apply(case_tac "ll3_inc_jump t (Suc na) []", auto)
+             apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[]" in spec)
+          apply(drule_tac x = True in spec) apply(drule_tac x = a in spec) apply(auto)
+         apply(drule_tac ll3_inc_jump_nilcp) apply(auto)
+      
+         apply(case_tac list, auto)
+          apply(case_tac "na = a", auto) 
+         apply(drule_tac b = 1 in ll3_bump_qvalid)
+         apply(drule_tac ll_valid_q.cases) apply(auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+        apply(case_tac " ll3_inc_jump t (Suc na) [a]", auto)
+    apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[a]" in spec) apply(auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+         apply(case_tac "ll3_inc_jump t (Suc na) (a # aa # lista)", auto)
+         apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "a#aa#lista" in spec) apply(auto)
+         apply(drule_tac ll_valid_q.cases) apply(auto)
+        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac p, auto)
+          apply(case_tac "ll3_inc_jump t (Suc na) []", auto)
+             apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[]" in spec)
+          apply(drule_tac x = False in spec) apply(drule_tac x = a in spec) apply(auto)
+         apply(drule_tac ll3_inc_jump_nilcp) apply(auto)
+               apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+         apply(case_tac list, auto)
+          apply(case_tac "na = a", auto) 
+       apply(drule_tac b = 1 in ll3_bump_qvalid)
+          apply(case_tac " ll3_inc_jump t (Suc na) [a]", auto)
+
+         apply(drule_tac ll_valid_q.cases) apply(auto)
+         apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+         apply(case_tac "ll3_inc_jump t (Suc na) (a # aa # lista)", auto)
+         apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "a#aa#lista" in spec) apply(auto)
+         apply(drule_tac ll_valid_q.cases) apply(auto)
+        apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    (* LSeq case *)
+    apply(case_tac p, auto)
+      apply(case_tac "ll3_inc_jump t (Suc na) []", auto) 
+    apply(rotate_tac 3)
+             apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[]" in spec)
+          apply(drule_tac x = False in spec) apply(drule_tac x = a in spec) apply(auto)
+      apply(drule_tac ll3_inc_jump_nilcp) apply(auto)
+
+     apply(case_tac "na = a", auto)
+      apply(case_tac " ll3_inc_jump x52 0 list", auto)
+      apply(case_tac ba, auto)
+       apply(drule_tac x = 0 in spec) apply(drule_tac x = list in spec) apply(auto)
+    apply(drule_tac b = 1 in ll3_bump_qvalid) apply(auto)
+       apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+      apply(case_tac " ll3_inc_jump t a (a # list) ") apply(auto)
+      apply(drule_tac x = 0 in spec) apply(drule_tac x = list in spec) apply(auto)
+      apply(drule_tac x = a in spec) apply(drule_tac x = "a#list" in spec) 
     apply(auto)
-    apply(clarify)
-    apply(drule_tac x = 
+       apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+     apply(case_tac " ll3_inc_jump t (Suc na) (a # list) ") apply(auto)
+     apply(rotate_tac 3)
+    
+     apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "a#list" in spec) apply(auto)
+       apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+
+        apply(case_tac p, auto)
+      apply(case_tac "ll3_inc_jump t (Suc na) []", auto) 
+    apply(rotate_tac 3)
+             apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "[]" in spec)
+     apply(drule_tac x = False in spec) apply(auto)
+      apply(drule_tac ll3_inc_jump_nilcp) apply(auto)
+       apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac "na = a", auto)
+     apply(case_tac "ll3_inc_jump x52 0 list", auto)
+    apply(case_tac ba, auto)
+     apply(case_tac "ll3_inc_jump t a (a # list)", auto)
+      apply(drule_tac x = 0 in spec) apply(drule_tac x = list in spec) apply(auto)
+      apply(drule_tac x = a in spec) apply(drule_tac x = "a#list" in spec) 
     apply(auto)
+     apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac "ll3_inc_jump t (Suc na) (a # list)") apply(auto)
+    apply(rotate_tac 3)
+      apply(drule_tac x = "Suc na" in spec) apply(drule_tac x = "a#list" in spec) 
+    apply(auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
 qed
 
+lemma ll3_inc_jump_qvalid [rule_format] :
+"   (((m,m'), (l :: ll3 list)) \<in> ll_validl_q \<longrightarrow>
+      (! n p b l' . ll3_inc_jump l n p = (l', b) \<longrightarrow>
+         (if b then ((m,m'+1), l') \<in> ll_validl_q
+               else ((m,m'), l') \<in> ll_validl_q)))"
+  (* need to give bogus arguments *)
+  apply(insert ll3_inc_jump_qvalid'[of "(0,0)" "(LLab True 0)" m m' l])
+  apply(auto)
   done
+
+lemma ll3_inc_jump_wrap_qvalid [rule_format]:
+"   (((t :: ll3)) \<in> ll_valid_q \<longrightarrow>
+      (! t' p b . ll3_inc_jump_wrap t p = t' \<longrightarrow>
+             (((t' :: ll3) \<in> ll_valid_q))))"
+  apply(auto) apply(case_tac t, auto)
+  apply(case_tac bba, auto)
+  apply(case_tac "ll3_inc_jump x52 0 p") apply(auto)
+  apply(case_tac bc, auto)
+  apply(drule_tac ll_valid_q.cases) apply(auto)
+  apply(frule_tac ll3_inc_jump_qvalid) apply(auto)
+  apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  done
+
+(* pull process jumps loop to outside? *)
+lemma process_jumps_loop_qvalid' [rule_format]:
+"(! t t' . process_jumps_loop n t = Some t' \<longrightarrow>
+  (t :: ll3) \<in> ll_valid_q \<longrightarrow>
+  (t' :: ll3) \<in> ll_valid_q)"
+proof(induction n)
+  case 0
+  then show ?case by auto
+next
+  case (Suc n)
+  then show ?case 
+    apply(auto)
+  apply(case_tac "ll3_resolve_jump_wrap ((a,b),ba)")
+      apply(auto)
+    apply(case_tac "ll3_inc_jump_wrap ((a,b),ba) (rev x3)") apply(auto)
+    apply(drule_tac x = ab in spec) apply(drule_tac x = bd in spec)
+    apply(drule_tac x = bda in spec)
+    apply(drule_tac x = aa in spec) apply(drule_tac x = bb in spec)
+    apply(auto)
+    apply(subgoal_tac "((ab, bd), bda) \<in> ll_valid_q")
+     apply(rule_tac[2] ll3_inc_jump_wrap_qvalid) apply(auto)
+    done
+qed
+
 (*
-lemma ll3_inc_jump_wrap_qvalid[rule_format]:
-
-lemma ll3_inc_jump_qvalid[rule_format]:
-
-
+inductive_set ll_jumps_havespace
+idea: the number of bytes set aside for the jump label
+must be equal to the address mod 256 (?)
+*)
 
 end
