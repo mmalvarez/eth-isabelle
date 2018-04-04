@@ -367,11 +367,11 @@ lemma divmod_decrease [rule_format]:
    apply(auto)
   done
 
-(* are we outputting these bytes backwards? *)
-function output_address :: "nat \<Rightarrow> 8 word list" where
-    "output_address n = (case Divides.divmod_nat n 256 of
+(* this outputs in little endian order, opposite of what EVM wants *)
+function nat_to_bytes' :: "nat \<Rightarrow> 8 word list" where
+    "nat_to_bytes' n = (case Divides.divmod_nat n 256 of
                          (0, mo) \<Rightarrow> [Evm.byteFromNat mo]
-                        |(Suc n, mo) \<Rightarrow> (Evm.byteFromNat mo)#(output_address (Suc n)))"
+                        |(Suc n, mo) \<Rightarrow> (Evm.byteFromNat mo)#(nat_to_bytes' (Suc n)))"
   by auto
 termination
   apply(relation "measure (\<lambda> x . x)")
@@ -382,8 +382,18 @@ termination
         256", auto)
   done
 
+(* output a nat as an address - i.e., without padding *)
+definition output_address :: "nat \<Rightarrow> 8 word list" where
+"output_address n = List.rev (nat_to_bytes' n)"
+
+(* this is probably what we actually want for most ints *)
+(* at least in FourL semantics where everything is a 256 bit int *)
 definition bytes_of_nat :: "nat \<Rightarrow> 8 word list" where
   "bytes_of_nat n = Word.word_rsplit (Word256.word256FromNat n)"
+
+value "bytes_of_nat 2049"
+
+value "output_address 2049"
 
 fun codegen' :: "ll4 \<Rightarrow> inst list" where
     "codegen' (_, (L _ i)) = [i]"
