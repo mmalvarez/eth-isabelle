@@ -112,11 +112,15 @@ type_synonym 'a parser =
   "string \<Rightarrow>
     ('a \<Rightarrow> string \<Rightarrow> llll option) \<Rightarrow> (* success continuation *)
     (string \<Rightarrow> llll option) \<Rightarrow> (* failure continuation, doesn't consume *)
+    (string \<Rightarrow> llll option) \<Rightarrow> (* captures recursive call to entire grammar parser (e.g. for parens) *)
     llll option"
 
+(* capturing the self-recursive nature of the grammar (parentheses) *)
+
+
 fun parseNumeral :: "nat parser" where
-"parseNumeral [] s f = f []" (* at this point we have no string to operate on *)
-| "parseNumeral (h#t) s f  =
+"parseNumeral [] s f r = f []" (* at this point we have no string to operate on *)
+| "parseNumeral (h#t) s f r =
    (if LemExtraDefs.is_digit_char h
     then s (LemExtraDefs.char_to_digit h) t
     else f (h#t))"
@@ -130,48 +134,52 @@ I still wonder if we need explicit peeking
 *)
 (* *)
 function(sequential) parseIntSub :: "int \<Rightarrow> int parser" where
-"parseIntSub i [] su fa  = su i []"
-| "parseIntSub i (h#t) su fa  =
+"parseIntSub i [] su fa r  = su i []"
+| "parseIntSub i (h#t) su fa r  =
    parseNumeral (h#t) 
-                (\<lambda> n l . parseIntSub (10*i + Int.int n) l su fa)
-                (\<lambda> l . su i l)
+                (\<lambda> n l . parseIntSub (10*i + Int.int n) l su fa r)
+                (\<lambda> l . su i l) r
    "
   by pat_completeness auto
 termination sorry
 
 fun parseInt :: "int parser" where
-"parseInt [] su fa = fa []"
-| "parseInt (h#t) su fa =
+"parseInt [] su fa r = fa []"
+| "parseInt (h#t) su fa r =
    parseNumeral (h#t) 
-    (\<lambda> n l . parseIntSub n l su fa)
-    fa"
+    (\<lambda> n l . parseIntSub n l su fa r)
+    fa r"
 
 (* more helpers: matching a keyword (literal string) *)
 (* matching an empty keyword is technically valid *)
 fun parseKeyword :: "string \<Rightarrow> unit parser" where
-"parseKeyword [] l su fa = su () l"
-| "parseKeyword (h#t) [] su fa = fa []"
-| "parseKeyword (h#t) (h'#t') su fa =
+"parseKeyword [] l su fa r = su () l"
+| "parseKeyword (h#t) [] su fa r = fa []"
+| "parseKeyword (h#t) (h'#t') su fa r =
    (if h = h' then
-       parseKeyword t t' su fa 
+       parseKeyword t t' su fa r
     else fa (h'#t'))"
 
 (* next: parsing expressions
 (for now, for demonstration, just add and sub) *)
 
 (* TODO: be more consistent in calling the parser input parameter l*)
-fun run_parse :: "llll option parser \<Rightarrow> string \<Rightarrow> (llll option)" where
+function run_parse :: "llll option parser \<Rightarrow> string \<Rightarrow> (llll option)" where
 "run_parse p s =
-  p s (\<lambda> x s . x) (\<lambda> s . None)"
+  p s (\<lambda> x s . x) (\<lambda> s . None)
+    (run_parse p)"
+  by pat_completeness auto
+termination sorry
+
 
 definition hello :: string where "hello = ''hello''"
 
 fun silly_parse :: "llll option parser" where
-"silly_parse l su fa =
+"silly_parse l su fa r =
  parseKeyword hello l
   (\<lambda> x l . su (Some (L4L_Int 0)) l)
  (\<lambda> l . parseKeyword ''kitty'' l
-  (\<lambda> x l . su (Some (L4L_Int 1)) l) fa)"
+  (\<lambda> x l . su (Some (L4L_Int 1)) l) fa r) r"
 
 value "run_parse silly_parse ''kitty''"
 value "run_parse silly_parse ''hello''"
@@ -193,41 +201,134 @@ value "run_parse fourLParse_int ''100''"
    if that all succeeds, succeed
    otherwise, fail
 *)
+(* Q: make this more general? have arbitrary parsers for the delimiters? *)
 function(sequential) delimitParse_sub :: "string \<Rightarrow> 'a parser \<Rightarrow> 'a list \<Rightarrow> 'a list parser" where
-"delimitParse_sub s parse acc l su fa =
+"delimitParse_sub s parse acc l su fa r =
   parseKeyword s l
   (\<lambda> x l . parse l 
     (\<lambda> x1 l . delimitParse_sub s parse (acc@[x1]) l
              (\<lambda> x2 l . su x2 l)
-             (\<lambda> l . su (acc@[x1]) l))
-  fa)
-  fa"
+             (\<lambda> l . su (acc@[x1]) l) r)
+  fa r)
+  fa r"
   by pat_completeness auto
 termination sorry
 
 fun endInputParse :: "unit parser" where
-"endInputParse [] su fa =
+"endInputParse [] su fa r =
   su () []"
-| "endInputParse l su fa =
+| "endInputParse l su fa r =
   fa l"
 
+(* useful primitives:
+ - chaining successes
+ - chaining failures
+ - choices of alternatives
+ - greedy recursive matching (?)
+ - one or more *)
+
+(*
+more concretely:
+- chaining successes (done)
+- choose between 2 alternatives, i.e. chaining in the first one's failure case
+- optionally run a parser (can be seen as choice between parser and empty, or its own thing)
+*)
+
+definition chainParse :: "'a parser \<Rightarrow> ('a \<Rightarrow> 'b parser) \<Rightarrow> 'b parser" where
+"chainParse parse after l su fa r =
+  parse l
+   (\<lambda> x l . after x l su fa r)
+   fa r
+"
+
+definition choiceParse :: "'a parser \<Rightarrow> 'a parser \<Rightarrow> 'a parser" where
+"choiceParse parse1 parse2 l su fa r =
+  parse1 l su
+   (\<lambda> l . parse2 l su fa r) r"
+
+(* takes a default value, if parsing fails
+nil, in the case of delimitParse *)
+(* ordering of inputs to this guy? *)
+definition optionalParse :: "'a parser \<Rightarrow> 'a \<Rightarrow> 'a parser" where
+"optionalParse parse dfl l su fa r =
+  parse l su (su dfl) r"
+
+function(sequential) starParse_sub :: "'a parser \<Rightarrow> 'a list \<Rightarrow> 'a list parser" where
+"starParse_sub parse acc l su fa r =
+  parse l (\<lambda> x l . starParse_sub parse (acc@[x]) l su fa r)
+    (su acc) r"
+  by pat_completeness auto
+termination sorry
+  
+
+definition starParse :: "'a parser \<Rightarrow> 'a list parser" where
+"starParse parse l su fa r = starParse_sub parse [] l su fa r"
+
+definition examine_unit_result :: "unit list \<Rightarrow> llll option parser" where
+"examine_unit_result ls l su fa r = 
+  su (Some (L4Seq (map (\<lambda> _ . L4L_Int 0) ls))) l"
+
+(* it would be nice to be parametric in output type... *)
+value "run_parse (chainParse (starParse (parseKeyword ''hi'')) examine_unit_result) []"
+
+value "run_parse (chainParse (starParse (parseKeyword ''hi'')) examine_unit_result) ''hi''"
+
+value "run_parse (chainParse (starParse (parseKeyword ''hi'')) examine_unit_result) ''hihi''"
+
+definition plusParse :: "'a parser \<Rightarrow> 'a list parser" where
+"plusParse parse l su fa r =
+  parse l (\<lambda> x l . starParse_sub parse [x] l su fa r) 
+  fa r"
+
+value "run_parse (chainParse (plusParse (parseKeyword ''hi'')) examine_unit_result) ''''"
+
+value "run_parse (chainParse (plusParse (parseKeyword ''hi'')) examine_unit_result) ''hi''"
+
+value "run_parse (chainParse (plusParse (parseKeyword ''hi'')) examine_unit_result) ''hihi''"
+
+
+(* should we have some kind of repeatParse combinator? *)
+
 (* Q: have leading whitespace, or no? *)
-definition delimitParse :: "string \<Rightarrow> 'a parser \<Rightarrow> 'a list parser" where
-"delimitParse s parse l su fa = 
+definition delimitParse' :: "string \<Rightarrow> 'a parser \<Rightarrow> 'a list parser" where
+"delimitParse' s parse l su fa r = 
   parse l 
     (\<lambda> x1 l . delimitParse_sub s parse [x1] l
              (\<lambda> x2 l . su x2 l)
-             (\<lambda> l . su [x1] l))
-  fa"
+             (\<lambda> l . su [x1] l) r)
+  fa r"
+
+(* idea: chainParse parse (optionalParse (delimitParse_sub s parse) *)
+definition delimitParse :: "string \<Rightarrow> 'a parser \<Rightarrow> 'a list parser" where
+"delimitParse s parse = 
+  chainParse parse 
+    (\<lambda> x . optionalParse (delimitParse_sub s parse [x]) [x])"
+
+(*
+    (\<lambda> x1 l . delimitParse_sub s parse [x1] l
+             (\<lambda> x2 l . su x2 l)
+             (\<lambda> l . su [x1] l) r)
+  fa r"
+*)
+
 
 fun nums_parse :: "llll option parser" where
 "nums_parse l su fa = (delimitParse '' '' parseInt) l
   (\<lambda> x l . su (Some (L4Seq (map L4L_Int x))) l)
   (\<lambda> l . None)"
   
-value "run_parse nums_parse ''1x0''"
+value "run_parse nums_parse ''10 11''"
+
+(* arith parser, with choice parsing, shows off + and - *)
+fun arith_parse1 :: "llll option parser" where
+"arith_parse1 =
+  chainParse
+  (parseKeyword ''('')
+  ()
+ "
 
 (* require ''+'', then '' '' (for now) *)
+(*
 fun arith_parse1 :: "llll option parser" where
 "arith_parse1 l su fa =
   (parseKeyword ''+'' l
@@ -239,8 +340,24 @@ fun arith_parse1 :: "llll option parser" where
    fa)"
 
 value "run_parse arith_parse1 ''+ 1 0 2''"
+*)
 
+(*
 
+need to start by parsing "("
+end by parsing ")"
+
+choice:
+( - parse +
+    - then parse one or more whitespaces
+      - then 
+
+fun arith_parse1 :: "llll option parser" where
+"arith_parse1 l su fa =
+  (parseChoice 
+    (pa)
+    ())
+*)
 (*
 
 fun fourLParse_arith_test :: "llll option parser" where
