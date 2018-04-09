@@ -198,6 +198,9 @@ definition run_parse_opt' :: "('a , 'b option) parser \<Rightarrow> ('a \<Righta
 definition run_parse_opt :: "('a option, 'a option) parser \<Rightarrow> string \<Rightarrow> 'a option" where
 "run_parse_opt p s = run_parse_opt' p id s"
 
+definition run_parse_opt_alt :: "('a, 'a option) parser \<Rightarrow> string \<Rightarrow> 'a option" where
+"run_parse_opt_alt p s = run_parse'' p Some None s"
+
 (*
 (* TODO: be more consistent in calling the parser input parameter l*)
 (* TODO: rethink how to do this in light of datatype rework *)
@@ -303,19 +306,6 @@ termination sorry
 definition starParse :: "('a, 'b) parser \<Rightarrow> ('a list, 'b) parser" where
 "starParse parse l su fa r = starParse_sub parse [] l su fa r"
 
-(*
-definition constParse :: "'a \<Rightarrow> ('a, 'a) parser" where
-"idParse dfl su fa r =
-  "
-*)
-
-(* TODO is this still needed?*)
-(*
-definition examine_unit_result :: "unit list \<Rightarrow> llll option parser" where
-"examine_unit_result ls l su fa r = 
-  su (Some (L4Seq (map (\<lambda> _ . L4L_Int 0) ls))) l"
-*)
-
 
 value "run_parse' (starParse (parseKeyword ''hi'')) [] ''hi''"
 
@@ -328,9 +318,6 @@ value "run_parse (chainParse (starParse (parseKeyword ''hi'')) examine_unit_resu
 value "run_parse (chainParse (starParse (parseKeyword ''hi'')) examine_unit_result) ''hihi''"
 *)
 
-(*
-should this return a ('a * 'a list, b) parser?  
-*)
 definition plusParse :: "('a, 'b) parser \<Rightarrow> ('a list, 'b) parser" where
 "plusParse parse l su fa r =
   parse l (\<lambda> x l . starParse_sub parse [x] l su fa r) 
@@ -348,6 +335,11 @@ value "run_parse' (plusParse (parseKeyword ''hi'')) [] ''''"
 value "run_parse' (plusParse2 (parseKeyword ''hi'')) ((),[]) ''''"
 
 value "run_parse' (plusParse2 (parseKeyword ''hi'')) ((),[]) ''''"
+
+value "run_parse_opt_alt (plusParse (parseKeyword ''hi'')) ''hihi''"
+
+
+value "run_parse' (plusParse (parseKeyword ''hi'')) [] ''''"
 
 value "run_parse'' (plusParse (parseKeyword ''hi'')) Some None ''''"
 
@@ -375,8 +367,8 @@ fun parseWs :: "(unit, 'a) parser" where
     else fa (h#t))"
    
 
-definition delimitParse' :: "string \<Rightarrow> 'a parser \<Rightarrow> 'a list parser" where
-"delimitParse' s parse l su fa r = 
+definition delimitParse' :: "'a parser \<Rightarrow> 'b parser \<Rightarrow> 'b list parser" where
+"delimitParse' del parse l su fa r = 
   parse l 
     (\<lambda> x1 l . delimitParse_sub s parse [x1] l
              (\<lambda> x2 l . su x2 l)
