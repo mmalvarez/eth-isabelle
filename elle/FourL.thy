@@ -104,6 +104,7 @@ fun stree_append :: "stree \<Rightarrow> stree \<Rightarrow> stree" where
 (* TODO: support comments
 idea: add an extra flag (" we are in a comment") when we see a ;
 clear it when we see a newline *)
+(* With thanks to Alex Sanchez-Stern *)
 fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list  \<Rightarrow> stree option" where
 "llll_parse' [] _ _ = None"
 | "llll_parse' (h#t) token parsed =
@@ -330,11 +331,16 @@ TODO: redo parseNat without parser combinators (?)
 TODO: add macro forms - constants only for now
 when looking for parameters we will need to peek ahead
 *)
+
+type_synonym funs_tab = "(string * (llll list \<Rightarrow> llll)) list"
+
+type_synonym vars_tab = "(string * llll) list"
+
 function(sequential) llll_parse1 :: "stree \<Rightarrow> llll option" where
 "llll_parse1 (STStr s) =
   (case run_parse_opt' parseNat s of
     None \<Rightarrow> None
-   | Some n \<Rightarrow> Some (L4L_Nat n))"
+   | Some n \<Rightarrow> Some (L4L_Nat n))" (* TODO: string literals are also a thing *)
 | "llll_parse1 (STStrs (h#t)) = 
    (case mapAll llll_parse1 t of
     None \<Rightarrow> None
