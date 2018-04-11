@@ -16,9 +16,16 @@ datatype stree =
   STStr "string"
   | STStrs "stree list"
 
+(* TODO: add macro definitions with arguments
+   the arguments will get compiled and filled in *)
+(* TODO: how to handle scoping macros?
+def and mac as defined here need a recursive llll argument
+*)
 datatype llll =
    L4L_Str "string"
-  | L4L_Nat "nat"
+   | L4L_Nat "nat"
+   | L4L_Def "string" "string list"
+   | L4L_Mac "string" "llll list"
   | L4I "inst"
   | L4Seq "llll list"
   | L4Arith "llllarith" "llll list"
@@ -85,13 +92,19 @@ definition isWs :: "char \<Rightarrow> bool"
   List.member
   (map String.char_of_nat
     [9, 10, 11, 12, 13, 32])"
+value "String.char_of_nat 10"
+
+definition isNewline :: "char \<Rightarrow> bool"
+  where "isNewline c = (c = String.char_of_nat 10)"
 
 fun stree_append :: "stree \<Rightarrow> stree \<Rightarrow> stree" where
 "stree_append (STStr x) _ = STStr x"
 | "stree_append (STStrs xs) s = STStrs (xs @ [s])"
 
-(* should third argument be a string list? or some kind of tree? *)
-fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> stree option" where
+(* TODO: support comments
+idea: add an extra flag (" we are in a comment") when we see a ;
+clear it when we see a newline *)
+fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list  \<Rightarrow> stree option" where
 "llll_parse' [] _ _ = None"
 | "llll_parse' (h#t) token parsed =
    (if h = CHR ''(''
@@ -312,6 +325,11 @@ fun mapAll :: "('a \<Rightarrow> 'b option) \<Rightarrow> 'a list \<Rightarrow> 
 (* only allow nat literals for now *)
 (* TODO: proper EOS handling for tokens (right now our tokens might have
 crap at the end that gets ignored *)
+(*
+TODO: redo parseNat without parser combinators (?)
+TODO: add macro forms - constants only for now
+when looking for parameters we will need to peek ahead
+*)
 function(sequential) llll_parse1 :: "stree \<Rightarrow> llll option" where
 "llll_parse1 (STStr s) =
   (case run_parse_opt' parseNat s of
@@ -336,6 +354,8 @@ definition llll_parse :: "string \<Rightarrow> llll option" where
    | Some st \<Rightarrow> llll_parse1 st)"
 
 value "llll_parse ''(seq (+ 1 2) (+ 2 3 3))''"
+
+value "llll_parse0 ''(seq (def a 2) (+ 2 3 3))''"
 
 (* idea: no parentheses yet.
 "+ 1 2" or "- 1 2" should parse correctly means
