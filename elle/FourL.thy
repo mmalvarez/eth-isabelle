@@ -86,25 +86,40 @@ definition isWs :: "char \<Rightarrow> bool"
   (map String.char_of_nat
     [9, 10, 11, 12, 13, 32])"
 
+fun stree_append :: "stree \<Rightarrow> stree \<Rightarrow> stree" where
+"stree_append (STStr x) _ = STStr x"
+| "stree_append (STStrs xs) s = STStrs (xs @ [s])"
+
 (* should third argument be a string list? or some kind of tree? *)
-fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> llll option" where
+fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> stree option" where
 "llll_parse' [] _ _ = None"
 | "llll_parse' (h#t) token parsed =
    (if h = CHR ''(''
        then llll_parse' t token ((STStrs [])#parsed)
     else (if h = CHR '')''
-          then if token \<noteq> [] then  _ else _)
+          then (case parsed of
+                [] \<Rightarrow> None
+                | ph#[] \<Rightarrow> if token \<noteq> [] then Some (stree_append ph (STStr token))
+                                         else Some ph
+                | ph1#ph2#pt \<Rightarrow> if token \<noteq> [] then llll_parse' t [] (stree_append ph2 (stree_append ph1 (STStr token)) # pt)
+                                              else llll_parse' t [] (stree_append ph2 ph1#pt))
     else (if isWs h
           then (if token \<noteq> [] then 
                 (case parsed of
                    [] \<Rightarrow> None
-                   | ph#pt \<Rightarrow> llll_parse' t [] ()
+                   | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt))
                 else llll_parse' t [] parsed) 
-    else llll_parse' t (token@[c]) parsed))"
+    else llll_parse' t (token@[h]) parsed)))"
 
-fun llll_parse :: "string \<Rightarrow> llll option" where
-"llll_parse
+fun llll_parse0 :: "string \<Rightarrow> stree option" where
+"llll_parse0 s = llll_parse' s [] []"
 
+value "llll_parse0 ''(+ 11 1)''"
+
+value "llll_parse0 ''(+ 11 (+ 1 1) (- 2 1))''"
+
+
+value "llll_parse0 ''(+ (+ 1 1) 2)''"
 
 (* Q: best way to deal with the fact that
 conditionals might not result in a value? *)
@@ -282,6 +297,45 @@ definition fourLParse_int :: "(llll, llll option) parser" where
  parseNat l (\<lambda> x s . su (L4L_Nat (x)) s) fa fail'"
 
 value "run_parse_opt' fourLParse_int ''1000''"
+
+value "run_parse_opt' parseNat ''20''"
+
+fun mapAll :: "('a \<Rightarrow> 'b option) \<Rightarrow> 'a list \<Rightarrow> 'b list option" where
+"mapAll _ [] = Some []"
+| "mapAll f (h#t) =
+  (case f h of
+   None \<Rightarrow> None
+   | Some b \<Rightarrow> (case mapAll f t of
+                 None \<Rightarrow> None
+                 | Some t' \<Rightarrow> Some (b#t')))"
+
+(* only allow nat literals for now *)
+(* TODO: proper EOS handling for tokens (right now our tokens might have
+crap at the end that gets ignored *)
+function(sequential) llll_parse1 :: "stree \<Rightarrow> llll option" where
+"llll_parse1 (STStr s) =
+  (case run_parse_opt' parseNat s of
+    None \<Rightarrow> None
+   | Some n \<Rightarrow> Some (L4L_Nat n))"
+| "llll_parse1 (STStrs (h#t)) = 
+   (case mapAll llll_parse1 t of
+    None \<Rightarrow> None
+    | Some ls \<Rightarrow> 
+    (if h = STStr ''seq'' then Some (L4Seq ls)
+     else if h = STStr ''+'' then Some (L4Arith LAPlus ls)
+     else if h = STStr ''-'' then Some (L4Arith LAMinus ls)
+     else None))"
+| "llll_parse1 _ = None"
+  by pat_completeness auto
+termination sorry
+
+definition llll_parse :: "string \<Rightarrow> llll option" where
+"llll_parse s = 
+  (case llll_parse0 s of
+   None \<Rightarrow> None
+   | Some st \<Rightarrow> llll_parse1 st)"
+
+value "llll_parse ''(seq (+ 1 2) (+ 2 3 3))''"
 
 (* idea: no parentheses yet.
 "+ 1 2" or "- 1 2" should parse correctly means
