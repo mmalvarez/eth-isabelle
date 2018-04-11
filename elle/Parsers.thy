@@ -1,5 +1,5 @@
-theory FourL
-  imports Main ElleSyntax ElleCompiler
+theory Parsers 
+  imports Main ElleSyntax ElleCompiler FourL
 begin
 
 (* deal with literals:
@@ -11,10 +11,6 @@ begin
 datatype llllarith =
    LAPlus
   | LAMinus
-
-datatype stree =
-  STStr "string"
-  | STStrs "stree list"
 
 datatype llll =
    L4L_Str "string"
@@ -77,34 +73,6 @@ fun llll_compile :: "llll \<Rightarrow> ll1" where
              llll_compile l,
              ll1.LJmp 0,
              ll1.LLab 2]]]"
-
-(* whitespace characters: bytes 9-13, 32 *)
-definition isWs :: "char \<Rightarrow> bool"
-  where
-"isWs = 
-  List.member
-  (map String.char_of_nat
-    [9, 10, 11, 12, 13, 32])"
-
-(* should third argument be a string list? or some kind of tree? *)
-fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> llll option" where
-"llll_parse' [] _ _ = None"
-| "llll_parse' (h#t) token parsed =
-   (if h = CHR ''(''
-       then llll_parse' t token ((STStrs [])#parsed)
-    else (if h = CHR '')''
-          then if token \<noteq> [] then  _ else _)
-    else (if isWs h
-          then (if token \<noteq> [] then 
-                (case parsed of
-                   [] \<Rightarrow> None
-                   | ph#pt \<Rightarrow> llll_parse' t [] ()
-                else llll_parse' t [] parsed) 
-    else llll_parse' t (token@[c]) parsed))"
-
-fun llll_parse :: "string \<Rightarrow> llll option" where
-"llll_parse
-
 
 (* Q: best way to deal with the fact that
 conditionals might not result in a value? *)
@@ -425,6 +393,13 @@ value "run_parse (chainParse (plusParse (parseKeyword ''hi'')) examine_unit_resu
 value "run_parse (chainParse (plusParse (parseKeyword ''hi'')) examine_unit_result) ''hihi''"
 *)
 
+(* whitespace characters: bytes 9-13, 32 *)
+definition isWs :: "char \<Rightarrow> bool"
+  where
+"isWs = 
+  List.member
+  (map String.char_of_nat
+    [9, 10, 11, 12, 13, 32])"
 
 fun parseWs :: "(unit, 'a) parser" where
 "parseWs [] su fa r = fa []"
