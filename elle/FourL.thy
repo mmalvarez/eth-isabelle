@@ -8,9 +8,31 @@ begin
 - expressions
 *)
 
+(* Do we need isZero at this level?
+   I think we only need to reflect it in the output ll1 code *)
 datatype llllarith =
    LAPlus
-  | LAMinus
+   | LAMinus
+   | LATimes
+   | LADiv
+   | LAMod
+   | LAAnd
+   | LAOr
+   | LAXor
+   | LANot
+
+datatype lllllogic =
+  LLAnd
+  | LLOr
+  | LLNot
+
+datatype llllcompare =
+  LCEq
+  | LCNeq
+  | LCLt
+  | LCLe
+  | LCGt
+  | LCGe
 
 datatype stree =
   STStr "string"
@@ -25,10 +47,12 @@ datatype llll =
    L4L_Str "string"
    | L4L_Nat "nat"
    | L4L_Def "string" "string list"
-   | L4L_Mac "string" "llll list"
+   | L4L_Mac "string" "llll list" 
   | L4I "inst"
   | L4Seq "llll list"
   | L4Arith "llllarith" "llll list"
+  | L4Logic "lllllogic" "llll list"
+  | L4Comp "llllcompare" "llll" "llll" (* all comparisons must be binary *)
   | L4When "llll" "llll"
   | L4If "llll" "llll" "llll"
   | L4While "llll" "llll"
@@ -70,7 +94,7 @@ fun llll_compile :: "llll \<Rightarrow> ll1" where
 | "llll_compile (L4I i) = ll1.L i"
 | "llll_compile (L4Seq l) = ll1.LSeq (map llll_compile l)"
 | "llll_compile (L4When c l) =
-   ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l, ll1.LLab 0]"
+   ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l, ll1.LLab 0]" (* wrong logic *)
 | "llll_compile (L4If c l1 l2) = 
    ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l2, ll1.LLab 0]"
 (* TODO: we can have a more efficient loop *)
@@ -332,32 +356,118 @@ TODO: add macro forms - constants only for now
 when looking for parameters we will need to peek ahead
 *)
 
-type_synonym funs_tab = "(string * (llll list \<Rightarrow> llll)) list"
+type_synonym funs_tab = "(string * (llll list \<Rightarrow> llll option)) list"
 
 type_synonym vars_tab = "(string * llll) list"
 
-function(sequential) llll_parse1 :: "stree \<Rightarrow> llll option" where
-"llll_parse1 (STStr s) =
+(* TODO: handle macros here, or in llll_compile?
+here might be easier
+llll_compile might make more sense if def
+is in the llll syntax. options are
+1. have llll_compile not cover all cases (e.g. def, macro)
+2. simply not put macros in llll syntax.
+
+there is actually another, better option:
+handle macros after tokenization
+ *)
+(* for now, heads of sexprs must be literals *)
+(*
+function(sequential) llll_parse1 :: "funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree \<Rightarrow> llll option" where
+"llll_parse1 _ _ (STStr s) =
   (case run_parse_opt' parseNat s of
     None \<Rightarrow> None
    | Some n \<Rightarrow> Some (L4L_Nat n))" (* TODO: string literals are also a thing *)
-| "llll_parse1 (STStrs (h#t)) = 
-   (case mapAll llll_parse1 t of
+| "llll_parse1 ft vt (STStrs (h#t)) = 
+  (* TODO: first check if h is a definition *)
+   (case mapAll (llll_parse1 ft vt) t of
     None \<Rightarrow> None
     | Some ls \<Rightarrow> 
+    (case h of
+     STStr hs \<Rightarrow> 
+      (case map_of ft hs of
+        None \<Rightarrow> None
+        | Some f \<Rightarrow> f ls)
+    | _ \<Rightarrow> None))"
+| "llll_parse1 _ _ _ = None"
+*)
+
+(* To emulate behavior of LLL, we need to have a state that is carried from
+one statement (in parsing order) to the next. that is to say, we need to return a new
+funs_tab and vars_tab (at most, maybe can get away with less - do we just need funs tab?) *)
+
+(* to correctly parse defs, we will have to
+no longer use mapAll - instead we will have to chain explicitly
+- other notes: will we have to explicitly decrease the stacks when we are done?
+
+should output type be (llll * funs_tab * vars tab)?
+should it just be (llll * funs_tab)?
+*)
+
+function(sequential) llll_parse1' :: "funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree \<Rightarrow> llll option" where
+"llll_parse1' _ _ (STStr s) =
+  (case run_parse_opt' parseNat s of
+    None \<Rightarrow> None
+   | Some n \<Rightarrow> Some (L4L_Nat n))" (* TODO: string literals are also a thing *)
+| "llll_parse1' ft vt (STStrs (h#t)) = 
+  (case h of
+    STStr ''def'' \<Rightarrow> _ 
+    
+    | STStr hs \<Rightarrow>
+    (case mapAll (llll_parse1 ft vt) t of
+      None \<Rightarrow> None
+      | Some ls \<Rightarrow> 
+        (case map_of ft hs of
+           None \<Rightarrow> None
+          | Some f \<Rightarrow> f ls))
+      | _ \<Rightarrow> None)"
+| "llll_parse1' _ _ _ = None"
+  (* TODO: first check if h is a definition.
+if it is we are doing something rather different: parsing a series of string variable names  *)
+
+
+(*
     (if h = STStr ''seq'' then Some (L4Seq ls)
      else if h = STStr ''+'' then Some (L4Arith LAPlus ls)
      else if h = STStr ''-'' then Some (L4Arith LAMinus ls)
-     else None))"
-| "llll_parse1 _ = None"
+     else None))
+*)
   by pat_completeness auto
 termination sorry
+
+(* default symbol table for llll 
+here we handle incorrect numbers of arguments for non-list types
+the next step must handle incorrect numbers for list types*)
+definition default_llll_funs :: funs_tab where
+"default_llll_funs =
+[
+(* control constructs *)
+(''seq'', (\<lambda> l . Some (L4Seq l)))
+(* integer arithmetic *)
+,(''+'', (\<lambda> l . Some (L4Arith LAPlus l)))
+,(''-'', (\<lambda> l . Some (L4Arith LAMinus l)))
+,(''*'', (\<lambda> l . Some (L4Arith LATimes l)))
+,(''/'', (\<lambda> l . Some (L4Arith LADiv l)))
+,(''%'', (\<lambda> l . Some (L4Arith LAMod l)))
+(* bitwise logic *)
+,(''&'', (\<lambda> l . Some (L4Arith LAAnd l)))
+,(''|'', (\<lambda> l . Some (L4Arith LAOr l)))
+,(''^'', (\<lambda> l . Some (L4Arith LAXor l)))
+,(''~'', (\<lambda> l . Some (L4Arith LANot l)))
+(* boolean logic *)
+,(''&&'', (\<lambda> l . Some (L4Logic LLAnd l)))
+,(''||'', (\<lambda> l . Some (L4Logic LLOr l)))
+,(''!'', (\<lambda> l . Some (L4Logic LLNot l)))
+(* comparisons - for later*)
+(* other constructs, loads/stores - for later*)
+(* data insertion - for later*)
+]
+"
 
 definition llll_parse :: "string \<Rightarrow> llll option" where
 "llll_parse s = 
   (case llll_parse0 s of
    None \<Rightarrow> None
-   | Some st \<Rightarrow> llll_parse1 st)"
+   | Some st \<Rightarrow> llll_parse1 default_llll_funs [] st)"
 
 value "llll_parse ''(seq (+ 1 2) (+ 2 3 3))''"
 
