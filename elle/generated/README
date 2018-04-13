@@ -1,0 +1,6 @@
+Files in this directory are generated automatically by Isabelle's code generator.
+They then need to be compiled with OCaml to produce a standalone binary, something like
+
+NB there is currently a bug in how we are outputting our bytecode, the order is wrong or something
+
+ocamlc -o llllc unix.cma nums.cma FourL.ml ../FourLShim.ml
