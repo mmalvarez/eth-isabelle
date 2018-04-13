@@ -1,2 +1,3 @@
 #!/bin/bash
-ocamlc nums.cma unix.cma ./FourLShim.ml generated/FourL.ml -o fourlc
+# needs to be run from generated/ directory
+# ocamlc -o llllc unix.cma nums.cma FourL.ml ../FourLShim.mli

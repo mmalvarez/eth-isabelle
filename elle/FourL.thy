@@ -78,7 +78,7 @@ PUSHes are little-endian?
 but no, numbers _are_ big endian in EVM
 *)
 definition intToBytes :: "int \<Rightarrow> 8 word list" where
-"intToBytes i = bytes_of_nat (Int.nat i)"
+"intToBytes i = output_address (Int.nat i)"
 
 value "intToBytes 2049"
 

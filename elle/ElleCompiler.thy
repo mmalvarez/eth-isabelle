@@ -388,6 +388,7 @@ definition output_address :: "nat \<Rightarrow> 8 word list" where
 
 (* this is probably what we actually want for most ints *)
 (* at least in FourL semantics where everything is a 256 bit int *)
+(* or do we...?  I think actually we only want this for strings *)
 definition bytes_of_nat :: "nat \<Rightarrow> 8 word list" where
   "bytes_of_nat n = Word.word_rsplit (Word256.word256FromNat n)"
 
