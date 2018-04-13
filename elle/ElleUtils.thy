@@ -9,7 +9,9 @@ definition hexread1_dom :: "char \<Rightarrow> bool" where
                    c = CHR ''3'' \<or> c = CHR ''4'' \<or> c = CHR ''5'' \<or>
                    c = CHR ''6'' \<or> c = CHR ''7'' \<or> c = CHR ''8'' \<or>
                    c = CHR ''9'' \<or> c = CHR ''A'' \<or> c = CHR ''B'' \<or>
-                   c = CHR ''D'' \<or> c = CHR ''E'' \<or> c = CHR ''F'')"
+                   c = CHR ''D'' \<or> c = CHR ''E'' \<or> c = CHR ''F'' \<or>
+                   c = CHR ''a'' \<or> c = CHR ''b'' \<or> c = CHR ''d'' \<or>
+                   c = CHR ''e'' \<or> c = CHR ''f'')"
 
 definition hexread1 :: "char \<Rightarrow> nat" where
 "hexread1 c = (if c = (CHR ''0'') then 0 else
@@ -28,13 +30,19 @@ definition hexread1 :: "char \<Rightarrow> nat" where
                if c = (CHR ''D'') then 13 else
                if c = (CHR ''E'') then 14 else
                if c = (CHR ''F'') then 15 else
+               if c = (CHR ''a'') then 10 else
+               if c = (CHR ''b'') then 11 else
+               if c = (CHR ''c'') then 12 else
+               if c = (CHR ''d'') then 13 else
+               if c = (CHR ''e'') then 14 else
+               if c = (CHR ''f'') then 15 else
                undefined)"
 
 definition hexwrite1_dom :: "nat \<Rightarrow> bool" where
 "hexwrite1_dom n = (n < 16)"
 
-definition hexwrite1 :: "nat \<Rightarrow> char" where
-"hexwrite1 c = (if c = 0 then CHR ''0'' else
+definition hexwrite1_upper :: "nat \<Rightarrow> char" where
+"hexwrite1_upper c = (if c = 0 then CHR ''0'' else
                 if c = 1 then CHR ''1'' else
                 if c = 2 then CHR ''2'' else
                 if c = 3 then CHR ''3'' else
@@ -51,12 +59,32 @@ definition hexwrite1 :: "nat \<Rightarrow> char" where
                 if c = 14 then CHR ''E'' else
                 if c = 15 then CHR ''F'' else undefined)"
 
+definition hexwrite1 :: "nat \<Rightarrow> char" where
+"hexwrite1 c = (if c = 0 then CHR ''0'' else
+                if c = 1 then CHR ''1'' else
+                if c = 2 then CHR ''2'' else
+                if c = 3 then CHR ''3'' else
+                if c = 4 then CHR ''4'' else
+                if c = 5 then CHR ''5'' else
+                if c = 6 then CHR ''6'' else
+                if c = 7 then CHR ''7'' else
+                if c = 8 then CHR ''8'' else
+                if c = 9 then CHR ''9'' else
+                if c = 10 then CHR ''a'' else
+                if c = 11 then CHR ''b'' else
+                if c = 12 then CHR ''c'' else
+                if c = 13 then CHR ''d'' else
+                if c = 14 then CHR ''e'' else
+                if c = 15 then CHR ''f'' else undefined)"
+
+
 value "(1 < (0::nat))"
 
+(*
 lemma hexread1_hexwrite1 : "hexread1_dom c \<Longrightarrow> hexwrite1 (hexread1 c) = c"
   apply (auto simp add:hexread1_dom_def hexread1_def hexwrite1_def)
   done
-
+*)
 lemma hexwrite1_help :
 "n < 16 \<Longrightarrow>
     n \<noteq> 15 \<Longrightarrow>
@@ -78,12 +106,13 @@ lemma hexwrite1_help :
 proof(induction n, auto)
 qed 
 
+(*
 lemma hexwrite1_hexread1 : "hexwrite1_dom n \<Longrightarrow> hexread1 (hexwrite1 n) = n"
   apply(auto simp add:hexwrite1_dom_def hexwrite1_def)
                   apply(auto simp add:hexread1_def)
                   apply(insert hexwrite1_help, auto)
   done
-
+*)
 
 definition hexread2 :: "char \<Rightarrow> char \<Rightarrow> nat" where
 "hexread2 c1 c2 = (16 * (hexread1 c1) + hexread1 c2)"
