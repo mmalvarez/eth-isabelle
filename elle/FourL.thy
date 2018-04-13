@@ -429,15 +429,15 @@ definition streq :: "string \<Rightarrow> string \<Rightarrow> bool" where
 
 value "lookupS [(''a'',1), (''a'',2)] ''a'' :: nat option"
 
-(* TODO: have vars_tab argument to parse1_def? *)
+(* TODO: have vars_tab argument to anything but parse1_def?  *)
 (* TODO: have llll_parse1_seq for parsing a sequence of arguments *)
-fun llll_parse1 :: "funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree \<Rightarrow> (llll * funs_tab) option " 
+fun llll_parse1 :: "funs_tab  \<Rightarrow> stree \<Rightarrow> (llll * funs_tab) option " 
 (* TODO: should first component of returned value of this one be an llll?
 should it just be a funs_tab option? *)
 (* morally it is just a funs_tab, but including an empty sequence will make life easier. *)
 (* first param is name being defined *)
 and llll_parse1_def :: "string \<Rightarrow> funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree list \<Rightarrow> (llll * funs_tab )option"
-and llll_parse1_args :: "funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree list \<Rightarrow> (llll list * funs_tab )option" 
+and llll_parse1_args :: "funs_tab \<Rightarrow> stree list \<Rightarrow> (llll list * funs_tab )option" 
 where
 
 (*
@@ -462,29 +462,26 @@ what this means is that we return a function that constructs a series of funstab
   Some (L4Seq [], (name, (\<lambda> l . 
     (case mkConsts vt (rev l) of
      None \<Rightarrow> None
-  (* TODO: are we leaving out something important by doing snd? *)
-    | Some ft' \<Rightarrow> (case (llll_parse1 (ft'@ft) vt h) of
+  (* TODO: are we leaving out something important by extracting the first parameter?? *)
+    | Some ft' \<Rightarrow> (case (llll_parse1 (ft'@ft) h) of
                          None \<Rightarrow> None
-                        | Some (l, _) \<Rightarrow> Some l (* [] or vt? *)))
+                        | Some (l, _) \<Rightarrow> Some l ))
  ))#ft)"
 
-(* this case also needs to change so it can typecheck
-in particular we need a case analysis on h to make sure it is an STtr
-use mkConsts for this *)
 | "llll_parse1_def name ft vt (h#t) = 
    (case h of
      STStr v \<Rightarrow> llll_parse1_def name ft (v#vt) t 
     | _ \<Rightarrow> None)"
 
-| "llll_parse1_args ft vt [] = None"
-| "llll_parse1_args ft vt (h#[]) = 
-    (case llll_parse1 ft vt h of
+| "llll_parse1_args ft [] = None"
+| "llll_parse1_args ft (h#[]) = 
+    (case llll_parse1 ft h of
      None \<Rightarrow> None
     | Some (l, ft') \<Rightarrow> Some ([l], ft'))"
-| "llll_parse1_args ft vt (h#t) = 
-    (case llll_parse1 ft vt h of
+| "llll_parse1_args ft (h#t) = 
+    (case llll_parse1 ft h of
      None \<Rightarrow> None
-    | Some (h', ft') \<Rightarrow> (case llll_parse1_args ft' vt t of
+    | Some (h', ft') \<Rightarrow> (case llll_parse1_args ft' t of
                         None \<Rightarrow> None
                         | Some (t', ft'') \<Rightarrow> Some (h'#t', ft'')))"
 (* idea: we have already seen a head symbol, so we just need
@@ -493,7 +490,7 @@ to the function context, thread those to the tail
 *)
 
 (* TODO: this does not deal with nullary macros correctly, I think. Need a case for those. *)
-| "llll_parse1 ft vt (STStr s) =
+| "llll_parse1 ft (STStr s) =
   (case run_parse_opt' parseNat s of
     None \<Rightarrow> (case lookupS ft s of
                       None \<Rightarrow> None
@@ -502,25 +499,25 @@ to the function context, thread those to the tail
                                     | Some l \<Rightarrow> Some (l, ft)))
    | Some n \<Rightarrow> Some (L4L_Nat n, ft))" (* TODO: string literals are also a thing *)
 
-| "llll_parse1 ft vt (STStrs (h#t)) = 
+| "llll_parse1 ft (STStrs (h#t)) = 
    (case h of
      STStr hs \<Rightarrow>
       (if hs = ''def''
           then (case t of
-                 STStr(h2)#t' \<Rightarrow> (case llll_parse1_def h2 ft vt t of
+                 STStr(h2)#t' \<Rightarrow> (case llll_parse1_def h2 ft [] t' of
                                   None \<Rightarrow> None
                                 | Some p \<Rightarrow> Some p)
                 | _ \<Rightarrow> None)
           else
           (case ((lookupS ft hs) :: (llll list \<Rightarrow> llll option) option) of
             None \<Rightarrow> None
-           | Some f \<Rightarrow> (case llll_parse1_args ft vt t of
+           | Some f \<Rightarrow> (case llll_parse1_args ft t of
                         None \<Rightarrow> None
                        | Some (ls, ft') \<Rightarrow> (case f ls of
                                      None \<Rightarrow> None
                                      | Some l \<Rightarrow> Some(l, ft')))))
     | _ \<Rightarrow> None)"
-| "llll_parse1 ft vt (STStrs []) = None"
+| "llll_parse1 ft  (STStrs []) = None"
 (*
 
    (case  (llll_parse1 ft vt) t of
@@ -579,7 +576,7 @@ definition default_llll_funs :: funs_tab where
 
 definition llll_parse1_default :: "stree \<Rightarrow> llll option" where
 "llll_parse1_default st = 
-  (case llll_parse1 default_llll_funs [] st of
+  (case llll_parse1 default_llll_funs st of
    None \<Rightarrow> None
    | Some (l, _) \<Rightarrow> Some l)"
 
@@ -599,6 +596,8 @@ definition llll_parse_complete_test :: "string \<Rightarrow> (llll * funs_tab) o
 value "llll_parse_complete ''(seq (+ 2 3) (- 1 2))''"
 
 value "llll_parse_complete ''(seq (+ 2 3) (+ 1 2))''"
+
+value "llll_parse0 ''(seq (+ 2 3) (+ 1 a))''"
 
 value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
 
