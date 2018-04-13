@@ -62,11 +62,11 @@ datatype llll =
 (* i think we might not need to, let's see *)
 fun truncate_string_sub :: "string \<Rightarrow> nat \<Rightarrow> 8 word list"
   where
-"truncate_string_sub _ 0 = []"
-| "truncate_string_sub [] (Suc n) = byteFromNat 0 # truncate_string_sub [] n"
-| "truncate_string_sub (h#t) (Suc n) =
-   byteFromNat (String.char.nat_of_char h) #
-   truncate_string_sub t n"
+ "truncate_string_sub [] (n) = 
+    (if n = 0 then [] else byteFromNat 0 # truncate_string_sub [] (n-1))"
+| "truncate_string_sub (h#t) (n) =
+    (if n = 0 then [] else byteFromNat (String.char.nat_of_char h) #
+   truncate_string_sub t (n-1))"
 
 definition truncate_string :: "string \<Rightarrow> 8 word list"
   where "truncate_string s = truncate_string_sub s 32"
@@ -432,10 +432,6 @@ value "lookupS [(''a'',1), (''a'',2)] ''a'' :: nat option"
 (* TODO: have vars_tab argument to anything but parse1_def?  *)
 (* TODO: have llll_parse1_seq for parsing a sequence of arguments *)
 fun llll_parse1 :: "funs_tab  \<Rightarrow> stree \<Rightarrow> (llll * funs_tab) option " 
-(* TODO: should first component of returned value of this one be an llll?
-should it just be a funs_tab option? *)
-(* morally it is just a funs_tab, but including an empty sequence will make life easier. *)
-(* first param is name being defined *)
 and llll_parse1_def :: "string \<Rightarrow> funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree list \<Rightarrow> (llll * funs_tab )option"
 and llll_parse1_args :: "funs_tab \<Rightarrow> stree list \<Rightarrow> (llll list * funs_tab )option" 
 where
@@ -586,12 +582,6 @@ definition llll_parse_complete :: "string \<Rightarrow> llll option" where
    None \<Rightarrow> None
   | Some st \<Rightarrow> llll_parse1_default st)"
 
-(* variant that preserves the context *)
-definition llll_parse_complete_test :: "string \<Rightarrow> (llll * funs_tab) option" where
-"llll_parse_complete_test s =
-  (case llll_parse0 s of
-   None \<Rightarrow> None
-  | Some st \<Rightarrow> llll_parse1 default_llll_funs [] st)"
 
 value "llll_parse_complete ''(seq (+ 2 3) (- 1 2))''"
 
@@ -603,8 +593,17 @@ value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
 
 value "llll_parse_complete ''(seq (def a 1) (+ 2 3) (+ 1 a)))''"
 
+value "llll_parse_complete ''(seq (def a 1) (def a 2) a)''"
+end
 
-value "llll_parse_complete_test ''(def + a b (- a b) (- a b))''"
+(*
+
+Everything after this point is remnants of an previous approach to
+parsing that is more general but unnecessary for an s-expression
+based language such as LLL
+
+*)
+
 (*
 function(sequential) llll_parse1' :: "stree \<Rightarrow> llll option" where
 "llll_parse1' (STStr s) =
