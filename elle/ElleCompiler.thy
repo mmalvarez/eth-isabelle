@@ -207,6 +207,9 @@ datatype jump_resolve_result =
 definition encode_size :: "nat \<Rightarrow> nat" where
   "encode_size n = (nat (Evm.log256floor (Int.int n)) + 1)"
 
+
+(* TODO: deal with idx vs idx +1 here *)
+(* TODO: we should be dealing with "Seq [LJmp 1]" somewhere, where? *)
 fun ll3_resolve_jump :: "ll3 list \<Rightarrow> nat option \<Rightarrow> nat \<Rightarrow> childpath \<Rightarrow> childpath \<Rightarrow> jump_resolve_result" where
   (* TODO: does this handle returning the childpath correctly? should it be n#c?*)
   "ll3_resolve_jump ((_, LJmp e idx s)#ls) None n rel absol = 

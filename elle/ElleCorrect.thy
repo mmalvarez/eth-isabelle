@@ -3006,6 +3006,261 @@ next
     done
 qed
 
+(* idea: require ll3 validity, plus a bit more
+core question: do we try to go top-down from Seq nodes?
+i think if we do that we may need to parameterize this predicate even more
+(some kind of extra depth parameter. that feels weird)
+*)
+
+
+(* should we bother with another inductive set, or just
+require that every jump have a corresponding seq root *)
+
+(* NB: just a jump on its own is not invalid, but a sequence of jumps will be.
+is that a problem? *)
+(*
+do we need to include all non-jump constructors here?
+Obviously including the jump constructors would be wrong as with
+*)
+inductive_set ll_valid4 :: "ll4 set" where
+"\<And> x e ls . ((x, LSeq e ls) :: ll4) \<in> ll_valid3' \<Longrightarrow> 
+   (! e' y d s k . ((x, LSeq e ls), (y, LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
+     length k > d) \<Longrightarrow>
+   (! e' y d s k . ((x, LSeq e ls), (y, LJmpI e' d s), k) \<in> ll3'_descend \<longrightarrow>
+     length k > d) \<Longrightarrow>
+   (x, LSeq e ls) \<in> ll_valid4"
+| "\<And> x e i . ((x, L e i) :: ll4) \<in> ll_valid3' \<Longrightarrow>
+     (x, L e i) \<in> ll_valid4"
+| "\<And> x e d . ((x, LLab e d) :: ll4) \<in> ll_valid3' \<Longrightarrow>
+    (x, LLab e d) \<in> ll_valid4" 
+
+
+(* getter that works based on location (location must be exact) *)
+(* also note that we dive _into_ sequences rather than flagging entire sequence *)
+fun getByLoc :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> nat \<Rightarrow> ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll option"
+and getByLocList :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow> nat \<Rightarrow> ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll option" where
+"getByLoc (_, LSeq e l) n = getByLocList l n"
+| "getByLoc ((x,x'), T) n =
+  (if n = x then Some ((x,x'), T)
+   else None)"
+| "getByLocList [] n = None"
+| "getByLocList (h#t) n =
+   (case getByLoc h n of
+    Some r \<Rightarrow> Some r
+    | None \<Rightarrow> getByLocList t n)
+"
+
+(* I am very tempted to have ll_valid4 include child as well as parent node.
+However, I think this will cause problems around describing a lone jump as "valid" *)
+fun ll4_jump_check :: "ll4 \<Rightarrow> nat \<Rightarrow> bool" where
+"ll4_jump_check (x, LSeq e ls) n = 
+  Lem.list_forall (\<lambda> l . ll4_jump_check l (n+1)) ls"
+| "ll4_jump_check (x, LJmp e d s) n = (n > d)"
+| "ll4_jump_check (x, LJmpI e d s) n = (n > d)"
+| "ll4_jump_check _ _ = True"
+
+(*
+lemma ll4_jump_check_spec :
+"(q, LSeq e ls) \<in> ll_valid3' \<Longrightarrow>
+  (ll4_jump_check (q,LSeq e ls) 0 \<longrightarrow>
+  (q, LSeq e ls) \<in> ll_valid4)"
+proof(induction rule:ll_valid3'.induct)
+case (1 i e x)
+  then show ?case 
+    apply (auto simp add:ll_valid4.intros)
+    apply
+   
+next
+  case (2 x d)
+  then show ?case sorry
+next
+  case (3 e x d s)
+  then show ?case sorry
+next
+  case (4 e x d s)
+  then show ?case sorry
+next
+  case (5 x l e)
+  then show ?case sorry
+next
+  case (6 x l e k y)
+  then show ?case sorry
+qed
+*)
+(*
+need a sub-lemma, saying something like
+"if we call ll4_jump_check on any tree,
+and it returns true
+then there must be no descended jump with higher depth"
+*)
+
+(* generalize: instaed of jump_check 0 jump_check n *)
+(* should this be -n instead of +n or something? *)
+lemma ll4_jump_check_spec' :
+"(! n . ll4_jump_check t n = True \<longrightarrow>
+   (! q' e d s k . (t, (q',LJmp e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k) \<and>
+(! q' e d s k . (t, (q',LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k)
+) \<and>
+(! q e n . ll4_jump_check (q, LSeq e ls) n = True \<longrightarrow>
+      (! q' e' d s k . ((q, LSeq e ls), (q',LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k) \<and>
+(! q' e' d s k . ((q, LSeq e ls), (q',LJmpI e' d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k)
+)
+"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case 
+    apply(auto) apply(drule_tac ll3_hasdesc, auto)
+apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (2 q e idx)
+  then show ?case 
+apply(auto) apply(drule_tac ll3_hasdesc, auto)
+apply(drule_tac ll3_hasdesc, auto)
+done next
+  case (3 q e idx n)
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll3_hasdesc,auto)
+apply(drule_tac ll3_hasdesc,auto)
+    done
+next
+  case (4 q e idx n)
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll3_hasdesc,auto)
+    apply(drule_tac ll3_hasdesc,auto)
+    done
+next
+  case (5 q e l)
+  then show ?case 
+    apply(auto)
+     apply(drule_tac x = "fst q " in spec)
+     apply(drule_tac x = "snd q " in spec)
+     apply(drule_tac x = e in spec) apply(auto)
+
+     apply(drule_tac x = "fst q " in spec)
+     apply(drule_tac x = "snd q " in spec)
+    apply(drule_tac x = e in spec) apply(auto)
+    done
+next
+  case 6
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll_descend_eq_r2l) apply(case_tac k, auto)
+    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k, auto)
+    done
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+       apply(case_tac k, auto) apply(drule_tac ll3_descend_nonnil, auto)
+       apply(drule_tac ll_descend_eq_r2l) apply(auto) apply(case_tac ab, auto)
+    apply(case_tac list, auto)
+      apply(drule_tac ll_descend_eq_l2r)
+      apply(drule_tac x = "Suc n" in spec) apply(auto)
+    apply(thin_tac "  \<forall>a b e d s k.
+          (h, ((a, b), llt.LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
+        d - Suc n < length k")  
+    apply(rotate_tac -1)
+      apply(drule_tac x = aa in spec)
+      apply(rotate_tac -1) 
+      apply(drule_tac x = ba in spec) 
+    apply(rotate_tac -1)
+      apply(drule_tac x  = e' in spec) apply(rotate_tac -1)
+      apply(drule_tac x = d in spec) apply(rotate_tac -1)
+      apply(drule_tac x = s in spec) apply(rotate_tac -1)
+      apply(drule_tac x = "a#lista" in spec) apply(auto)
+
+
+    
+    sorry
+qed
+
+
+lemma ll4_jump_check_spec :
+"(q, t) \<in> ll_valid3' \<Longrightarrow>
+  (! e ls . t = LSeq e ls \<longrightarrow>
+  ll4_jump_check (q,t) 0 \<longrightarrow>
+  (q,t) \<in> ll_valid4)"
+proof(induction rule:ll_valid3'.induct)
+case (1 i e x)
+  then show ?case 
+    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
+    done
+next
+  case (2 x d)
+  then show ?case 
+apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
+done next
+  case (3 e x d s)
+  then show ?case 
+    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
+    done
+next
+  case (4 e x d s)
+  then show ?case 
+    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
+    done
+next
+  case (5 x l e)
+  then show ?case
+    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
+    apply(rule_tac ll_valid4.intros)
+    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
+next
+  case (6 x l e k y)
+  then show ?case sorry
+qed
+
+(*
+idea: we should prove that after calling write_jumps on a buffer,
+successfully,
+each jump node will contain a location for which getByLoc will return
+the same location as looking up their label's address directly
+*)
+
+(*
+more necessary lemmas:
+- if an ll4 is ll3_valid, then getting the location of a
+seq node's destination in the buffer will succeed
+and return a jump dest
+- jumping to a jump dest will have the same
+semantics as executing the sub-Sequence node starting
+and the label - this should be restated in a lower level way
+- finally, we can tie all this together and show that the JUMP instruction will have this effect
+We will also need to push these results through to 
+the bytecode output, probably by proving a
+lemma about codegen'
+(idea: lookups by location
+in an ll4
+(really "tail" subsequences)
+are preserved when you look up in bytecode)
+*)
+
+(*
+more concretely, take a whole program P that we have called write_jumps on.
+If we have a node P' equal to or descended from P
+that is a jump or jumpi,
+it will have the address of a Label node in it (according to getByLoc).
+Furthermore, this label will be such that
+(it is descended from P' at depth equal to its depth annotation) and
+(the jump is descended from P' at a depth equal to its depth annotation)
+
+other validity predicates mean we do not need to reason about
+the uniqueness of this label.
+*)
+
+(*
+we can also state a theorem about getByLoc:
+returned node will be descended (is this useful?)
+how to further characterize this descent?
+*)
+
 (*
 inductive_set ll_jumps_havespace
 idea: the number of bytes set aside for the jump label
