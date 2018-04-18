@@ -3006,22 +3006,13 @@ next
     done
 qed
 
-(* idea: require ll3 validity, plus a bit more
-core question: do we try to go top-down from Seq nodes?
-i think if we do that we may need to parameterize this predicate even more
-(some kind of extra depth parameter. that feels weird)
-*)
-
-
-(* should we bother with another inductive set, or just
-require that every jump have a corresponding seq root *)
-
-(* NB: just a jump on its own is not invalid, but a sequence of jumps will be.
-is that a problem? *)
 (*
 do we need to include all non-jump constructors here?
-Obviously including the jump constructors would be wrong as with
+Obviously including the jump constructors would be wrong 
+also - do we want a separate predicate describing correctness after
+we write the addresses?
 *)
+(*
 inductive_set ll_valid4 :: "ll4 set" where
 "\<And> x e ls . ((x, LSeq e ls) :: ll4) \<in> ll_valid3' \<Longrightarrow> 
    (! e' y d s k . ((x, LSeq e ls), (y, LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
@@ -3033,7 +3024,42 @@ inductive_set ll_valid4 :: "ll4 set" where
      (x, L e i) \<in> ll_valid4"
 | "\<And> x e d . ((x, LLab e d) :: ll4) \<in> ll_valid3' \<Longrightarrow>
     (x, LLab e d) \<in> ll_valid4" 
+*)
 
+(* this set captures the fact that no jumps should point upward to nil-labeled
+Seq nodes. It will recurse to children by virtue of the fact that it requires
+everything in the set of ls to also be valid4_inner, meaning if they themselves
+are nil-labeled, no jumps point to them *)
+inductive_set ll_valid4_inner :: "ll4 set" where
+"\<And> ls . 
+  (! x . x \<in> set ls \<longrightarrow> (x :: ll4) \<in> ll_valid4_inner) \<Longrightarrow>
+  (! e' q1 q2 d s k . (((q1, LSeq [] ls)::ll4), (q2, LJmp e' d s), (k::nat list)) \<in> ll3'_descend \<longrightarrow>
+     length k \<noteq> d + 1) \<Longrightarrow>
+  ((q1, LSeq [] ls) :: ll4) \<in> ll_valid4_inner"
+| "\<And> ls h t q .
+     (! x . x \<in> set ls \<longrightarrow> (x :: ll4) \<in> ll_valid4_inner) \<Longrightarrow>
+     ((q, LSeq (h#t) ls) :: ll4) \<in> ll_valid4_inner"
+| "\<And> x e i . ((x, L e i) :: ll4) \<in> ll_valid4_inner"
+| "\<And> x e d . ((x, LLab e d) :: ll4) \<in> ll_valid4_inner"
+| "\<And> x e d s . ((x, LJmp e d s) :: ll4) \<in> ll_valid4_inner"
+| "\<And> x e d s . ((x, LJmpI e d s) :: ll4) \<in> ll_valid4_inner"
+
+
+(* need to extend this to rule out jumps to seqs with nil labels *)
+(* this means we need some kind of transitive case? *)
+(* need ll4_inner for ourselves as well as for our descendents (?) *)
+inductive_set ll_valid4 :: "ll4 set" where
+"\<And> x e ls . ((x, LSeq e ls) :: ll4) \<in> ll_valid3' \<Longrightarrow> 
+   (! e' y d s k . ((x, LSeq e ls), (y, LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
+     length k > d) \<Longrightarrow>
+   (! e' y d s k . ((x, LSeq e ls), (y, LJmpI e' d s), k) \<in> ll3'_descend \<longrightarrow>
+     length k > d) \<Longrightarrow>
+   (x, LSeq e ls) \<in> ll_valid4_inner \<Longrightarrow>
+   (x, LSeq e ls) \<in> ll_valid4"
+| "\<And> x e i . ((x, L e i) :: ll4) \<in> ll_valid3' \<Longrightarrow>
+     (x, L e i) \<in> ll_valid4"
+| "\<And> x e d . ((x, LLab e d) :: ll4) \<in> ll_valid3' \<Longrightarrow>
+    (x, LLab e d) \<in> ll_valid4" 
 
 (* getter that works based on location (location must be exact) *)
 (* also note that we dive _into_ sequences rather than flagging entire sequence *)
@@ -3052,12 +3078,52 @@ and getByLocList :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Right
 
 (* I am very tempted to have ll_valid4 include child as well as parent node.
 However, I think this will cause problems around describing a lone jump as "valid" *)
+(* this function should not flag a lone jump as valid (d must be strictly less than n,
+for n=0 this isn't psosible) 
+*)
 fun ll4_jump_check :: "ll4 \<Rightarrow> nat \<Rightarrow> bool" where
 "ll4_jump_check (x, LSeq e ls) n = 
   Lem.list_forall (\<lambda> l . ll4_jump_check l (n+1)) ls"
 | "ll4_jump_check (x, LJmp e d s) n = (n > d)"
 | "ll4_jump_check (x, LJmpI e d s) n = (n > d)"
 | "ll4_jump_check _ _ = True"
+
+(* not sure if these next 2 functions are helpful *)
+(*
+(* helper function for ll4 jump checker *)
+fun bl_get :: "bool list \<Rightarrow> nat \<Rightarrow> bool" where
+"bl_get [] _ = False"
+| "bl_get (h#t) n =
+   (if n = 0 then h else bl_get t (n-1))"
+
+(* Makes sure jumps don't reach out of the syntax tree
+and also don't point to labelless Seq nodes *)
+fun ll4_jump_check_full :: "ll4 \<Rightarrow> bool list \<Rightarrow> bool" where
+"ll4_jump_check_full (x, LSeq e ls) bs = 
+  Lem.list_forall (\<lambda> l . ll4_jump_check_full l ((e \<noteq> [])#bs)) ls"
+| "ll4_jump_check_full (x, LJmp e d s) bs = bl_get bs d"
+| "ll4_jump_check_full (x, LJmpI e d s) bs = bl_get bs d"
+| "ll4_jump_check_full _ _ = True"
+*)
+(* this is getting a little annoying... *)
+(*
+lemma ll4_jump_check_full_spec :
+"(! n . ll4_jump_check t n = True \<longrightarrow>
+   (! qd e d s k . (t, (qd,LJmp e d s), k) \<in> ll3'_descend \<longrightarrow>
+    (? t' k' . (t = t' \<or> (? q es d ls k' . (t, (q, LSeq es ls), k'))) \<and>
+       length k' = d \<and> es \<noteq> [])
+   d - n < length k) \<and>
+(! q' e d s k . (t, (q',LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k)
+) \<and>
+(! q e n . ll4_jump_check (q, LSeq e ls) n = True \<longrightarrow>
+      (! q' e' d s k . ((q, LSeq e ls), (q',LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k) \<and>
+(! q' e' d s k . ((q, LSeq e ls), (q',LJmpI e' d s), k) \<in> ll3'_descend \<longrightarrow>
+   d - n < length k)
+)
+"
+*)
 
 (*
 lemma ll4_jump_check_spec :
@@ -3094,20 +3160,23 @@ and it returns true
 then there must be no descended jump with higher depth"
 *)
 
-(* generalize: instaed of jump_check 0 jump_check n *)
-(* should this be -n instead of +n or something? *)
+(* is this off by one?
+i think this one is correct.
+we want to make sure that d - n doesn't exceed length k,
+since the total descent depth is n + length k
+and d can be at most that minus one *)
 lemma ll4_jump_check_spec' :
 "(! n . ll4_jump_check t n = True \<longrightarrow>
    (! q' e d s k . (t, (q',LJmp e d s), k) \<in> ll3'_descend \<longrightarrow>
-   d - n < length k) \<and>
+   d < length k + n) \<and>
 (! q' e d s k . (t, (q',LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
-   d - n < length k)
+   d < length k + n)
 ) \<and>
 (! q e n . ll4_jump_check (q, LSeq e ls) n = True \<longrightarrow>
       (! q' e' d s k . ((q, LSeq e ls), (q',LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
-   d - n < length k) \<and>
+   d < length k + n)\<and>
 (! q' e' d s k . ((q, LSeq e ls), (q',LJmpI e' d s), k) \<in> ll3'_descend \<longrightarrow>
-   d - n < length k)
+   d < length k + n)
 )
 "
 proof(induction rule:my_ll_induct)
@@ -3165,7 +3234,7 @@ next
       apply(drule_tac x = "Suc n" in spec) apply(auto)
     apply(thin_tac "  \<forall>a b e d s k.
           (h, ((a, b), llt.LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
-        d - Suc n < length k")  
+        d  < Suc (length k + n)")  
     apply(rotate_tac -1)
       apply(drule_tac x = aa in spec)
       apply(rotate_tac -1) 
@@ -3176,11 +3245,213 @@ next
       apply(drule_tac x = s in spec) apply(rotate_tac -1)
       apply(drule_tac x = "a#lista" in spec) apply(auto)
 
+     apply(rotate_tac 1) (* bogus *) apply(drule_tac x = 0 in spec)
+     apply(rotate_tac -1) apply(drule_tac x = 0 in spec)  apply(rotate_tac -1)
+     apply(drule_tac x = "[]" in spec) apply(rotate_tac -1) apply(drule_tac x = n in spec)
+    apply(auto)
+     apply(drule_tac l = l and q = "(0,0)" and e = "[]" in ll_descend_eq_l2r_list) 
+    apply(rotate_tac -3)
+     apply(drule_tac x = aa in spec)
+     apply(rotate_tac -1)
+     apply(drule_tac x = ba in spec) apply(rotate_tac -1)
+     apply(drule_tac x = e' in spec) apply(rotate_tac -1) apply(drule_tac x = d in spec)
+     apply(rotate_tac -1) apply(drule_tac x = s in spec)
+     apply(rotate_tac -1) apply(drule_tac x = "nat#list" in spec)
+    apply(auto)
 
-    
-    sorry
+    apply(case_tac k, auto)
+apply(drule_tac ll3_descend_nonnil, auto)
+    apply(drule_tac ll_descend_eq_r2l, auto) apply(case_tac ab, auto)
+     apply(drule_tac x = "Suc n" in spec) apply(rotate_tac -1)
+     apply(auto) apply(case_tac list, auto)
+     apply(drule_tac ll_descend_eq_l2r) apply(rotate_tac -2)
+     apply(drule_tac x = aa in spec) apply(rotate_tac -1)
+     apply(drule_tac x = ba in spec) apply(rotate_tac -1)
+     apply(drule_tac x = e' in spec, rotate_tac -1)
+     apply(drule_tac x = d in spec, rotate_tac -1)
+apply(drule_tac x = s in spec, rotate_tac -1)
+     apply(drule_tac x = "a#lista" in spec, rotate_tac -1) apply(auto)
+
+
+     apply(rotate_tac 1) (* bogus *) apply(drule_tac x = 0 in spec)
+     apply(rotate_tac -1) apply(drule_tac x = 0 in spec)  apply(rotate_tac -1)
+     apply(drule_tac x = "[]" in spec) apply(rotate_tac -1) apply(drule_tac x = n in spec)
+    apply(auto)
+     apply(drule_tac l = l and q = "(0,0)" and e = "[]"  in ll_descend_eq_l2r_list) 
+    apply(rotate_tac -2)
+     apply(drule_tac x = aa in spec)
+     apply(rotate_tac -1)
+     apply(drule_tac x = ba in spec) apply(rotate_tac -1)
+     apply(drule_tac x = e' in spec) apply(rotate_tac -1) apply(drule_tac x = d in spec)
+     apply(rotate_tac -1) apply(drule_tac x = s in spec)
+     apply(rotate_tac -1) apply(drule_tac x = "nat#list" in spec)
+    apply(auto)
+    done
 qed
 
+(* additional case ruling out lone jumps *)
+lemma ll4_jump_check_spec_base [rule_format] :
+"(! n . ll4_jump_check t 0 = True \<longrightarrow>
+  (! q e d s . t \<noteq> (q, LJmp e d s)) \<and>
+  (! q e d s . t \<noteq> (q, LJmpI e d s)))"
+  apply(auto)
+  done
+
+
+(* now, we need another checker, that, at each non-labelled sequence node,
+ensures it has no jumps
+this may end up being a rather inefficient way to do this,
+but it seems easier to verify
+*)
+fun ll4_ensure_no_jumps :: "ll4 \<Rightarrow> nat \<Rightarrow> bool" where
+"ll4_ensure_no_jumps (x, LSeq _ ls) d =
+  Lem.list_forall (\<lambda> l . ll4_ensure_no_jumps l (d+1)) ls"
+| "ll4_ensure_no_jumps (x, LJmp e d' ls) d = (d' + 1 \<noteq> d)"
+| "ll4_ensure_no_jumps (x, LJmpI e d' ls) d = (d' + 1 \<noteq> d)"
+| "ll4_ensure_no_jumps _ _ = True"
+
+(* any sequence node for which ensure_no_labels returns true
+has no descended labels at same depth as label *)
+
+(* the issue here is that we need to treat a program with a single
+jump enclosed by no sequences as invalid. current we don't i think *)
+
+(* TODO: I am very worried about an off by one sort of error here *)
+(* any jump \<rightarrow> diff depth *)
+(* d - n - 1 ? *)
+lemma ll4_ensure_no_jumps_spec' :
+"(! n . ll4_ensure_no_jumps t n = True \<longrightarrow>
+   (! q' e d s k . (t, (q',LJmp e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d + 1 \<noteq> length k + n) \<and>
+(! q' e d s k . (t, (q',LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d + 1  \<noteq> length k + n)
+) \<and>
+(! q e n . ll4_ensure_no_jumps (q, LSeq e ls) n = True \<longrightarrow>
+      (! q' e' d s k . ((q, LSeq e ls), (q',LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
+   d + 1 \<noteq> length k + n) \<and>
+(! q' e' d s k . ((q, LSeq e ls), (q',LJmpI e' d s), k) \<in> ll3'_descend \<longrightarrow>
+   d + 1 \<noteq> length k + n)
+)
+"
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case 
+    apply(auto) apply(drule_tac ll3_hasdesc, auto)
+apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (2 q e idx)
+  then show ?case 
+apply(auto) apply(drule_tac ll3_hasdesc, auto)
+apply(drule_tac ll3_hasdesc, auto)
+done next
+  case (3 q e idx n)
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll3_hasdesc,auto)
+apply(drule_tac ll3_hasdesc,auto)
+    done
+next
+  case (4 q e idx n)
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll3_hasdesc,auto)
+    apply(drule_tac ll3_hasdesc,auto)
+    done
+next
+  case (5 q e l)
+  then show ?case 
+    apply(auto)
+     apply(drule_tac x = "fst q " in spec)
+     apply(drule_tac x = "snd q " in spec)
+     apply(drule_tac x = e in spec) apply(drule_tac x = n in spec) apply(auto)
+  
+     apply(drule_tac x = "fst q " in spec)
+     apply(drule_tac x = "snd q " in spec)
+    apply(drule_tac x = e in spec) apply(auto)
+    done
+next
+  case 6
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll_descend_eq_r2l) apply(case_tac k, auto)
+    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k, auto)
+    done
+next
+  case (7 h l)
+  then show ?case 
+    apply(auto)
+     apply(case_tac k, auto)
+      apply(drule_tac ll3_descend_nonnil, auto)
+     apply(drule_tac ll_descend_eq_r2l) apply(auto)
+     apply(case_tac ab, auto)
+
+      apply(case_tac list) apply(auto)
+      apply(drule_tac ll_descend_eq_l2r) 
+      apply(drule_tac x = "Suc n" in spec) apply(auto)
+      apply(rotate_tac -2) apply(drule_tac x = aa in spec) apply(rotate_tac -1)
+      apply(drule_tac x = ba in spec) apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+      apply(rotate_tac -1) apply(drule_tac x = "Suc (length lista + n)" in spec)
+      apply(rotate_tac -1) apply(drule_tac x = s in spec) apply(auto)
+
+    (* bogus params *)
+     apply(drule_tac q = "(0,0)" and e = "[]" in ll_descend_eq_l2r_list)
+     apply(rotate_tac 1)
+     apply(drule_tac x = 0 in  spec) apply(rotate_tac -1)
+     apply(drule_tac x = 0 in spec) apply(rotate_tac -1)
+     apply(drule_tac x = "[]" in spec) apply(rotate_tac -1)
+     apply(drule_tac x = n in spec) apply(auto) apply(rotate_tac -2)
+     apply(drule_tac x = aa in spec) apply(rotate_tac -1)
+     apply(drule_tac x = ba in spec) apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+    apply(rotate_tac -1)  apply(drule_tac x = "(length list + n)" in spec)
+      apply(rotate_tac -1) apply(drule_tac x = s in spec) apply(auto)
+
+
+     apply(case_tac k, auto)
+      apply(drule_tac ll3_descend_nonnil, auto)
+     apply(drule_tac ll_descend_eq_r2l) apply(auto)
+     apply(case_tac ab, auto)
+
+      apply(case_tac list) apply(auto)
+      apply(drule_tac ll_descend_eq_l2r) 
+      apply(drule_tac x = "Suc n" in spec) apply(auto)
+      apply(rotate_tac -1) apply(drule_tac x = aa in spec) apply(rotate_tac -1)
+      apply(drule_tac x = ba in spec) apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+      apply(rotate_tac -1) apply(drule_tac x = "Suc (length lista + n)" in spec)
+      apply(rotate_tac -1) apply(drule_tac x = s in spec) apply(auto)
+
+    (* bogus params *)
+     apply(drule_tac q = "(0,0)" and e = "[]" in ll_descend_eq_l2r_list)
+     apply(rotate_tac 1)
+     apply(drule_tac x = 0 in  spec) apply(rotate_tac -1)
+     apply(drule_tac x = 0 in spec) apply(rotate_tac -1)
+     apply(drule_tac x = "[]" in spec) apply(rotate_tac -1)
+    apply(drule_tac x = n in spec) apply(auto)
+    apply(rotate_tac -1)
+     apply(drule_tac x = aa in spec) apply(rotate_tac -1)
+     apply(drule_tac x = ba in spec) apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+    apply(rotate_tac -1)  apply(drule_tac x = "(length list + n)" in spec)
+      apply(rotate_tac -1) apply(drule_tac x = s in spec) apply(auto)
+    done
+
+qed
+
+fun ll4_emptylab_check :: "ll4 \<Rightarrow> bool" where
+"ll4_emptylab_check (x, LSeq (h#t) ls) = 
+  Lem.list_forall ll4_emptylab_check ls"
+| "ll4_emptylab_check (x, LSeq [] ls) =
+   (if ll4_ensure_no_jumps (x, LSeq [] ls) 0 then
+      Lem.list_forall ll4_emptylab_check ls
+    else False)"
+| "ll4_emptylab_check _ = True"
+
+(* if an ll4 passes emptylab_check, then
+there exist no jump descendents for seq nodes with nil labels
+(at that depth) *)
+
+(*
+lemma ll4_emptylab_check :
+*)
 
 lemma ll4_jump_check_spec :
 "(q, t) \<in> ll_valid3' \<Longrightarrow>
