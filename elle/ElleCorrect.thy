@@ -1521,7 +1521,7 @@ done qed
 lemma ll3_descend_singleton [rule_format] :
 "(t1, t2, k) \<in> ll3'_descend \<Longrightarrow>
 (! x . k = [x] \<longrightarrow>
-  (? q1 e1 ls . t1 = (q1, LSeq e1 ls) \<and> ls ! x = t2))"
+  (? q1 e1 ls . t1 = (q1, LSeq e1 ls) \<and> x < length ls \<and> ls ! x = t2))"
   apply(induction rule:ll3'_descend.induct)
    apply(auto)
   apply(case_tac n, auto) apply(drule_tac[1] ll3_descend_nonnil, auto)
@@ -3035,6 +3035,8 @@ inductive_set ll_valid4_inner :: "ll4 set" where
   (! x . x \<in> set ls \<longrightarrow> (x :: ll4) \<in> ll_valid4_inner) \<Longrightarrow>
   (! e' q1 q2 d s k . (((q1, LSeq [] ls)::ll4), (q2, LJmp e' d s), (k::nat list)) \<in> ll3'_descend \<longrightarrow>
      length k \<noteq> d + 1) \<Longrightarrow>
+  (! e' q1 q2 d s k . (((q1, LSeq [] ls)::ll4), (q2, LJmpI e' d s), (k::nat list)) \<in> ll3'_descend \<longrightarrow>
+     length k \<noteq> d + 1) \<Longrightarrow>
   ((q1, LSeq [] ls) :: ll4) \<in> ll_valid4_inner"
 | "\<And> ls h t q .
      (! x . x \<in> set ls \<longrightarrow> (x :: ll4) \<in> ll_valid4_inner) \<Longrightarrow>
@@ -3060,6 +3062,13 @@ inductive_set ll_valid4 :: "ll4 set" where
      (x, L e i) \<in> ll_valid4"
 | "\<And> x e d . ((x, LLab e d) :: ll4) \<in> ll_valid3' \<Longrightarrow>
     (x, LLab e d) \<in> ll_valid4" 
+
+(* idea: if write_jumps succeeds, and the incoming thing was valid4 (i.e.,
+already checked for both kinds of bad jumps)
+then for every (seq, jump, k) \<in> descend
+there exists an LLab appropriately descended from that seq node
+such that the address present in the annotation equal the address of that llab
+*)
 
 (* getter that works based on location (location must be exact) *)
 (* also note that we dive _into_ sequences rather than flagging entire sequence *)
@@ -3436,6 +3445,18 @@ next
 
 qed
 
+lemma ll4_ensure_no_jumps_spec [rule_format] :
+"(! n . ll4_ensure_no_jumps t n \<longrightarrow>
+   (! q' e d s k . (t, (q',LJmp e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d + 1 \<noteq> length k + n) \<and>
+(! q' e d s k . (t, (q',LJmpI e d s), k) \<in> ll3'_descend \<longrightarrow>
+   d + 1  \<noteq> length k + n)
+)"
+  apply(insert ll4_ensure_no_jumps_spec')
+  apply(auto)
+  done
+ 
+
 fun ll4_emptylab_check :: "ll4 \<Rightarrow> bool" where
 "ll4_emptylab_check (x, LSeq (h#t) ls) = 
   Lem.list_forall ll4_emptylab_check ls"
@@ -3449,44 +3470,153 @@ fun ll4_emptylab_check :: "ll4 \<Rightarrow> bool" where
 there exist no jump descendents for seq nodes with nil labels
 (at that depth) *)
 
+lemma ll4_emptylab_check_valid4_inner :
+"(ll4_emptylab_check t \<longrightarrow> t \<in> ll_valid4_inner) \<and>
+(! e x . ll4_emptylab_check (x, LSeq e ls)  \<longrightarrow> ((x, LSeq e ls) \<in> ll_valid4_inner))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case 
+    apply(auto simp add:ll_valid4_inner.intros)
+    done
+next
+  case (2 q e idx)
+  then show ?case 
+    apply(auto simp add:ll_valid4_inner.intros)
+    done
+next
+  case (3 q e idx n)
+  then show ?case
+    apply(auto simp add:ll_valid4_inner.intros)
+    done
+next
+  case (4 q e idx n)
+  then show ?case
+    apply(auto simp add:ll_valid4_inner.intros)
+    done
+next
+  case (5 q e l)
+  then show ?case
+    apply(auto)
+    apply(drule_tac x = e in spec)
+    apply(drule_tac x = "fst q" in spec) apply(drule_tac x = "snd q" in spec)
+    apply(auto simp add:ll_valid4_inner.intros)
+    done
+next
+  case 6
+  then show ?case 
+    apply(auto)
+    apply(case_tac e, auto)
+     apply(auto simp add:ll_valid4_inner.intros)
+    apply(rule_tac ll_valid4_inner.intros) apply(auto)
+    apply(drule_tac ll_descend_eq_r2l) apply(case_tac k, auto)     
+        apply(drule_tac ll_descend_eq_r2l) apply(case_tac k, auto)
+done
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+     apply(case_tac e, auto)
+    apply(case_tac "ll4_ensure_no_jumps h (Suc 0)", auto)
+     apply(case_tac "\<forall>e\<in>set l. ll4_ensure_no_jumps e (Suc 0)", auto)
+
+    apply(case_tac e, auto)
+    apply(case_tac "ll4_ensure_no_jumps h (Suc 0)", auto)
+     apply(case_tac "\<forall>e\<in>set l. ll4_ensure_no_jumps e (Suc 0)", auto)
+     apply(rule_tac ll_valid4_inner.intros) apply(auto)
+
+      apply(drule_tac x = "[]" in spec) apply(simp)
+      (* bogus args *)
+      apply(rotate_tac -1) apply(drule_tac x = 0 in spec)
+      apply(rotate_tac -1) apply(drule_tac x= 0 in spec)
+    apply(rotate_tac -1)
+      apply(drule_tac ll_valid4_inner.cases) apply(auto)
+
+     apply(case_tac k, auto) apply(case_tac ab, auto)
+      apply(drule_tac  ll_descend_eq_r2l, auto)
+      apply(case_tac list, auto) apply(drule_tac ll_descend_eq_l2r)
+      apply(frule_tac ll4_ensure_no_jumps_spec) apply(auto)
+
+
+       apply(rotate_tac -2) apply(drule_tac x = aa in spec)
+      apply(rotate_tac -1) apply(drule_tac x = ba in spec)
+       apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+
+       apply(rotate_tac -1) apply(drule_tac x = "Suc (length lista)" in spec)
+      apply(rotate_tac -1) apply(drule_tac x = s in spec)
+    apply(rotate_tac -1) apply(drule_tac x = "a#lista" in spec) apply(auto)
+
+    (* better idea: use "split" lemma here? *)
+     apply(drule_tac ll3_descend_splitpath_cons) apply(case_tac list, auto)
+      apply(drule_tac ll3_descend_singleton) apply(auto)
+      apply(drule_tac List.nth_mem) apply(auto)
+
+      apply(drule_tac ll3_descend_singleton) apply(auto)
+     apply(drule_tac List.nth_mem) apply(auto)
+     apply(subgoal_tac "ll4_ensure_no_jumps ((ac, bb), bc) (Suc 0)") apply(auto)
+     apply(drule_tac Set.bspec) apply(auto)
+
+    apply(rotate_tac -1)
+     apply(drule_tac ll4_ensure_no_jumps_spec) apply(auto)
+     apply(rotate_tac -2) apply(drule_tac x = aa in spec) apply(rotate_tac -1)
+     apply(drule_tac x = ba in spec) apply(rotate_tac -1)
+      apply(drule_tac x = e' in spec) apply(rotate_tac -1)
+      apply(drule_tac x = "Suc (length lista)" in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "s" in spec) apply(rotate_tac -1)
+      apply(drule_tac x = "ab#lista" in spec) apply(rotate_tac -1) apply(auto)
+
+     apply(case_tac k, auto) apply(drule_tac ll3_descend_splitpath_cons)
+     apply(case_tac list, auto)
+      apply(drule_tac ll3_descend_singleton, auto) apply(case_tac ab, auto)
+      apply(drule_tac List.nth_mem, auto)
+     apply(drule_tac ll3_descend_singleton, auto) apply(case_tac ab, auto)
+      apply(drule_tac ll4_ensure_no_jumps_spec) apply(auto)
+      apply(rotate_tac -1) apply(drule_tac x = aa in spec)
+      apply(rotate_tac -1) apply(drule_tac x = ba in spec)
+      apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+    apply(rotate_tac -1)
+        apply(drule_tac x = "Suc (length lista)" in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "s" in spec) apply(rotate_tac -1)
+      apply(drule_tac x = "ac#lista" in spec) apply(rotate_tac -1) apply(auto)
+
+     apply(drule_tac List.nth_mem) apply(auto)
+     apply(rotate_tac 3) apply(drule_tac Set.bspec) apply(auto)
+     apply(rotate_tac -1) apply(drule_tac ll4_ensure_no_jumps_spec) apply(auto)
+    apply(rotate_tac -1)  apply(drule_tac x = aa in spec)
+      apply(rotate_tac -1) apply(drule_tac x = ba in spec)
+      apply(rotate_tac -1) apply(drule_tac x = e' in spec)
+    apply(rotate_tac -1)
+        apply(drule_tac x = "Suc (length lista)" in spec) apply(rotate_tac -1)
+    apply(drule_tac x = "s" in spec) apply(rotate_tac -1)
+     apply(drule_tac x = "ac#lista" in spec) apply(rotate_tac -1) apply(auto)
+
+    (* last part - nonnil label, less to check *)
+  (* work below is speculative *)
+(* I'm confused why this doesn't go through. need to generalize to all descendents? *) 
+       apply(drule_tac x = "0#[]" in spec) apply(auto)
+
+    apply(rule_tac ll_valid4_inner.intros) apply(auto)
+    apply(case_tac ba, auto simp add:ll_valid4_inner.intros)
+    (* bogus *)
+    apply(drule_tac x = 0 in spec) apply(drule_tac x = 0 in spec)
+    apply(rotate_tac -1)
+    apply(drule_tac ll_valid4_inner.cases) apply(auto)
+    done
+qed
+
+(* next: if a node is ll4 valid, and we call write_jump_targets on it,
+and it succeeds, then
+- for each jump that gets written (jump descended from the root Seq node at its depth)
+- there must exist a Lab descended from that root seq node at its depth
+- such that the address written is the address of the lab
+*)
+
+(*
+lemma ll4_write_jump_targets_spec
+*)
+
 (*
 lemma ll4_emptylab_check :
 *)
-
-lemma ll4_jump_check_spec :
-"(q, t) \<in> ll_valid3' \<Longrightarrow>
-  (! e ls . t = LSeq e ls \<longrightarrow>
-  ll4_jump_check (q,t) 0 \<longrightarrow>
-  (q,t) \<in> ll_valid4)"
-proof(induction rule:ll_valid3'.induct)
-case (1 i e x)
-  then show ?case 
-    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
-    done
-next
-  case (2 x d)
-  then show ?case 
-apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
-done next
-  case (3 e x d s)
-  then show ?case 
-    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
-    done
-next
-  case (4 e x d s)
-  then show ?case 
-    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
-    done
-next
-  case (5 x l e)
-  then show ?case
-    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
-    apply(rule_tac ll_valid4.intros)
-    apply (auto simp add: ll_valid3'.intros ll_valid4.intros)
-next
-  case (6 x l e k y)
-  then show ?case sorry
-qed
 
 (*
 idea: we should prove that after calling write_jumps on a buffer,
