@@ -3610,9 +3610,368 @@ and it succeeds, then
 - such that the address written is the address of the lab
 *)
 
+(* TODO: we probably eventually need to prove a relationship between
+encode_size and the number of bytes output. the spec of this function ultimately
+needs to talk about addresses in the output code being the right size *)
+fun validate_addrs :: "ll4 \<Rightarrow> bool" where
+"validate_addrs (x, LJmp a _ sz) = (encode_size a = sz)"
+| "validate_addrs (x, LJmpI a _ sz) = (encode_size a = sz)"
+| "validate_addrs (x, LSeq e ls) = Lem.list_forall validate_addrs ls"
+| "validate_addrs _ = True"
+
 (*
-lemma ll4_write_jump_targets_spec
+inductive_set ll_valid4_post :: "ll4 set" where
 *)
+
+(* this - which should be moved to a different file -
+defines semantics of arbitrary lls,
+as well as being useful for showing that compiler passes only
+change annotations, thus do not change semantics *)
+fun ll_purge_annot :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> ll1" where
+"ll_purge_annot (_, L _ i) = ll1.L i"
+| "ll_purge_annot (_, LLab _ idx) = ll1.LLab idx"
+| "ll_purge_annot (_, LJmp _ idx _) = ll1.LJmp idx"
+| "ll_purge_annot (_, LJmpI _ idx _) = ll1.LJmpI idx"
+| "ll_purge_annot (_, LSeq _ ls) =
+  ll1.LSeq (map ll_purge_annot ls)"
+
+(* characterization of mypeel *)
+lemma mypeel_spec1 [rule_format] :
+"(! h l' . mypeel (h#t) = Some l' \<longrightarrow>
+  (? h' t' . h = Some h' \<and> mypeel t = Some t' \<and> l' = h'#t'))
+"
+proof(induction t)
+case Nil
+  then show ?case 
+    apply(auto) apply(case_tac h, auto)
+    done
+next
+  case (Cons a t)
+  then show ?case
+    apply(auto)
+    apply(case_tac h, auto)
+    apply(case_tac a, auto)
+    apply(case_tac " case mypeel t of None \<Rightarrow> None | Some t' \<Rightarrow> Some (aaa # t')", auto)
+    done
+qed
+
+(* TODO i think this spec needs tightening
+at the very least we should be relating the output jump address
+to the address of the label.
+but i think that's not why this doesn't hold inductively *)
+(* do we need a separate case covering bare JMPs ? 
+this could even be a separate lemma?
+problem seems to come from the "k1@k2" part
+*)
+lemma write_jump_targets_spec :
+"
+  (! l t' . write_jump_targets l t = Some t' \<longrightarrow>
+  (! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> ql el idxl kl . (t', (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+                idxl + 1 = length kl \<and> idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? td k1 k2 . (t', td, k1) \<in> ll3'_descend \<and> (td, (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+    kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
+    ( ? ql el idxl kl . (td, (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+      idxl + 1 = length kl \<and> fst ql = ej)) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  ))) \<and>
+(! q e l t' . write_jump_targets l (q, LSeq e ls) = Some t' \<longrightarrow>
+  (! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> ql el idxl kl . (t', (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+                idxl + 1 = length kl \<and> idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? td k1 k2 . (t', td, k1) \<in> ll3'_descend \<and> (td, (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+    kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
+    ( ? ql el idxl kl . (td, (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+      idxl + 1 = length kl \<and> fst ql = ej)) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  )))
+"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case 
+    apply(clarify)
+    apply(auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (2 q e idx)
+  then show ?case
+    apply(clarify) apply(auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (3 q e idx n)
+  then show ?case
+    apply(clarify) apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac "mynth l idx", auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  (* will have to change when we add jmpI? *)
+  case (4 q e idx n)
+  then show ?case 
+    apply(clarify) apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac "mynth l idx", auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (5 q e l)
+  then show ?case
+   apply(clarify) apply(auto)
+    apply(case_tac q, auto)
+    apply(drule_tac x = ab in spec, rotate_tac -1)
+    apply(drule_tac x = bc in spec, rotate_tac -1)
+    apply(drule_tac x = e in spec, rotate_tac -1)
+    apply(drule_tac x = la in spec, rotate_tac -1)
+    apply(drule_tac x = a in spec, rotate_tac -1)
+    apply(drule_tac x = b in spec, rotate_tac -1)
+    apply(drule_tac x = ba in spec, rotate_tac -1) apply(auto)
+
+    apply(drule_tac x = aa in spec, rotate_tac -1)
+    apply(drule_tac x = bb in spec, rotate_tac -1)
+    apply(drule_tac x = ej in spec, rotate_tac -1)
+    apply(drule_tac x = idxj in spec, rotate_tac -1)
+    apply(drule_tac x = sz in spec, rotate_tac -1)
+    apply(drule_tac x = kj in spec, rotate_tac -1) apply(auto)
+
+    done
+next
+  case 6
+  then show ?case
+    apply(clarify)
+    apply(auto)
+    apply(case_tac e, auto) apply(drule_tac ll3_hasdesc2, auto)
+    done
+next
+  case (7 h l)
+  then show ?case
+    apply(clarify)
+    apply(auto)
+    apply(case_tac e, auto)
+     apply(case_tac "mypeel (write_jump_targets (None # la) h # map (write_jump_targets (None # la)) l)", auto)
+
+(* speculative *)
+
+     apply(frule_tac mypeel_spec1) apply(auto)
+    apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+    apply(drule_tac x = "a" in spec, rotate_tac -1)
+    apply(drule_tac x = "b" in spec, rotate_tac -1)
+    apply(drule_tac x = "bb" in spec, rotate_tac -1)
+     apply(auto)
+
+ 
+(* I think we need to start specializing here so that we
+can reduce away the premise about write_jump_targets *)
+     apply(frule_tac ll3_descend_nonnil, auto)
+     apply(rotate_tac 1)
+  (* bogus *) 
+    apply(drule_tac x = 0 in spec, rotate_tac -1)
+     apply(drule_tac x = 0 in spec, rotate_tac -1)
+     apply(drule_tac x = "[]" in spec, rotate_tac -1) apply(auto)
+     apply(drule_tac x = la in spec, rotate_tac -1)
+    apply(drule_tac x = 0 in spec, rotate_tac -1)
+     apply(drule_tac x = 0 in spec, rotate_tac -1)
+     apply(drule_tac x = "llt.LSeq [] t'" in spec, rotate_tac -1)
+     apply(auto)
+
+(* is this the right way to proceed? my standard approach
+of case splitting on the head is failing, which seems odd. *)
+    apply(drule_tac ll3_descend_splitpath_cons)
+     apply(case_tac tl, auto)
+    apply(frule_tac ll3_descend_singleton, auto)
+      apply(case_tac hd, auto)
+       apply(drule_tac ll_descend_eq_r2l) apply(auto)
+       apply(case_tac h, auto) apply(case_tac bb, auto)
+         apply(case_tac "mynth (None # la) x32", auto)
+         apply(case_tac idxj, auto)
+        apply(case_tac "mynth (None # la) x42", auto) 
+       apply(case_tac x52, auto) apply(case_tac x51, auto) apply(case_tac x51, auto)
+    apply(case_tac "mypeel
+              (write_jump_targets (None # None # la)
+                ((ac, bb), bd) #
+               map (write_jump_targets (None # None # la))
+                list)", auto)
+    apply(case_tac "ll_get_label (((ac, bb), bd) # list)
+              (ad # lista)", auto)
+    apply(case_tac "mypeel
+              (write_jump_targets (Some ae # None # la)
+                ((ac, bb), bd) #
+               map (write_jump_targets (Some ae # None # la))
+                list)", auto)
+
+      apply(drule_tac ll_descend_eq_r2l, auto)
+      apply(drule_tac q = "(0,0)" and e = "[]" in ll_descend_eq_l2r_list)
+    apply(drule_tac x = ab in spec, rotate_tac -1)
+    apply(drule_tac x = bc in spec, rotate_tac -1)
+    apply(drule_tac x = ej in spec, rotate_tac -1)
+    apply(drule_tac x = idxj in spec, rotate_tac -1)
+    apply(drule_tac x = sz in spec, rotate_tac -1)
+      apply(drule_tac x = "[nat]" in spec, rotate_tac -1) apply(auto)
+
+(* i think we can get this goal, will require shifting descends facts around *)
+       apply(rotate_tac -2)
+       apply(frule_tac ll3'_descend_cons, auto)
+       apply(rotate_tac -1)
+       apply(drule_tac x = aa in spec, rotate_tac -1)
+       apply(drule_tac x = ba in spec, rotate_tac -1)
+apply(drule_tac x = "[]" in spec, rotate_tac -1) 
+       apply(drule_tac x = a in spec, rotate_tac -1)
+       apply(drule_tac x = b in spec, rotate_tac -1)
+       apply(drule_tac x = bb in spec, rotate_tac -1) apply(auto)
+
+(* this next case looks fairly easy... *)
+    apply(rule_tac x = ac in exI)
+    apply(rule_tac x = bd in exI)
+      apply(rule_tac x = be in exI)
+    apply(drule_tac k = k1 in ll3'_descend_cons) apply(auto)
+
+(* OTOH this case seems tricky *)
+    apply(rule_tac x = ad in exI)
+    apply(rule_tac x = bd in exI)
+     apply(rule_tac x = be in exI)
+     apply(rule_tac x = "[hd]" in exI) apply(auto)
+      apply(case_tac hd, auto)
+       apply(rotate_tac -2) apply(drule_tac ll_descend_eq_r2l, auto)
+    apply(rotate_tac -1)
+       apply(drule_tac x = ab in spec, rotate_tac -1)
+       apply(drule_tac x = bc in spec, rotate_tac -1)
+    apply(drule_tac x = ej in spec, rotate_tac -1)
+       apply(drule_tac x = idxj in spec, rotate_tac -1)
+       apply(drule_tac x = sz in spec, rotate_tac -1)
+apply(drule_tac x = "ac#list" in spec, rotate_tac -1)
+       apply(auto)
+        apply(rotate_tac 2)
+        apply(drule_tac x = bf in spec, rotate_tac -1)
+        apply(drule_tac x = el in spec, rotate_tac -1)
+        apply(drule_tac x = "Suc idxl + length k1" in spec, rotate_tac -1)
+apply(drule_tac x = "0#k1@kl" in spec, rotate_tac -1) apply(auto)
+    apply(rule_tac x = bd in exI)
+     apply(rule_tac x = be in exI)
+(* now, use the other big hypothesis *)
+
+      apply(frule_tac ll3_descend_singleton, auto) apply(case_tac hd, auto)
+       apply(rotate_tac 5)
+       apply(drule_tac x = ab in spec, rotate_tac -1)
+       apply(drule_tac x = bc in spec, rotate_tac -1)
+       apply(drule_tac x = ej in spec, rotate_tac -1)
+       apply(drule_tac x = idxj in spec, rotate_tac -1)
+       apply(drule_tac x = sz in spec, rotate_tac -1)
+       apply(drule_tac x = "ac#list" in spec, rotate_tac -1) apply(auto)
+        apply(rotate_tac 3)      
+        apply(drule_tac x = bf in spec, rotate_tac -1)
+        apply(drule_tac x = el in spec, rotate_tac -1)
+apply(drule_tac x = idxl in spec, rotate_tac -1)
+apply(drule_tac x = k2 in spec, rotate_tac -1) apply(auto)
+
+
+(* we now need to use the fact
+    apply(rotate_tac 5)
+*)
+
+(* i think a case split on hd will allow us to make progress here.
+hopefully eventually the complexity of this proof can be reduced. *)
+
+(* old progress *)
+(* now we specialize so we can use descend fact *)
+      apply(rotate_tac 5)
+    apply(drule_tac x = ab in spec, rotate_tac -1)
+     apply(drule_tac x = bc in spec, rotate_tac -1)
+    apply(case_tac t', auto)
+
+    apply(case_tac "mypeel (map (write_jump_targets (None # la)) l)", auto)
+     apply(drule_tac ll_descend_eq_r2l) apply(case_tac hd, auto)
+      apply(case_tac tl, auto)
+       apply(case_tac l, auto)
+
+     apply(drule_tac ll_descend_eq_l2r) apply(case_tac hd, auto)
+
+(* do we need a case split on kj at this point? *)
+    apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+    apply(drule_tac x = "a" in spec, rotate_tac -1)
+    apply(drule_tac x = "b" in spec, rotate_tac -1)
+    apply(drule_tac x = "bb" in spec, rotate_tac -1)
+     apply(auto)
+
+qed
+
+
+(* TODO I have written this to only apply to jump nodes for now *)
+(* TODO: even need valid4 premise? *)
+(* we need to generalize this to a list of descendents somehow
+i don't think that validation is really an option for this step
+because the process of validating is about as simple as doing it in the first place *)
+(*
+either the way we are doing induction is wrong or our theorem statement is
+at the moment my money's on the theorem statement
+*)
+(*
+another option: prove that _if there is a jump in the input_
+- i think this is fairly appealing but idk
+then there is a jump in the output and a label in the output
+with the same properties?
+we will probably have to prove later that write_jump_targets
+will only change annotations
+(as with basically all the compiler passes)
+or, we can just make this lemma even more complicated an explicitly
+say that all the nodes are the same here (?)
+*)
+lemma ll4_write_jump_targets_spec [rule_format] :
+"(q, tt) \<in> ll_valid4 \<Longrightarrow>
+  (! l l' t' . write_jump_targets l (q, tt) = Some t' \<longrightarrow>
+  (! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> ql el idxl kl . (t', (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+                idxl + 1 = length kl \<and> idxj + 1 = length kj) \<or>
+   (? td k1 k2 . (t', td, k1) \<in> ll3'_descend \<and> (td, (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+    kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
+    ( ? ql el idxl kl . (td, (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+      idxl + 1 = length kl)) \<or>
+   (? n a . mynth l n = Some a \<and> length kj + n = idxj)
+  )))"
+proof(induction rule:ll_valid4.induct)
+  case (1 x e ls)
+  then show ?case
+  (* here we need to show that we
+preserve descended jumps
+but this feels like it should be an inductive hypothesis or something
+*)
+    apply(clarify)
+    apply(case_tac x, auto)
+    apply(case_tac e, auto)
+    apply(case_tac "mypeel (map (write_jump_targets (None # l)) ls)", auto)
+     apply(case_tac ls, auto)
+      apply(drule_tac ll3_hasdesc2, auto)
+
+    apply(drule_tac ll3'_descend.cases, auto)
+
+     apply(case_tac bc, auto)
+    apply(case_tac "mypeel (map (write_jump_targets (None # l)) list)", auto)
+
+    sorry
+next
+  case (2 x e i)
+  then show ?case sorry
+next
+  case (3 x e d)
+  then show ?case sorry
+qed
+(*
+if we are valid 4
+and we call write_jump_targets with context (list of nat) c
+then for each jump descended from the root, 1 of 3 cases holds:
+- the root has a (unique) descendent matching label with the address that is the address of the jump
+- the root has a (unique) descended seq node, from which is descended both a (unique) matching label and
+the jump, and the jump's stored address matches the label's
+- (there is no matching label) and our jump's idx exceeds the depth of our
+root descendent relation, but the address in the jump is equal to the one in context
+(mynth, for appropriate value of n)
+*)
+(*
+TODO: rewrite ll_get_label in terms of ll_get_node, or at least prove
+the two equivalent
+*)
+
 
 (*
 lemma ll4_emptylab_check :
