@@ -3063,6 +3063,10 @@ inductive_set ll_valid4 :: "ll4 set" where
 | "\<And> x e d . ((x, LLab e d) :: ll4) \<in> ll_valid3' \<Longrightarrow>
     (x, LLab e d) \<in> ll_valid4" 
 
+(* need valid4_post, which includes the fact that jumps have been correctly assigned
+look in your notebook for different formulations of this
+ultimately we will need to tie write jumps spec to it*)
+
 (* idea: if write_jumps succeeds, and the incoming thing was valid4 (i.e.,
 already checked for both kinds of bad jumps)
 then for every (seq, jump, k) \<in> descend
@@ -3663,6 +3667,434 @@ but i think that's not why this doesn't hold inductively *)
 this could even be a separate lemma?
 problem seems to come from the "k1@k2" part
 *)
+(*
+idea: include premise stating that LSeq root node has an annotation?
+but we should be able to still say something in the nil-annotation case
+*)
+(*
+OK.
+
+Without q-validity, we don't know anything about the label's index.
+we just know it must exist at a certain depth and its path is the one we gave to get_label.
+valid4 will ensure they are meaningful, but this theorem is structured so as not
+to need it
+
+Better idea: make the Seq explicit (in first line) instead of giving t'
+*)
+(*
+
+lemma write_jump_targets_spec_simpler :
+"  (! l t' . write_jump_targets l t = Some t' \<longrightarrow>
+  (! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> ql el idxl kl . (t', (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+                (*idxl + 1 = length kl \<and> *)idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  ))) \<and>
+(! q e l t' . write_jump_targets l (q, LSeq e ls) = Some t' \<longrightarrow>
+(! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> ql el idxl kl . (t', (ql, LLab el idxl), kl) \<in> ll3'_descend \<and> 
+                (*idxl + 1 = length kl \<and> *) idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  )))
+"
+*)
+
+(* todo: make sure this "simpler" lemma is actually provable
+i think it is not what we want as the idxj+1=length kj premise seems not good
+*)
+(*
+lemma write_jump_targets_spec_simpler :
+"  (! l qr er ls  . write_jump_targets l t = Some (qr, LSeq er ls) \<longrightarrow>
+  (! qj ej idxj sz kj . ((qr, LSeq er ls), (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  (idxj + 1 = length kj \<longrightarrow>
+  ((\<exists> ql el idxl . ((qr, LSeq er ls), (ql, LLab el idxl), er) \<in> ll3'_descend \<and> fst ql = ej) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  ))) \<and>
+(! q e l qr er ls . write_jump_targets l (q, LSeq e ls') = Some (qr, LSeq er ls) \<longrightarrow>
+(! qj ej idxj sz kj . ((qr, LSeq er ls), (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> ql el idxl . ((qr, LSeq er ls), (ql, LLab el idxl), er) \<in> ll3'_descend \<and> 
+                (*idxl + 1 = length kl \<and> *) idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  ))))
+"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case 
+    apply(auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+     apply(drule_tac ll3_hasdesc, auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+done next
+  case (4 q e idx n)
+  then show ?case
+    apply(auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+     apply(drule_tac ll3_hasdesc, auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+done 
+next
+  case (5 q e l)
+  then show ?case 
+ apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac e, auto)
+     apply(case_tac "mypeel (map (write_jump_targets (None # la)) l)", auto)
+    (* bogus *)
+     apply(drule_tac x = a in spec, rotate_tac -1)
+     apply(drule_tac x = b in spec, rotate_tac -1)
+    apply(drule_tac x = "[]" in spec, rotate_tac -1)
+     apply(drule_tac x = "la" in spec, rotate_tac -1)
+      apply(auto)
+      apply(drule_tac x = aa in spec, rotate_tac -1)
+     apply(drule_tac x = ba in spec, rotate_tac -1)
+      apply(drule_tac x = "ej" in spec, rotate_tac -1)
+    apply(drule_tac x = "idxj" in spec, rotate_tac -1)
+      apply(drule_tac x = "sz" in spec, rotate_tac -1)
+      apply(drule_tac x = "kj" in spec, rotate_tac -1) apply(auto)
+
+     apply(case_tac "ll_get_label l (ac # list)", auto)
+    apply(case_tac "mypeel (map (write_jump_targets (Some ad # la)) l)", auto)
+      apply(drule_tac x = a in spec, rotate_tac -1)
+     apply(drule_tac x = b in spec, rotate_tac -1)
+     apply(drule_tac x = "ac#list" in spec, rotate_tac -1)
+    apply(drule_tac x = la in spec, rotate_tac -1) apply(auto)
+    apply(drule_tac x = "aa" in spec, rotate_tac -1)
+      apply(drule_tac x = "ba" in spec, rotate_tac -1)
+     apply(drule_tac x = "ej" in spec, rotate_tac -1) 
+     apply(drule_tac x = "idxj" in spec, rotate_tac -1)
+      apply(drule_tac x = "sz" in spec, rotate_tac -1)
+     apply(drule_tac x = "kj" in spec, rotate_tac -1) apply(auto)
+
+    apply(case_tac q, auto)
+      apply(drule_tac x = ab in spec, rotate_tac -1)
+     apply(drule_tac x = bb in spec, rotate_tac -1)
+     apply(drule_tac x = "e" in spec, rotate_tac -1)
+    apply(drule_tac x = la in spec, rotate_tac -1) 
+    apply(drule_tac x = "a" in spec, rotate_tac -1)
+      apply(drule_tac x = "b" in spec, rotate_tac -1)
+     apply(drule_tac x = "er" in spec, rotate_tac -1) 
+    apply(drule_tac x = "ls" in spec, rotate_tac -1) apply(auto)
+      apply(drule_tac x = aa in spec, rotate_tac -1)
+     apply(drule_tac x = ba in spec, rotate_tac -1)
+     apply(drule_tac x = "ej" in spec, rotate_tac -1)
+    apply(drule_tac x = idxj in spec, rotate_tac -1) 
+      apply(drule_tac x = "sz" in spec, rotate_tac -1)
+     apply(drule_tac x = "kj" in spec, rotate_tac -1) apply(auto)
+    done
+next
+  case 6
+  then show ?case 
+    apply(auto)
+     apply(case_tac e, auto) apply(drule_tac ll3_hasdesc2, auto)
+    apply(case_tac e, auto) apply(drule_tac ll3_hasdesc2, auto)
+    done
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+     apply(case_tac e, auto)
+    apply(case_tac "mypeel
+              (write_jump_targets (None # la) h #
+               map (write_jump_targets (None # la)) l)", auto)
+      apply(drule_tac mypeel_spec1, auto)
+      apply(frule_tac ll3_descend_nonnil, auto)
+      apply(drule_tac ll_descend_eq_r2l, auto) apply(case_tac hd, auto)
+       apply(case_tac tl, auto)
+        apply(case_tac h, auto)
+        apply(case_tac bc, auto)
+          apply(case_tac "mynth (None # la) x32", auto)
+
+         apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+         apply(drule_tac x = "aa" in spec, rotate_tac -1)
+         apply(drule_tac x = "bb" in spec, rotate_tac -1) apply(auto)
+          apply(case_tac idxj, auto)
+
+         apply(case_tac "mynth (None # la) x42", auto)
+
+        apply(case_tac x51, auto)
+    apply(case_tac "mypeel (map (write_jump_targets (None # None # la)) x52)", auto)
+        apply(case_tac "ll_get_label x52 (ac # list)", auto)
+        apply(case_tac "mypeel (map (write_jump_targets (Some ad # None # la)) x52)", auto)
+
+       apply(case_tac h, auto) apply(case_tac bda, auto)
+         apply(case_tac "mynth (None # la) x32", auto)
+         apply(case_tac "mynth (None # la) x42", auto)
+    apply(case_tac bc, auto)
+         apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+         apply(drule_tac x = "a" in spec, rotate_tac -1)
+       apply(drule_tac x = "b" in spec, rotate_tac -1) apply(auto)
+    apply(drule_tac q = "(a,b)" and e = "x51a" in ll_descend_eq_l2r_list)
+         apply(drule_tac x = "ab" in spec, rotate_tac -1)
+       apply(drule_tac x = "bb" in spec, rotate_tac -1) 
+                apply(drule_tac x = "ej" in spec, rotate_tac -1)
+         apply(drule_tac x = "idxj" in spec, rotate_tac -1)
+         apply(drule_tac x = "sz" in spec, rotate_tac -1)
+         apply(drule_tac x = "ac#list" in spec, rotate_tac -1)
+
+       apply(auto)
+  (* bogus? *)
+        apply(drule_tac x = a in spec, rotate_tac -1)
+         apply(drule_tac x = "b" in spec, rotate_tac -1)
+         apply(drule_tac x = "[]" in spec, rotate_tac -1)
+        apply(auto)
+        apply(drule_tac x = la in spec, rotate_tac -1)
+         apply(drule_tac x = "a" in spec, rotate_tac -1)
+        apply(drule_tac x = "b" in spec, rotate_tac -1)  
+         apply(drule_tac x = "[]" in spec, rotate_tac -1)
+        apply(drule_tac x = "t'" in spec, rotate_tac -1) apply(auto)
+
+(* i'm confused here. *)
+
+          apply(case_tac t, auto)
+
+    sorry         apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+
+qed
+
+
+
+case (1 q e i)
+  then show ?case 
+    apply(auto)
+     apply(drule_tac ll3_hasdesc, auto)
+    apply(drule_tac ll3_hasdesc, auto)
+
+    done
+next
+  case (2 q e idx)
+  then show ?case
+    apply(auto)
+     apply(drule_tac ll3_hasdesc, auto)
+    apply(drule_tac ll3_hasdesc, auto)
+
+    done
+next
+  case (3 q e idx n)
+  then show ?case 
+    apply(auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+     apply(drule_tac ll3_hasdesc, auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+     apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (4 q e idx n)
+  then show ?case
+        apply(auto)
+    apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+    apply(drule_tac x = idx in spec) apply(auto)
+      apply(drule_tac ll3_hasdesc, auto)
+     apply(drule_tac ll3_hasdesc, auto)
+     apply(case_tac q, auto) apply(case_tac "mynth l idx", auto)
+     apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (5 q e l)
+  then show ?case
+    apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac e, auto)
+     apply(case_tac "mypeel (map (write_jump_targets (None # la)) l)", auto)
+    (* bogus *)
+     apply(drule_tac x = 0 in spec, rotate_tac -1)
+     apply(drule_tac x = 0 in spec, rotate_tac -1)
+    apply(drule_tac x = "[]" in spec, rotate_tac -1)
+     apply(drule_tac x = "la" in spec, rotate_tac -1)
+    apply(auto)
+    apply(case_tac "mypeel (map (write_jump_targets (None # None # la)) l)", auto)
+
+next
+  case 6
+  then show ?case sorry
+next
+  case (7 h l)
+  then show ?case sorry
+qed
+*)
+lemma write_jump_targets_spec :
+"
+  (! l t' . write_jump_targets l t = Some t' \<longrightarrow>
+  (! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> qr er ls ql el idxl  . t' = (qr, LSeq er ls) \<and> (t', (ql, LLab el idxl), er) \<in> ll3'_descend \<and> 
+                 idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? qd ed ls k1 k2 . (t', (qd, LSeq ed ls), k1) \<in> ll3'_descend \<and> 
+    ((qd, LSeq ed ls), (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+    kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
+    ( ? ql el idxl kl . ((qd, LSeq ed ls), (ql, LLab el idxl), ed) \<in> ll3'_descend \<and> 
+       fst ql = ej)) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  ))) \<and>
+(! q e l t' . write_jump_targets l (q, LSeq e ls) = Some t' \<longrightarrow>
+  (! qj ej idxj sz kj . (t', (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> qr er ls' ql el idxl  . t' = (qr, LSeq er ls') \<and> (t', (ql, LLab el idxl), er) \<in> ll3'_descend \<and> 
+                 idxj + 1 = length kj \<and> fst ql = ej) \<or>
+   (? qd ed ls k1 k2 . (t', (qd, LSeq ed ls), k1) \<in> ll3'_descend \<and> 
+    ((qd, LSeq ed ls), (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+    kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
+    ( ? ql el idxl kl . ((qd, LSeq ed ls), (ql, LLab el idxl), ed) \<in> ll3'_descend \<and> 
+       fst ql = ej)) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+  )))
+"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case 
+    apply(clarify)
+    apply(auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (2 q e idx)
+  then show ?case
+    apply(clarify) apply(auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (3 q e idx n)
+  then show ?case
+    apply(clarify) apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac "mynth l idx", auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  (* will have to change when we add jmpI? *)
+  case (4 q e idx n)
+  then show ?case 
+    apply(clarify) apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac "mynth l idx", auto)
+    apply(drule_tac ll3_hasdesc, auto)
+    done
+next
+  case (5 q e l)
+  then show ?case
+   apply(clarify) apply(auto)
+    apply(case_tac q, auto)
+    apply(drule_tac x = ab in spec, rotate_tac -1)
+    apply(drule_tac x = bc in spec, rotate_tac -1)
+    apply(drule_tac x = e in spec, rotate_tac -1)
+    apply(drule_tac x = la in spec, rotate_tac -1)
+    apply(drule_tac x = a in spec, rotate_tac -1)
+    apply(drule_tac x = b in spec, rotate_tac -1)
+    apply(drule_tac x = ba in spec, rotate_tac -1) apply(auto)
+
+    apply(drule_tac x = aa in spec, rotate_tac -1)
+    apply(drule_tac x = bb in spec, rotate_tac -1)
+    apply(drule_tac x = ej in spec, rotate_tac -1)
+    apply(drule_tac x = idxj in spec, rotate_tac -1)
+    apply(drule_tac x = sz in spec, rotate_tac -1)
+    apply(drule_tac x = kj in spec, rotate_tac -1) apply(auto)
+
+    done
+next
+  case 6
+  then show ?case
+    apply(clarify)
+    apply(auto)
+    apply(case_tac e, auto) apply(drule_tac ll3_hasdesc2, auto)
+    apply(drule_tac ll3_hasdesc2, auto)
+    done
+next
+  case (7 h l)
+  then show ?case
+    apply(clarify)
+    apply(auto)
+
+    apply(case_tac e, auto)
+     apply(case_tac "mypeel (write_jump_targets (None # la) h # map (write_jump_targets (None # la)) l)", auto)
+     apply(frule_tac mypeel_spec1) apply(auto)
+
+(* speculative *)
+
+      apply(frule_tac ll3_descend_nonnil, auto)
+      apply(case_tac hd, auto)
+       apply(frule_tac ll_descend_eq_r2l, auto)
+
+    apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+    apply(drule_tac x = "a" in spec, rotate_tac -1)
+    apply(drule_tac x = "b" in spec, rotate_tac -1)
+    apply(drule_tac x = "bb" in spec, rotate_tac -1)
+       apply(auto)
+       apply(case_tac tl, auto)
+        apply(case_tac h, auto) apply(case_tac bb, auto)
+          apply(case_tac "mynth (None # la) x32", auto)
+          apply(rotate_tac -5)
+          apply(case_tac idxj, auto)    
+         apply(case_tac "mynth (None # la) x42", auto)
+        apply(case_tac x51, auto)
+    apply(case_tac "mypeel (map (write_jump_targets (None # None # la)) x52)", auto)
+        apply(case_tac "ll_get_label x52 (ac # list)", auto)
+        apply(case_tac "mypeel (map (write_jump_targets (Some ad # None # la)) x52)", auto)
+
+(* hopefully it gets a little easier from here on out.
+this case should be provable without having to derive a contradiction in all cases, lol *)
+
+       apply(drule_tac ll_descend_eq_l2r)
+    apply(drule_tac x = "ab" in spec, rotate_tac -1)
+    apply(drule_tac x = "bc" in spec, rotate_tac -1)
+       apply(drule_tac x = "ej" in spec, rotate_tac -1)
+    apply(drule_tac x = "idxj" in spec, rotate_tac -1)
+    apply(drule_tac x = "sz" in spec, rotate_tac -1)
+       apply(drule_tac x = "ac#list" in spec, rotate_tac -1) apply(auto)
+
+         apply(rule_tac x = a in exI) apply(rule_tac x = b in exI)
+           apply(rule_tac x = er in exI) apply(rule_tac x = ls in exI)
+         apply(rule_tac x = "[0]" in exI)
+         apply(auto simp add:ll3'_descend.intros)
+
+(* need to split on hd here, i think *)
+(* or somehow split off the "hd#k1" prefix *)
+                  apply(rule_tac x = ad in exI) apply(rule_tac x = bd in exI)
+           apply(rule_tac x = ed in exI) apply(rule_tac x = ls in exI)
+        apply(rule_tac x = "0#k1" in exI) apply(auto)
+          apply(rule_tac ll_descend_eq_l2r) apply(auto)
+          apply(case_tac k1, auto)
+           apply(rotate_tac -3) apply(drule_tac ll3_descend_nonnil, auto)
+           apply(rotate_tac -3) apply(drule_tac ll3_descend_nonnil, auto)
+           apply(rotate_tac -3) apply(drule_tac ll3_descend_nonnil, auto)
+
+        apply(rule_tac ll_descend_eq_r2l)  apply(auto)
+       apply(rule_tac x = a in exI) apply(rule_tac x = b in exI)
+       apply(drule_tac ll_descend_eq_r2l) apply(auto)
+       apply(drule_tac ll_descend_eq_l2r)
+       apply(rotate_tac -1) apply(frule_tac ll3_hasdesc) apply(auto)
+       apply(rule_tac x = e in exI) apply(rule_tac x = ls in exI)
+       apply(rule_tac x = "[0]" in exI) apply(auto)
+       apply(case_tac n, auto)
+
+
+
+(* need to prove root node is a Seq *)
+    apply(frule_tac ll_descend_eq_r2l, auto)
+      apply(drule_tac ll_descend_eq_l2r_list)
+
+(* this is the nil-label case again, but for the tail *)
+
+    apply(rule_tac ll3'_descend.intros)
+    apply(auto simp add:ll3'_descend.intros)
+
+         apply(rule_tac x = ls in exI)
+
+ 
+
+(* Do we want a less general version of this? maybe it's easier if we only
+prove about jumps at root rather than descended jumps? *)
+(*
+We need to remove the requirement that the label we find is at the right depth.
+this will be established by a previous pass.
+Instead we need to add a requirement that the root node be a Seq with a label,
+and the descended label be descended via that depth
+(question: how does this interact with the context/mnyth part?)
+when do we fail over to doing mynth?
+*)
+(*
 lemma write_jump_targets_spec :
 "
   (! l t' . write_jump_targets l t = Some t' \<longrightarrow>
@@ -3895,7 +4327,7 @@ hopefully eventually the complexity of this proof can be reduced. *)
      apply(auto)
 
 qed
-
+*)
 
 (* TODO I have written this to only apply to jump nodes for now *)
 (* TODO: even need valid4 premise? *)
