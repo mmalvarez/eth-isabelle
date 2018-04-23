@@ -182,8 +182,10 @@ fun ll3_unwrap :: "(ll3 list \<Rightarrow> 'a option) \<Rightarrow> ll3  \<Right
   "ll3_unwrap f (_, LSeq _ ls) = f ls"
   | "ll3_unwrap _ (_, _) = None"
 
+(* TODO this is slightly wrong, or at least weird
+i am going to make it so that if it fetches a label the path is exact *)
 fun ll_get_label :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow> childpath \<Rightarrow> nat option" where
-    "ll_get_label (((x,_),LLab _ _)#_) (0#_) = Some x"
+    "ll_get_label (((x,_),LLab _ _)#_) (0#[]) = Some x"
   | "ll_get_label ((_, LSeq _ lsdec)#ls) (0#p) = 
      ll_get_label lsdec p"
   | "ll_get_label (_#ls) (0#_) = None"

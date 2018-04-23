@@ -4017,9 +4017,9 @@ fun ll4_validate_jump_targets :: "nat option list \<Rightarrow> ll4 \<Rightarrow
 | "ll4_validate_jump_targets ns (q, LSeq [] lsdec) = 
   (Lem.list_forall (ll4_validate_jump_targets (None#ns)) lsdec)"
 | "ll4_validate_jump_targets ns (q, LSeq loc lsdec) = 
-  (case ll_get_node_list lsdec loc of
-   Some ((q, _), LLab e idx) \<Rightarrow> idx + 1 = length loc\<and>
-  Lem.list_forall (ll4_validate_jump_targets ((Some q)#ns)) lsdec
+  (case ll_get_node (q, LSeq loc lsdec) loc of
+   Some ((q, _), LLab e idx) \<Rightarrow> idx + 1 = length loc \<and>
+     Lem.list_forall (ll4_validate_jump_targets ((Some q)#ns)) lsdec
    | _ \<Rightarrow> False)"
 | "ll4_validate_jump_targets _ _ = True"
 
@@ -4046,17 +4046,35 @@ lemma validate_jump_targets_spec :
    (? n . mynth l n = Some ej \<and> length kj + n = idxj) 
   ))) \<and>
 
-(! q e l . ll4_validate_jump_targets l (q, LSeq e ls) \<longrightarrow>
-  (! qj ej idxj sz kj . ((q, LSeq e ls), (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
-(* fix t' here *)
-  ((\<exists> ql el idxl  . ((q, LSeq e ls), (ql, LLab el idxl), e) \<in> ll3'_descend \<and> 
-                 idxj + 1 = length kj \<and> idxl + 1 = length e \<and> fst ql = ej) \<or>
-   (? qd ed lsd k1 k2 . ((q, LSeq e ls), (qd, LSeq ed lsd), k1) \<in> ll3'_descend \<and> 
-    ((qd, LSeq ed lsd), (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+(* NB: before, this was over a Seq node,
+and included some information about its 
+annotation
+
+this is in a recent commit (4/22)
+*)
+(*
+need to patch this side so thast we are talking about the node x's label
+(which as a sequence node it must have) equaling the descend
+*)
+(! l t.
+(* set isn't quite enough... need all descendents? *)
+(* or - need to go back to old statement? *)
+(* in order to strengthen the induction, do we need to gather
+descend facts about the nodes we traverse along the way
+(not just their addresses? *)
+(* should this be descended instead of set? *)
+  t \<in> set ls \<longrightarrow>
+
+ ll4_validate_jump_targets l t \<longrightarrow>
+  (! qj ej idxj sz kj . (t, (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> qr er ls ql el idxl  . t = (qr, LSeq er ls) \<and> (t, (ql, LLab el idxl), er) \<in> ll3'_descend \<and> 
+                 idxj + 1 = length kj \<and> idxl + 1 = length er \<and> fst ql = ej) \<or>
+   (? qd ed ls k1 k2 . (t, (qd, LSeq ed ls), k1) \<in> ll3'_descend \<and> 
+    ((qd, LSeq ed ls), (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
     kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
-    ( ? ql el idxl kl . ((qd, LSeq ed lsd), (ql, LLab el idxl), ed) \<in> ll3'_descend \<and> 
+    ( ? ql el idxl kl . ((qd, LSeq ed ls), (ql, LLab el idxl), ed) \<in> ll3'_descend \<and> 
        idxl + 1 = length ed \<and> fst ql = ej)) \<or>
-   (? n . mynth l n = Some ej \<and> length kj + n = idxj)
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj) 
   )))
 "
 proof(induction rule:my_ll_induct)
@@ -4087,6 +4105,185 @@ next
   case (5 q e l)
   then show ?case 
     apply(clarsimp)
+    apply(case_tac e, auto)
+      apply(frule_tac ll3'_descend.cases, auto)
+       apply(drule_tac List.nth_mem, auto)
+       apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+    apply(drule_tac x = "ab" in spec, rotate_tac -1)
+       apply(drule_tac x = "bb" in spec, rotate_tac -1)
+       apply(drule_tac Set.bspec) apply(auto)
+       apply(case_tac " mynth (None # la) idxj", auto)
+       apply(case_tac idxj, auto)
+
+    apply(rotate_tac -2)
+      apply(frule_tac ll3_hasdesc, auto)
+      apply(rule_tac x = ab in exI)
+      apply(rule_tac x = bc in exI)
+      apply(rule_tac x = ea in exI)
+      apply(rule_tac x = ls in exI)
+      apply(rule_tac x = n in exI)
+    apply(auto)
+
+(* maybe the idea here is that we work our way down n ?*)
+       apply(rotate_tac -1)
+       apply(frule_tac ll3_descend_nonnil, auto)
+       apply(frule_tac ll3_descend_splitpath_cons)
+       apply(case_tac tl, auto)
+        apply(frule_tac ll3'_descend.cases, auto)
+         apply(drule_tac List.nth_mem, auto)
+
+         apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+         apply(drule_tac x = ad in spec, rotate_tac -1)
+         apply(drule_tac x = bb in spec, rotate_tac -1)
+         apply(drule_tac x = "llt.LSeq ea ls" in spec, auto)
+    apply(rotate_tac -1)
+         apply(drule_tac x = ac in spec, rotate_tac -1)
+apply(drule_tac x = be in spec, rotate_tac -1)
+         apply(drule_tac x = ej in spec, rotate_tac -1)
+         apply(drule_tac x = idxj in spec, rotate_tac -1)
+         apply(drule_tac x = sz in spec, rotate_tac -1)
+         apply(drule_tac x = n' in spec, rotate_tac -1)
+         apply(auto)
+          apply(drule_tac Set.bspec) apply(auto)
+    apply(case_tac ea, auto)
+    apply(case_tac k1, auto)
+          apply(drule_tac ll_descend_eq_r2l) apply(rotate_tac 2)
+apply(drule_tac ll_descend_eq_r2l) apply(auto)
+    apply(case_tac ea, auto)
+    apply(case_tac k1, auto)
+      apply(drule_tac x = "(ad, bb), llt.LSeq ea ls)")
+
+      apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+      apply(frule_tac ll3_hasdesc2, auto)
+      apply(drule_tac x = aa in spec, rotate_tac -1)
+    apply(drule_tac x = ba in spec, rotate_tac -1)
+      apply(drule_tac x = bb in spec, rotate_tac -1) apply(auto)
+       apply(frule_tac ll3_descend_nonnil, auto)
+       apply(case_tac hd, auto)
+        apply(frule_tac ll_descend_eq_r2l, auto)
+        apply(case_tac tla, auto)
+         apply(case_tac " mynth (None # la) idxj", auto)
+         apply(case_tac idxj, auto)
+        apply(drule_tac ll_descend_eq_l2r)
+        apply(rule_tac x = aa in exI)
+        apply(rule_tac x = ba in exI)
+        apply(rotate_tac -1)
+    apply(frule_tac ll3_hasdesc, auto)
+        apply(rule_tac x = ea in exI)
+        apply(rule_tac x = ls in exI)
+        apply(rule_tac x = "[0]" in exI)
+        apply(auto)
+          apply(auto simp add:ll3'_descend.intros)
+
+    apply(rotate_tac -2)
+        apply(drule_tac x = a in spec, rotate_tac -1)
+        apply(drule_tac x = b in spec, rotate_tac -1)
+        apply(drule_tac x = ej in spec, rotate_tac -1)
+        apply(drule_tac x = idxj in spec, rotate_tac -1)
+        apply(drule_tac x = sz in spec, rotate_tac -1)
+         apply(drule_tac x = "ab#list" in spec, rotate_tac -1) apply(auto)
+
+
+          apply(frule_tac k = k1 in ll3_descend_nonnil)
+          apply(frule_tac k = k2 in ll3_descend_nonnil)
+          apply(auto)
+    apply(case_tac ea, auto)
+    apply(case_tac list, auto)
+          apply(rule_tac x = aa in exI)
+          apply(rule_tac x = ba in exI)
+    apply(rule_tac x = er  in exI)
+          apply(rule_tac x = ls in exI)
+          apply(rule_tac x = "[0]" in exI) apply(auto)
+          apply(auto simp add:ll3'_descend.intros)
+
+          apply(rule_tac x = ac in exI)
+          apply(rule_tac x = bc in exI)
+    apply(rule_tac x = ed  in exI)
+          apply(rule_tac x = ls in exI)
+          apply(rule_tac x = "0#k1" in exI) apply(auto)
+    apply(rule_tac ll_descend_eq_l2r) apply(auto)
+         apply(frule_tac k = k1 in ll3_descend_nonnil) apply(auto)
+         apply(rule_tac ll_descend_eq_r2l) apply(auto)
+
+        apply(case_tac n, auto)
+
+       apply(frule ll_descend_eq_r2l, auto)
+    apply(case_tac tl, auto)
+
+    apply(case_tac bb, auto)
+      apply(drule_tac Set.bspec)
+    apply(auto)
+     apply(drule_tac x = "fst q" in spec, rotate_tac -1)
+     apply(drule_tac x = "snd q" in spec, rotate_tac -1)
+     apply(drule_tac x = "e" in spec, rotate_tac -1)
+    apply(drule_tac x = "la" in spec, rotate_tac -1)
+    apply(clarsimp)
+     apply(drule_tac x = a in spec, rotate_tac -1)
+     apply(drule_tac x = b in spec, rotate_tac -1)
+     apply(drule_tac x = ej in spec, rotate_tac -1)
+     apply(drule_tac x = idxj in spec, rotate_tac -1) 
+apply(drule_tac x = sz in spec, rotate_tac -1)
+    apply(drule_tac x = kj in spec, rotate_tac -1)
+     apply(auto)
+    
+
+    sorry
+next
+  case 6
+  then show ?case
+    apply(clarsimp)
+    done
+next
+  case (7 h l)
+  then show ?case 
+    apply(clarsimp)
+    done
+(* prior proof for case 5 below *)
+
+    apply(case_tac e, auto)
+      apply(drule_tac x = "None#la" in spec, rotate_tac -1)
+      apply(frule_tac ll3_hasdesc2, auto)
+      apply(drule_tac x = aa in spec, rotate_tac -1)
+    apply(drule_tac x = ba in spec, rotate_tac -1)
+      apply(drule_tac x = bb in spec, rotate_tac -1) apply(auto)
+       apply(frule_tac ll3_descend_nonnil, auto)
+       apply(case_tac hd, auto)
+        apply(frule_tac ll_descend_eq_r2l, auto)
+        apply(case_tac tla, auto)
+         apply(case_tac " mynth (None # la) idxj", auto)
+         apply(case_tac idxj, auto)
+        apply(drule_tac ll_descend_eq_l2r)
+    apply(rotate_tac 2)
+        apply(drule_tac x = a in spec, rotate_tac -1)
+        apply(drule_tac x = b in spec, rotate_tac -1)
+        apply(drule_tac x = ej in spec, rotate_tac -1)
+        apply(drule_tac x = idxj in spec, rotate_tac -1)
+        apply(drule_tac x = sz in spec, rotate_tac -1)
+        apply(drule_tac x = "ab#list" in spec, rotate_tac -1) apply(auto)
+          apply(rule_tac x = aa in exI)
+          apply(rule_tac x = ba in exI)
+    apply(rule_tac x = er  in exI)
+          apply(rule_tac x = ls in exI)
+          apply(rule_tac x = "[0]" in exI) apply(auto)
+          apply(auto simp add:ll3'_descend.intros)
+
+          apply(rule_tac x = ac in exI)
+          apply(rule_tac x = bc in exI)
+    apply(rule_tac x = ed  in exI)
+          apply(rule_tac x = ls in exI)
+          apply(rule_tac x = "0#k1" in exI) apply(auto)
+    apply(rule_tac ll_descend_eq_l2r) apply(auto)
+         apply(frule_tac k = k1 in ll3_descend_nonnil) apply(auto)
+         apply(rule_tac ll_descend_eq_r2l) apply(auto)
+
+        apply(case_tac n, auto)
+
+       apply(frule ll_descend_eq_r2l, auto)
+    apply(case_tac tl, auto)
+
+    apply(case_tac bb, auto)
+      apply(drule_tac Set.bspec)
+    apply(auto)
      apply(drule_tac x = "fst q" in spec, rotate_tac -1)
      apply(drule_tac x = "snd q" in spec, rotate_tac -1)
      apply(drule_tac x = "e" in spec, rotate_tac -1)
