@@ -3047,9 +3047,7 @@ inductive_set ll_valid4_inner :: "ll4 set" where
 | "\<And> x e d s . ((x, LJmpI e d s) :: ll4) \<in> ll_valid4_inner"
 
 
-(* need to extend this to rule out jumps to seqs with nil labels *)
-(* this means we need some kind of transitive case? *)
-(* need ll4_inner for ourselves as well as for our descendents (?) *)
+
 inductive_set ll_valid4 :: "ll4 set" where
 "\<And> x e ls . ((x, LSeq e ls) :: ll4) \<in> ll_valid3' \<Longrightarrow> 
    (! e' y d s k . ((x, LSeq e ls), (y, LJmp e' d s), k) \<in> ll3'_descend \<longrightarrow>
