@@ -88,6 +88,69 @@ proof(induction rule:my_ll1_induct)
     done
 qed
 
+lemma ll_phase1_same' :
+"((! i t' i' . ll_phase1 t i = (t', i') \<longrightarrow>
+  ll_purge_annot t' = t)
+\<and>
+(! i ts' i' . ll_phase1_seq ts i = (ts', i') \<longrightarrow>
+  map ll_purge_annot ts' = ts))"
+proof(induction rule:my_ll1_induct)
+case (1 i)
+  then show ?case by auto
+next
+  case (2 idx)
+  then show ?case by auto
+next
+case (3 idx)
+  then show ?case by auto
+next
+  case (4 idx)
+  then show ?case by auto
+next
+  case (5 l)
+  then show ?case 
+    apply(case_tac l, auto)
+    apply(case_tac "ll_phase1 a i", auto)
+    apply(rename_tac boo)
+    apply(case_tac "ll_phase1_seq list boo") apply(auto)
+     apply(drule_tac x = aa in spec) apply(auto)
+    apply(drule_tac x = aa in spec) apply(auto)
+    done
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 t l)
+  then show ?case 
+    apply(auto)
+    apply(case_tac "ll_phase1 t i", auto)
+    apply(rename_tac boo)
+    apply(case_tac "ll_phase1_seq l boo", auto)
+     apply(drule_tac x = i in spec) apply(auto)
+    apply(drule_tac x = i in spec) apply(auto)
+    done
+qed
+
+lemma ll_phase1_same :
+"ll_phase1 t i = (t', i') \<Longrightarrow>
+  ll_purge_annot t' = t"
+  apply(insert ll_phase1_same')
+  apply(blast)
+  done
+
+value "ll_pass1 (ll1.LSeq [])"
+
+lemma ll_pass1_same :
+"ll_pass1 t = t' \<Longrightarrow> ll_purge_annot t' = t"
+  apply(auto)
+
+(* very frustrating this is necessary *)
+  apply(insert ElleCompiler.ll_pass1_def[of t])
+  apply(auto)
+  apply(case_tac "ll_phase1 t 0") apply(auto)
+  apply(frule_tac ll_phase1_same)
+  apply(auto)
+  done
 
 inductive_set ll_descend_alt  :: "(('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll * childpath) set" where
 "\<And> t t' kh kt . ll_get_node t (kh#kt) = Some t' \<Longrightarrow>

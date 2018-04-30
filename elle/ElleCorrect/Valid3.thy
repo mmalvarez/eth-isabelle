@@ -173,6 +173,41 @@ proof(induction rule: ll_valid_q_ll_validl_q.induct)
     done
 qed
 
+lemma ll3_init_same' :
+"((! t' . ll3_init t = t' \<longrightarrow>
+  ll_purge_annot t' = ll_purge_annot t)
+\<and>
+(! ts' . map ll3_init ts = ts' \<longrightarrow>
+  map ll_purge_annot ts' = map ll_purge_annot ts))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case by auto
+qed
+
+lemma ll3_init_same [rule_format] :
+"(! t' . ll3_init t = t' \<longrightarrow>
+  ll_purge_annot t' = ll_purge_annot t)"
+  apply(insert ll3_init_same') apply(blast)
+  done
+
 lemma ll3_consume_label_qvalid' :
 "((q, t) \<in> ll_valid_q \<longrightarrow> (! ls e . t = (LSeq e ls) \<longrightarrow> (! p p' n ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> (q, LSeq e ls') \<in> ll_valid_q)))
 \<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> (! p p' n ls' . ll3_consume_label p n ls = Some (ls', p') \<longrightarrow> ((x,x'), ls') \<in> ll_validl_q ))"
@@ -572,6 +607,60 @@ lemma ll3_consume_none_gen :
   apply(blast+)
   done
 
+(* TODO: ll3_consume_label_same *)
+(* first case: map purge annot over the list and the list', assert equality *)
+(* better first case: assert that any Seq node resulting would be annotation-equal to original? Seems
+like unnecessary work *)
+(* second case: also map purge annot *)
+lemma ll3_consume_label_same' :
+  "(! e l q . (t :: ll3) = (q, LSeq e l) \<longrightarrow> (! p n p' l' . ll3_consume_label p n l = Some (l',p') \<longrightarrow>
+               map ll_purge_annot l = map ll_purge_annot l')) \<and>
+  (! l' p p' n . ll3_consume_label p n (l :: ll3 list) = Some (l', p') \<longrightarrow> map ll_purge_annot l = map ll_purge_annot l')"
+proof(induction rule:my_ll_induct)
+  case (1 q e i)
+  then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+case 6
+  then show ?case by auto
+next
+case (7 h l)
+  then show ?case 
+    apply(auto)
+    apply(case_tac h, auto)
+    apply(case_tac ba, auto)
+         apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+         apply(drule_tac x = aa in spec, auto)
+        apply(case_tac "x22 = length p", auto)
+         apply(case_tac "\<not> x21", auto)
+         apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+         apply(drule_tac x = aa in spec, auto)
+         apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+         apply(drule_tac x = aa in spec, auto)
+         apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+      apply(drule_tac x = aa in spec, auto)
+     apply(case_tac "ll3_consume_label (n # p) 0 x52", auto)
+     apply(case_tac ba, auto)
+         apply(case_tac "ll3_consume_label p (Suc n) l", auto)
+    apply(drule_tac x = ab in spec, auto)
+    done
+qed
+
+lemma ll3_consume_label_same [rule_format]:
+"(! l' p p' n . ll3_consume_label p n (l :: ll3 list) = Some (l', p') \<longrightarrow> map ll_purge_annot l = map ll_purge_annot l')"
+  apply(insert ll3_consume_label_same') apply(blast)
+  done
 
 (* this statement isn't quite right *)
 (* need to generalize each side more? *)
@@ -713,6 +802,234 @@ lemma ll3_consumes_alt_eq_r2l2 [rule_format] :
   apply(case_tac x, auto)
   apply(drule_tac ll3_consumes_alt_eq_r2l)
   apply(auto simp add:ll3_consumes_alt.intros)
+  done
+
+inductive ll_purge_eq ::
+  "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
+   ('li2x, 'll2x, 'lj2x, 'lji2x, 'ls2x, 'pt2x, 'pn2x) ll \<Rightarrow>
+  bool"
+  where
+"\<And> (t1 :: ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll)
+    (t2 :: ('li2x, 'll2x, 'lj2x, 'lji2x, 'ls2x, 'pt2x, 'pn2x) ll)
+ . (ll_purge_annot t1) = (ll_purge_annot t2) \<Longrightarrow>
+  ll_purge_eq t1 t2"
+
+lemma ll_purge_eq_trans [rule_format] :
+  "ll_purge_eq t1 t2 \<Longrightarrow>
+   (! t3 . ll_purge_eq t2 t3 \<longrightarrow> ll_purge_eq t1 t3)"
+proof(induction rule:ll_purge_eq.induct)
+  case (1 t1 t2)
+  then show ?case
+    apply(auto)
+    apply(drule_tac ll_purge_eq.cases) apply(auto)
+    apply(rule_tac ll_purge_eq.intros) apply(auto)
+    done
+qed
+
+lemma ll_purge_eq_refl :
+  "ll_purge_eq t t"
+  apply(auto simp add:ll_purge_eq.intros)
+  done
+
+lemma ll_purge_eq_sym [rule_format] :
+  "ll_purge_eq t1 t2 \<Longrightarrow> ll_purge_eq t2 t1"
+proof(induction rule:ll_purge_eq.induct)
+  case (1 t1 t2)
+  then show ?case
+    apply(rule_tac ll_purge_eq.intros)
+    apply(auto)
+    done
+qed
+  
+
+inductive ll_purge_eqs ::
+  "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list \<Rightarrow>
+   ('li2x, 'll2x, 'lj2x, 'lji2x, 'ls2x, 'pt2x, 'pn2x) ll list \<Rightarrow>
+  bool"
+  where
+"\<And> (l1 :: ('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll list)
+    (l2 :: ('li2x, 'll2x, 'lj2x, 'lji2x, 'ls2x, 'pt2x, 'pn2x) ll list)
+ . (map ll_purge_annot l1) = (map ll_purge_annot l2) \<Longrightarrow>
+  ll_purge_eqs l1 l2"
+
+lemma ll_purge_eqs_trans [rule_format] :
+  "ll_purge_eqs t1 t2 \<Longrightarrow>
+   (! t3 . ll_purge_eqs t2 t3 \<longrightarrow> ll_purge_eqs t1 t3)"
+proof(induction rule:ll_purge_eqs.induct)
+  case (1 t1 t2)
+  then show ?case
+    apply(auto)
+    apply(drule_tac ll_purge_eqs.cases) apply(auto)
+    apply(rule_tac ll_purge_eqs.intros) apply(auto)
+    done
+qed
+
+lemma ll_purge_eqs_refl :
+  "ll_purge_eqs t t"
+  apply(auto simp add:ll_purge_eqs.intros)
+  done
+
+lemma ll_purge_eqs_sym [rule_format] :
+  "ll_purge_eqs t1 t2 \<Longrightarrow> ll_purge_eqs t2 t1"
+proof(induction rule:ll_purge_eqs.induct)
+  case (1 t1 t2)
+  then show ?case
+    apply(rule_tac ll_purge_eqs.intros)
+    apply(auto)
+    done
+qed
+
+lemma ll_purge_eq_seq [rule_format] :
+  "ll_purge_eq t1 t2 \<Longrightarrow>
+    (! q1 e1 l1 . t1 = (q1, LSeq e1 l1) \<longrightarrow>
+    (? q2 e2 l2 . t2 = (q2, LSeq e2 l2) \<and>
+    ll_purge_eqs l1 l2))"
+proof(induction rule:ll_purge_eq.induct)
+  case (1 t1 t2)
+  then show ?case
+    apply(auto)
+    apply(case_tac t2, auto) apply(case_tac baa, auto)
+    apply(rule_tac ll_purge_eqs.intros) apply(auto)
+    done
+qed
+
+lemma ll_purge_eqs_seq [rule_format] :
+  "ll_purge_eqs l1 l2 \<Longrightarrow>
+   (! q1 e1 q2 e2 .
+    ll_purge_eq (q1, LSeq e1 l1) (q2, LSeq e2 l2))"
+proof(induction rule:ll_purge_eqs.induct)
+  case (1 l1 l2)
+  then show ?case
+    apply(auto)
+    apply(rule_tac ll_purge_eq.intros)
+    apply(auto)
+    done
+qed
+
+
+
+(* ugh... let's create a new relation to guide the simplifier then *)
+(* need an extra generalization about how we are running on not just our l,
+but on any ll3 that has the same purge_annotations as our original list
+do we need this in the second branch or just first? *)
+(* idea: ll_purge_eq t t2 *)
+lemma ll3_assign_label_same' :
+"(! t2 . ll_purge_eq (t :: ll3) (t2 :: ll3) \<longrightarrow>
+  (! q' t' .  ll3_assign_label t2  = Some t' \<longrightarrow> ll_purge_eq t t')) \<and>
+ ( ! l2. ll_purge_eqs (l :: ll3 list) (l2 :: ll3 list) \<longrightarrow>
+  (! l' . ll3_assign_label_list (l2 :: ll3 list) = Some l' \<longrightarrow> 
+      ll_purge_eqs l l'))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case 
+    apply(auto)
+    apply(case_tac ba, auto)
+     apply(drule_tac ll_purge_eq.cases)
+      apply(auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+    done
+next
+  case (2 q e idx)
+  then show ?case 
+    apply(auto)
+    apply(case_tac ba, auto)
+     apply(case_tac x21, auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+    done
+next
+  case (3 q e idx n)
+  then show ?case
+    apply(auto)
+    apply(case_tac ba, auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+    done
+next
+  case (4 q e idx n)
+  then show ?case
+    apply(auto)
+    apply(case_tac ba, auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+    done
+next
+  case (5 q e l)
+  then show ?case 
+    apply(clarify)
+    apply(auto)
+    apply(case_tac ba, auto)
+     apply(drule_tac ll_purge_eq_seq, auto)
+apply(drule_tac ll_purge_eq_seq, auto)
+    apply(case_tac "ll3_consume_label [] 0 x52", auto)
+    apply(rename_tac boo) 
+    apply(case_tac "ll3_assign_label_list ab", auto)
+(* need consume eq here *)
+    apply(frule_tac ll3_consume_label_same)
+    apply(drule_tac ll_purge_eqs.intros)
+    apply(drule_tac x = ab in spec)
+    apply(drule_tac ll_purge_eqs_trans)
+     apply(auto)
+    apply(rule_tac ll_purge_eqs_seq) apply(auto)
+    done
+next
+  case 6
+  then show ?case 
+    apply(auto)
+    apply(case_tac l2, auto)
+    apply(drule_tac ll_purge_eqs.cases, auto)
+    done
+next
+  case (7 h l)
+  then show ?case 
+    apply(clarify)
+    apply(case_tac l2, auto)
+    apply(case_tac "ll3_assign_label ((a, b), ba)", auto)
+    apply(case_tac "ll3_assign_label_list list", auto)
+    apply(drule_tac ll_purge_eqs.cases, auto)
+    apply(rule_tac ll_purge_eqs.intros, auto)
+
+     apply(drule_tac ll_purge_eq.intros)
+    apply(drule_tac x = a in spec, rotate_tac -1)
+    apply(drule_tac x = b in spec, rotate_tac -1)
+     apply(drule_tac x = ba in spec, rotate_tac -1) apply(auto)
+    apply(rotate_tac -1)
+     apply(drule_tac ll_purge_eq_sym) apply(rotate_tac -1)
+apply(drule_tac ll_purge_eq_trans)  apply(auto)
+     apply(drule_tac ll_purge_eq.cases) apply(auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+
+    apply(rotate_tac 1)
+    apply(drule_tac x = list in spec)
+    apply(drule_tac ll_purge_eqs.intros)
+    apply(auto)
+    apply(rotate_tac -1)
+    apply(drule_tac ll_purge_eqs_sym, rotate_tac -1)
+    apply(drule_tac ll_purge_eqs_trans, auto)
+    apply(rotate_tac -1)
+    apply(drule_tac ll_purge_eqs.cases)
+    apply(auto)
+    done
+qed
+(*
+(! t2 . ll_purge_eq (t :: ll3) (t2 :: ll3) \<longrightarrow>
+  (! q' t' .  ll3_assign_label t2  = Some t' \<longrightarrow> ll_purge_eq t t')
+*)
+
+lemma ll3_assign_label_same'2 [rule_format] :
+"(! t2 . ll_purge_eq (t :: ll3) (t2 :: ll3) \<longrightarrow>
+  (! q' t' .  ll3_assign_label t2  = Some t' \<longrightarrow> ll_purge_eq t t'))"
+  apply(insert ll3_assign_label_same')  apply(auto)
+  done
+
+
+lemma ll3_assign_label_same [rule_format] :
+"ll3_assign_label t  = Some t' \<Longrightarrow> ll_purge_annot t = ll_purge_annot t'"
+  apply(insert ll3_assign_label_same'2[of t t t'])
+  apply(auto)
+  apply(subgoal_tac "ll_purge_eq t t")
+   apply(rule_tac[2] ll_purge_eq_refl)
+  apply(auto)
+  apply(drule_tac ll_purge_eq.cases) apply(auto)
   done
 
 (* building up to assign label q valid proof *)

@@ -181,4 +181,13 @@ and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> na
 definition w256_0 where "w256_0 = word256FromNat 0"
 definition w160_0 where "w160_0 = word160FromNatural 0"
 
+(* enables us to get back an ll1, useful for semantics *)
+fun ll_purge_annot :: "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow> ll1" where
+"ll_purge_annot (_, L _ i) = ll1.L i"
+| "ll_purge_annot (_, LLab _ idx) = ll1.LLab idx"
+| "ll_purge_annot (_, LJmp _ idx _) = ll1.LJmp idx"
+| "ll_purge_annot (_, LJmpI _ idx _) = ll1.LJmpI idx"
+| "ll_purge_annot (_, LSeq _ ls) =
+  ll1.LSeq (map ll_purge_annot ls)"
+
 end

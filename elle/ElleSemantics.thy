@@ -200,5 +200,66 @@ fun elle_sem' ::
    (ellest \<Rightarrow> ellest option)" where
 "elle_sem' x n c = ll1_sem x elle_denote elle_jmpd n None [] c"
 
+(* denote jmpd *)
+
+(* TODO: build an ll' sem, using purge_ll_annot *)
+fun ll'_sem ::  "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
+   (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
+   ('a \<Rightarrow> (bool * 'a) option) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   nat \<Rightarrow> (* fuel *)
+   nat option \<Rightarrow> (* depth, if we are scanning for a label *)
+(* continuations corresponding to enclosing scopes *)
+   (('a \<Rightarrow> 'a option) list) \<Rightarrow>
+   ('a \<Rightarrow> 'a option) \<Rightarrow> (* continuation *)
+   ('a \<Rightarrow> 'a option)" where
+"ll'_sem x =
+  ll1_sem (ll_purge_annot x)"
+
+fun ll'_sem' ::
+  "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
+   nat \<Rightarrow> (* fuel for elle jumps *)
+  (* continuations corresponding to enclosing scopes *)
+   (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
+   (ellest \<Rightarrow> ellest option)" where
+"ll'_sem' x n c = ll'_sem x elle_denote elle_jmpd n None [] c"
+
+(* prove that if two lls are equal, throwing away annotations,
+the semantics are also the same
+use ll'_sem *)
+lemma ll'_sem_same' :
+"(! t2 . ll_purge_annot (t1 :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) = ll_purge_annot t2 \<longrightarrow>
+  (! d jd n depth s c . ll'_sem t1 d jd n depth s c = ll'_sem t2 d jd n depth s c))
+\<and>
+(! q e q2 e2 ls2 . ll_purge_annot (q, LSeq e (ls :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) = ll_purge_annot (q2, LSeq e2 ls2) \<longrightarrow>
+   (! d jd n depth s c . ll'_sem (q, LSeq e ls) d jd n depth s c = ll'_sem (q2, LSeq e2 ls2) d jd n depth s c))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case by auto
+next
+case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case by auto
+qed
+
+lemma ll'_sem_same :
+"(! t2 . ll_purge_annot (t1 :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) = ll_purge_annot t2 \<longrightarrow>
+  (! d jd n depth s c . ll'_sem t1 d jd n depth s c = ll'_sem t2 d jd n depth s c))"
+  apply(insert ll'_sem_same')
+  apply(auto)
+  done
 
 end

@@ -43,6 +43,36 @@ next
     done
 qed 
 
+lemma ll4_init_same :
+"((! t' . ll4_init t = t' \<longrightarrow>
+  ll_purge_annot t' = ll_purge_annot t)
+\<and>
+(! ts' . map ll4_init ts = ts' \<longrightarrow>
+  map ll_purge_annot ts' = map ll_purge_annot ts))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case by auto
+qed
+
+
 lemma ll3_bump_qvalid' [rule_format]:
   "((x, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow> 
       (! e ls . t = LSeq e ls \<longrightarrow>
@@ -91,13 +121,47 @@ done next
 
 qed
 
-
 lemma ll3_bump_qvalid [rule_format]:
 "(((m,m'), (l :: ll3 list)) \<in> ll_validl_q \<longrightarrow>
       (! b . ((m+b, m'+b), ll3_bump b l) \<in> ll_validl_q))"
   apply(insert ll3_bump_qvalid')
   apply(blast)
   done
+
+(* ll3_bump_same *)
+
+lemma ll3_bump_same :
+"
+(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+  (! b . map ll_purge_annot ls = map ll_purge_annot (ll3_bump b ls)))
+\<and>
+(! b . map ll_purge_annot (l :: ll3 list) = map ll_purge_annot (ll3_bump b l))"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+  case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case 
+    apply(auto)
+    apply(case_tac h, auto)
+    apply(case_tac baa, auto)
+    done
+qed
 
 (*
 prove ll3 bump is equal to ll bump
@@ -170,6 +234,8 @@ lemma ll3_inc_jump_nilcp [rule_format] :
   apply(insert ll3_inc_jump_nilcp')
   apply(auto) apply(blast)
   done
+
+(* inc_jump_same *)
 
 lemma ll3_inc_jump_qvalid'[rule_format]:
   "((x, (t :: ll3t)) \<in> ll_valid_q \<longrightarrow> 
@@ -373,6 +439,137 @@ lemma ll3_inc_jump_qvalid [rule_format] :
   apply(auto)
   done
 
+(* need ll3_inc_jump_same *)
+lemma ll3_inc_jump_same' :
+"(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+  (! n p l' b . ll3_inc_jump (ls :: ll3 list) n p = (l', b) \<longrightarrow>
+   map ll_purge_annot ls = map ll_purge_annot l')
+)
+\<and>
+(! n p l' b . ll3_inc_jump (l :: ll3 list) n p = (l', b) \<longrightarrow>
+   map ll_purge_annot l = map ll_purge_annot l')
+"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+  then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case by auto
+next
+  case (4 q e idx n)
+  then show ?case by auto
+next
+  case (5 q e l)
+  then show ?case by auto
+next
+case 6
+  then show ?case by auto
+next
+  case (7 h l)
+  then show ?case 
+    apply(auto)
+    apply(case_tac h, auto)
+    apply(case_tac baa, auto)
+        apply(case_tac "ll3_inc_jump l (Suc n) p", auto)
+        apply(drule_tac x=  "Suc n" in spec)
+        apply(drule_tac x = p in spec)
+        apply(drule_tac x = aa in spec) apply(auto)
+
+        apply(case_tac "ll3_inc_jump l (Suc n) p", auto)
+        apply(drule_tac x=  "Suc n" in spec)
+        apply(drule_tac x = p in spec)
+       apply(drule_tac x = aa in spec) apply(auto)
+      apply(case_tac p, auto)
+       apply(case_tac "ll3_inc_jump l (Suc n) []", auto)
+       apply(drule_tac x = "Suc n" in spec)
+       apply(drule_tac x = "[]" in spec)
+       apply(drule_tac x = aa in spec) apply(auto)
+
+      apply(case_tac list, auto)
+       apply(case_tac "n=aa", auto)
+        apply(insert ll3_bump_same)
+        apply(auto)
+
+       apply(case_tac "ll3_inc_jump l (Suc n) [aa]", auto)
+       apply(drule_tac x = "Suc n" in spec, rotate_tac -1)
+       apply(drule_tac x = "[aa]" in spec, rotate_tac -1)
+       apply(drule_tac x = "ab" in spec, rotate_tac -1)
+       apply(auto)
+
+    apply(case_tac "ll3_inc_jump l (Suc n)
+              (aa # ab # lista)", auto)
+           apply(drule_tac x = "Suc n" in spec, rotate_tac -1)
+       apply(drule_tac x = "(aa # ab # lista)" in spec, rotate_tac -1)
+       apply(drule_tac x = "ac" in spec, rotate_tac -1)
+      apply(auto)
+
+     apply(case_tac p, auto)
+      apply(case_tac "ll3_inc_jump l (Suc n) []", auto)
+      apply(drule_tac x = "Suc n" in spec)
+      apply(drule_tac x = "[]" in spec)
+      apply(drule_tac x = "aa" in spec) apply(auto)
+
+     apply(case_tac list, auto)
+      apply(case_tac "n=aa", auto)
+      apply(case_tac "ll3_inc_jump l (Suc n) [aa]", auto)
+      apply(drule_tac x = "Suc n" in spec)
+      apply(drule_tac x = "[aa]" in spec)
+      apply(drule_tac x = "ab" in spec) apply(auto)
+
+    apply(case_tac "ll3_inc_jump l (Suc n)
+              (aa # ab # lista)", auto)
+     apply(drule_tac x = "Suc n" in spec)
+     apply(drule_tac x = "aa # ab # lista" in spec)
+     apply(drule_tac x = ac in spec) apply(auto)
+
+    apply(case_tac p, auto)
+     apply(case_tac " ll3_inc_jump l (Suc n) []", auto)
+    apply(rotate_tac 1)
+     apply(drule_tac x = "Suc n" in spec, rotate_tac -1)
+       apply(drule_tac x = "[]" in spec, rotate_tac -1)
+     apply(drule_tac x = "aa" in spec, rotate_tac -1)
+     apply(auto)
+
+    apply(case_tac "n=aa", auto)
+
+     apply(case_tac "ll3_inc_jump x52 0 list", auto)
+     apply(case_tac bb, auto)
+         apply(drule_tac x = "0" in spec, rotate_tac -1)
+       apply(drule_tac x = "list" in spec, rotate_tac -1)
+     apply(drule_tac x = "ab" in spec, rotate_tac -1)
+      apply(auto)
+
+     apply(case_tac "ll3_inc_jump l aa (aa # list)", auto)
+           apply(drule_tac x = "0" in spec, rotate_tac -1)
+       apply(drule_tac x = "list" in spec, rotate_tac -1)
+     apply(drule_tac x = "ab" in spec, rotate_tac -1)
+      apply(auto)
+
+      apply(drule_tac x = "0" in spec, rotate_tac -1)
+       apply(drule_tac x = "list" in spec, rotate_tac -1)
+     apply(drule_tac x = "ab" in spec, rotate_tac -1)
+      apply(auto)
+
+    apply(case_tac "ll3_inc_jump l (Suc n)
+              (aa # list) ", auto)
+    apply(rotate_tac 1)
+    apply(drule_tac x = "Suc n" in spec, rotate_tac -1)
+    apply(drule_tac x = "aa#list" in spec, rotate_tac -1)
+    apply(drule_tac x = "ab" in spec, rotate_tac -1)
+    apply(auto)
+    done
+qed
+
+lemma ll3_inc_jump_same [rule_format] :
+"(! n p l' b . ll3_inc_jump (l :: ll3 list) n p = (l', b) \<longrightarrow>
+   map ll_purge_annot l = map ll_purge_annot l')"
+  apply(insert ll3_inc_jump_same')
+  apply(auto)
+  done
+
 lemma ll3_inc_jump_wrap_qvalid [rule_format]:
 "   (((t :: ll3)) \<in> ll_valid_q \<longrightarrow>
       (! t' p b . ll3_inc_jump_wrap t p = t' \<longrightarrow>
@@ -384,6 +581,20 @@ lemma ll3_inc_jump_wrap_qvalid [rule_format]:
   apply(drule_tac ll_valid_q.cases) apply(auto)
   apply(frule_tac ll3_inc_jump_qvalid) apply(auto)
   apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+  done
+
+
+(* need ll3_inc_jump_wrap_same *)
+lemma ll3_inc_jump_wrap_same :
+"ll3_inc_jump_wrap t p = t' \<Longrightarrow>
+  ll_purge_annot t = ll_purge_annot t'"
+  apply(auto)
+  apply(case_tac t, auto)
+  apply(case_tac ba, auto)
+  apply(case_tac "ll3_inc_jump x52 0 p", auto)
+  apply(case_tac ba, auto)
+  apply(drule_tac ll3_inc_jump_same)
+  apply(auto)
   done
 
 (* pull process jumps loop to outside? *)
@@ -409,6 +620,56 @@ next
      apply(rule_tac[2] ll3_inc_jump_wrap_qvalid) apply(auto)
     done
 qed
+
+(* TODO: inductive argument here will need to change
+when we de-fuel process_jumps_loop *)
+lemma process_jumps_loop_same' [rule_format] :
+"(!  t2 t' . process_jumps_loop n (t2 :: ll3) = Some t' \<longrightarrow>
+(! t  . ll_purge_eq (t :: ll3) t2 \<longrightarrow>
+    ll_purge_annot t = ll_purge_annot t'))
+"
+proof(induction n)
+  case 0
+  then show ?case by auto
+next
+  case (Suc n)
+  then show ?case 
+    apply(auto)
+    apply(case_tac "ll3_resolve_jump_wrap
+              ((a, b), ba)", auto)
+     apply(drule_tac ll_purge_eq.cases, auto)
+    apply(case_tac "ll3_inc_jump_wrap ((a, b), ba)
+          (rev x3)", auto)
+    apply(drule_tac x = ac in spec)
+    apply(drule_tac x = bf in spec)
+    apply(drule_tac x = bfa in spec)
+    apply(drule_tac x = aa in spec)
+    apply(drule_tac x = bb in spec)
+    apply(drule_tac x = bc in spec)
+    apply(auto)
+    apply(drule_tac x = ac in spec)
+    apply(drule_tac x = bf in spec)
+    apply(subgoal_tac "ll_purge_eq ((ac, bf), bfa) ((ac, bf), bfa)")
+    apply(rule_tac [2] ll_purge_eq_refl)
+    apply(drule_tac x = bfa in spec) apply(auto)
+    apply(frule_tac ll3_inc_jump_wrap_same)
+    apply(drule_tac ll_purge_eq.cases)
+     apply(auto)
+    done
+qed
+
+lemma process_jumps_loop_same [rule_format] :
+"(!  t t' . process_jumps_loop n (t :: ll3) = Some t' \<longrightarrow>
+    ll_purge_annot t = ll_purge_annot t')
+"
+  apply(auto)
+  apply(drule_tac process_jumps_loop_same')
+   apply(auto)
+  apply(rule_tac ll_purge_eq_refl)
+  done
+
+(* then need a proof in semantics about how the semantics
+are the same if discarding annotations are same (?) *)
 
 inductive_set ll_valid4_inner :: "ll4 set" where
 "\<And> ls . 
@@ -1429,6 +1690,58 @@ apply(rule_tac x = ed in exI)
     apply(auto)
     apply(rule_tac ll3'_descend_relabelq)
     apply(auto)
+    done
+qed
+
+lemma write_jump_targets_same' :
+"
+(! l t' . write_jump_targets l (t :: ll4) = Some t' \<longrightarrow>
+  ll_purge_annot t = ll_purge_annot t')
+\<and>
+(! l ls' . mypeel (map (write_jump_targets l) ls) = Some ls' \<longrightarrow>
+  map ll_purge_annot ls = map ll_purge_annot ls'
+)
+"
+proof(induction rule:my_ll_induct)
+case (1 q e i)
+then show ?case by auto
+next
+  case (2 q e idx)
+  then show ?case by auto
+next
+  case (3 q e idx n)
+  then show ?case 
+    apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac "mynth l idx", auto)
+    done
+next
+  case (4 q e idx n)
+  then show ?case 
+apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac "mynth l idx", auto)
+    done
+next
+  case (5 q e l)
+  then show ?case 
+    apply(auto)
+    apply(case_tac q, auto)
+    apply(case_tac e, auto)
+     apply(case_tac "mypeel (map (write_jump_targets (None # la)) l)", auto)
+    apply(case_tac " ll_get_label l (ab # list)", auto)
+    apply(case_tac "mypeel (map (write_jump_targets (Some ac # la)) l)", auto)
+    done
+next
+  case 6
+  then show ?case 
+    apply(auto)
+    done
+next
+  case (7 h l)
+  then show ?case
+    apply(auto)
+    apply(drule_tac mypeel_spec1, auto)
     done
 qed
 
