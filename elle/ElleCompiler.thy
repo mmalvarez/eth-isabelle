@@ -329,6 +329,14 @@ fun process_jumps_loop :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3 option" where
   | JFail _ \<Rightarrow> None
   | JBump c \<Rightarrow> process_jumps_loop (n - 1) (ll3_inc_jump_wrap ls (rev c)))"
 
+(* count up the number of jumps, and multiply by 32 *)
+
+fun get_process_jumps_fuel :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> nat" where
+"get_process_jumps_fuel (_, LJmp _ _ s) = 32 - s"
+| "get_process_jumps_fuel (_, LJmpI _ _s) = 32 - s"
+| "get_process_jumps_fuel (_, LSeq _ ls) =
+    List.foldl (\<lambda> a b . a + b) 0 (List.map get_process_jumps_fuel ls)"
+| "get_process_jumps_fuel _ = 0"
 
 fun mynth :: "'a option list \<Rightarrow> nat \<Rightarrow> 'a option" where
     "mynth [] _ = None"
