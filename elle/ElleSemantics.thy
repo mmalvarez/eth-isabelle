@@ -255,7 +255,7 @@ next
   then show ?case by auto
 qed
 
-lemma ll'_sem_same :
+lemma ll'_sem_same [rule_format]:
 "(! t2 . ll_purge_annot (t1 :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) = ll_purge_annot t2 \<longrightarrow>
   (! d jd n depth s c . ll'_sem t1 d jd n depth s c = ll'_sem t2 d jd n depth s c))"
   apply(insert ll'_sem_same')
