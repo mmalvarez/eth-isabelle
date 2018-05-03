@@ -431,6 +431,8 @@ ll_valid3_check (?) \<rightarrow> ll_valid4pre_check (?) \<rightarrow>
 ll_valid4_post (?)
 *)
 
+(* TODO: implement this new pipeline *)
+
 (*
 Need to think carefully about what the preconditions for each of our compiler passes is.
 
