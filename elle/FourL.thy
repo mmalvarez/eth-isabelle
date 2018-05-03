@@ -429,6 +429,8 @@ definition streq :: "string \<Rightarrow> string \<Rightarrow> bool" where
 
 value "lookupS [(''a'',1), (''a'',2)] ''a'' :: nat option"
 
+(* TODO: support "lit", "lll" constructs *)
+
 (* TODO: have vars_tab argument to anything but parse1_def?  *)
 (* TODO: have llll_parse1_seq for parsing a sequence of arguments *)
 fun llll_parse1 :: "funs_tab  \<Rightarrow> stree \<Rightarrow> (llll * funs_tab) option " 
@@ -543,11 +545,15 @@ should it just be (llll * funs_tab)?
 (* everything we don't recognize just becomes a macro invocation *)
 *)
 
+(* TODO functions for threading POPs in between elements of SEQ *)
+(* *)
+
 (* default *)
 definition default_llll_funs :: funs_tab where
 "default_llll_funs =
 [
 (* control constructs *)
+(* TODO make this pop all but last result *)
 (''seq'', (\<lambda> l . Some (L4Seq l)))
 (* integer arithmetic *)
 ,(''+'', (\<lambda> l . Some (L4Arith LAPlus l)))

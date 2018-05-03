@@ -421,6 +421,23 @@ fun codegen' :: "ll4 \<Rightarrow> inst list" where
 definition codegen :: "ll4 \<Rightarrow> 8 word list" where
 "codegen ls = List.concat (map Evm.inst_code (codegen' ls))"
 
+(* new pipeline:
+ll_pass1 \<rightarrow> ll3_init \<rightarrow> ll3_assign_label \<rightarrow>
+ll_valid3_check \<rightarrow> process_jumps_loop \<rightarrow>
+ll_valid3_check \<rightarrow> ll_valid4pre_check \<rightarrow> ll4_init \<rightarrow>
+ll_valid3_check (?) \<rightarrow> ll_valid4pre_check (?) \<rightarrow>
+write_jump_targets \<rightarrow>
+ll_valid3_check (?) \<rightarrow> ll_valid4pre_check (?) \<rightarrow>
+ll_valid4_post (?)
+*)
+
+(*
+Need to think carefully about what the preconditions for each of our compiler passes is.
+
+*)
+
+(* legacy pipelines that do NOT run the checker,
+therefore aren't (quite) verified *)
 definition pipeline' :: "ll1 \<Rightarrow> nat \<Rightarrow> ll4 option" where
 "pipeline' l n = 
  (case (ll3_assign_label (ll3_init (ll_pass1 l))) of

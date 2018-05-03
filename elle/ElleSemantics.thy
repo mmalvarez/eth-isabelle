@@ -18,6 +18,9 @@ and gather_ll1_labels_list :: "ll1 list \<Rightarrow> childpath \<Rightarrow> na
    gather_ll1_labels_list t cp (ofs+1) d"
 
 
+(* TODO: need to subtract off gas in LJmp case *)
+(* subtract_gas (meter_gas (PC JumpI) v c net)
+((new_memory_consumption inst(vctx_memory_usage   v) (vctx_stack_default(( 0 :: int)) v) (vctx_stack_default(( 1 :: int)) v) (vctx_stack_default(( 2 :: int)) v) (vctx_stack_default(( 3 :: int)) v) (vctx_stack_default(( 4 :: int)) v) (vctx_stack_default(( 5 :: int)) v) (vctx_stack_default(( 6 :: int)) v))) *)
 fun ll1_sem :: 
   "ll1 \<Rightarrow>
    (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
@@ -133,6 +136,8 @@ fun elle_denote :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
 
 (* TODO need to unpack correctly *)
 (* NB we make no update to keep the PC correct *)
+(* TODO: do we account for gas here?  I think we just need to
+subtract off verylow*)
 fun elle_jmpd :: "ellest \<Rightarrow> (bool * ellest) option" where
 "elle_jmpd (v, c, n) =
  (case (vctx_stack v) of
@@ -261,5 +266,13 @@ lemma ll'_sem_same [rule_format]:
   apply(insert ll'_sem_same')
   apply(auto)
   done
+
+(* idea: now we need to prove that the two semantics we have for an ll4
+1. ll'_sem
+2. program_sem ("to_program" (write_bytes out))
+
+To do this we need to first fix the gas issue around jumps
+in the ll/ll' semantics
+*)
 
 end
