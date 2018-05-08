@@ -63,7 +63,8 @@ where
 
 
 (* first, deal with scanning cases *)
-(* TODO we should include semantics of the label itself *)
+(* TODO we should include semantics of the label itself
+however this only changed the PC, we don't care about that *)
 
 (* NB we only call ourselves in "seek" mode on a label when we are sure of finding a label *)
 | "ll1_sem (ll1.LLab d) _ _ n (Some d') _ cont = 

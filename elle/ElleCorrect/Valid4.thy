@@ -1745,6 +1745,120 @@ next
     done
 qed
 
-(* write_jump_targets_qvalid *)
+(* write_jump_targets_qvalid - or is this needed? 
+i think we need it to build a link between the address in EVM and the ll semantics *)
+
+lemma write_jump_targets_qvalid' :
+"((x, (t :: ll4t)) \<in> ll_valid_q \<longrightarrow> 
+  (! lp x' t' . write_jump_targets lp (x, t) = Some (x', t') \<longrightarrow> 
+    x = x' \<and>
+    (x, t') \<in> ll_valid_q)) \<and>
+ (((m,m'), (l :: ll4 list)) \<in> ll_validl_q \<longrightarrow> 
+    (! lp l' . mypeel (map (write_jump_targets lp) l) = Some l' \<longrightarrow>
+       ((m, m'), l') \<in> ll_validl_q))"
+proof(induction rule: ll_valid_q_ll_validl_q.induct)
+case (1 i x e)
+  then show ?case 
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (2 x d e)
+  then show ?case 
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (3 x d e s)
+  then show ?case 
+    apply(auto)
+    apply(case_tac "mynth lp d") apply(auto)
+     apply(case_tac "mynth lp d") apply(auto)
+apply(case_tac "mynth lp d") apply(auto)
+     apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (4 x d e s)
+  then show ?case 
+    apply(auto)
+      apply(case_tac "mynth lp d") apply(auto)
+     apply(case_tac "mynth lp d") apply(auto)
+apply(case_tac "mynth lp d") apply(auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (5 n l n' e)
+  then show ?case 
+    apply(clarsimp)
+    apply(case_tac e, clarsimp)
+    apply(auto)
+    apply(case_tac " mypeel
+              (map (write_jump_targets (None # lp)) l)", auto)
+    apply(case_tac " mypeel
+              (map (write_jump_targets (None # lp)) l)", auto)
+    apply(case_tac " mypeel
+              (map (write_jump_targets (None # lp)) l)", auto)
+     apply(drule_tac x = "None#lp" in spec) apply(drule_tac x = aa in spec) apply(auto)
+     apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+
+    apply(case_tac "ll_get_label l (aa#list)", auto)
+    apply(case_tac "mypeel
+              (map (write_jump_targets (Some ab # lp)) l)", auto)
+    apply(case_tac "ll_get_label l (aa#list)", auto)
+    apply(case_tac "mypeel
+              (map (write_jump_targets (Some ab # lp)) l)", auto)
+
+        apply(case_tac "ll_get_label l (aa#list)", auto)
+    apply(case_tac "mypeel
+              (map (write_jump_targets (Some ab # lp)) l)", auto)
+    apply(drule_tac x = "Some ab # lp" in spec)
+    apply(drule_tac x = "ac" in spec) apply(auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (6 n)
+  then show ?case 
+    apply(auto)
+    apply(rule_tac ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (7 n h n' t n'')
+  then show ?case 
+    apply(auto)
+    apply(drule_tac mypeel_spec1) apply(auto)
+    apply(drule_tac x = lp in spec, rotate_tac -1)
+    apply(drule_tac x = a in spec, rotate_tac -1)
+    apply(drule_tac x = b in spec, rotate_tac -1)
+    apply(drule_tac x = ba in spec, rotate_tac -1) apply(auto)
+    apply(drule_tac x = lp in spec) 
+    apply(drule_tac x = t' in spec) apply(auto)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+qed
+
+lemma write_jump_targets_qvalid1 [rule_format] :
+"((x, (t :: ll4t)) \<in> ll_valid_q \<longrightarrow> 
+  (! lp x' tt' . write_jump_targets lp (x, t) = Some tt' \<longrightarrow>
+    tt' \<in> ll_valid_q))
+"
+  (* last 3 args bogus *)
+  apply(insert write_jump_targets_qvalid'[of x t 0 0 "[]"])
+  apply(auto)
+  done
+
+(* Now, we need the final theorem
+- if a Seq node is qvalid starting from 0
+- and it has a descendent (that is qvalid)
+  - and that descendent has a unique label
+  - then executing that Seq in "skip mode" in the ll semantics
+    is equivalent to executing the code generated from the root Seq node
+    with PC equal to that address
+      
+Q: How to generalize over different continuations?
+Is this necessary?
+Is this possible?
+
+Another idea: generalize over location. Have an address offset to make up the
+difference between 0 and the Seq node's start
+*)
 
 end
+
