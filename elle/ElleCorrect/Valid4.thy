@@ -1860,5 +1860,66 @@ Another idea: generalize over location. Have an address offset to make up the
 difference between 0 and the Seq node's start
 *)
 
+(*
+
+Idea: IF we are valid3
+AND validate_jump_targets (on the root?) (with what scope arguments?) is true
+AND we have an lc (continuations list, incoming to ll_sem)
+AND for each item in the continuations list
+  - either it is None, and there is a Seq with no descendents
+  - or it is Some, and there is a Seq for which scanning to that seq at that depth in the tree has the same semantics
+
+THEN
+
+ll_sem x matches
+program_sem (purge_annot (compile x))
+
+*)
+
+(*
+
+Question: do we need to fix a root? I think we need to say either:
+1. The incoming lc is nil, and the node we are on is the root
+2. The incoming lc is nonnil, and we have a series of sub-roots
+  - How does this shake out though?
+
+*)
+
+(*
+
+How do we match up incoming LC with incoming addresses in validate_jump_targets?
+  - the idea is that the address stored at each node should be the address of that label
+    (and equal to the address that gets written in the jump)
+  - jumps get resolved in 1 of 2 ways
+    - 1. they are given by a continuation
+      2. there exist a descendent, and semantics are equal to "scanning" that descendent at appropriate depth
+
+is just positing the existence of such a root enough?
+
+Also, what do we do induction on? My instinct is still that it should be on the syntax tree (ll)
+
+*)
+
+(* Another attempt at restating:
+
+If we have a Seq node that is valid3' with some list l, then
+
+1. l is nil and that Seq is the root. Then we have the following 2 results:
+   a. The non-scanning semantics of Seq are the same as running the Seq starting from the beginning (pc = 0)
+   b. Either
+      i. There is no label, and scanning fails
+      ii. There is a unique label, and the semantics of scanning are the same as jumping to that address
+
+- important - how do we handle all these different nonnil cases? -
+2. l is nonnil. Then there must be a root such that
+   
+
+3.
+
+4.
+
+*)
+
+
 end
 
