@@ -1341,7 +1341,7 @@ qed
 lemma ll_get_node_list_prefix :
 ll_get_node_list
 *)
-lemma validate_jump_targets_spec :
+lemma validate_jump_targets_spec' :
 "
   (! l . ll4_validate_jump_targets l t \<longrightarrow>
   (! qj ej idxj sz kj . (t, (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
@@ -1693,6 +1693,26 @@ apply(rule_tac x = ed in exI)
     done
 qed
 
+lemma validate_jump_targets_spec [rule_format] :
+"
+(! l . ll4_validate_jump_targets l t \<longrightarrow>
+  (! qj ej idxj sz kj . (t, (qj, LJmp ej idxj sz), kj) \<in> ll3'_descend \<longrightarrow>
+  ((\<exists> qr er ls ql el idxl  . t = (qr, LSeq er ls) \<and> (t, (ql, LLab el idxl), er) \<in> ll3'_descend \<and> 
+                 idxj + 1 = length kj \<and> idxl + 1 = length er \<and> fst ql = ej) \<or>
+   (? qd ed ls k1 k2 . (t, (qd, LSeq ed ls), k1) \<in> ll3'_descend \<and> 
+    ((qd, LSeq ed ls), (qj, LJmp ej idxj sz), k2) \<in> ll3'_descend \<and>
+    kj = k1 @ k2 \<and> idxj + 1 = length k2 \<and>
+    ( ? ql el idxl kl . ((qd, LSeq ed ls), (ql, LLab el idxl), ed) \<in> ll3'_descend \<and> 
+       idxl + 1 = length ed \<and> fst ql = ej)) \<or>
+   (? n . mynth l n = Some ej \<and> length kj + n = idxj) 
+  )))
+"
+  apply(insert validate_jump_targets_spec')
+  apply(auto)
+  done
+
+
+
 lemma write_jump_targets_same' :
 "
 (! l t' . write_jump_targets l (t :: ll4) = Some t' \<longrightarrow>
@@ -1911,15 +1931,159 @@ If we have a Seq node that is valid3' with some list l, then
       ii. There is a unique label, and the semantics of scanning are the same as jumping to that address
 
 - important - how do we handle all these different nonnil cases? -
+problem is that we may end up following one of the passed-in continuations
+how do we account for that in our low-level semantic steps?
 2. l is nonnil. Then there must be a root such that
-   
+- starting that root from the beginning has the same semantics as starting EVM semantics from beginning
+  - (needed?)
+- starting our node from the beginning (using continuations passed in
+  has same semantics as starting EVM semantics from its beginning
+- starting our node in scanning mode (if there is on)
 
-3.
 
-4.
+2'. HOW do we make sure the continuations appropriately "match up"?
+This seems to be the other missing piece.
+- idea: (continuation, address) pairs are either both None
+- or, running the continuation has same result as jumping to address in global
+*)
+
+(*
+
+How to handle generalizing over different scanning depths?
+  - that is the key. if we scan at 0, then we will look for descendents that point up at this node
+  - if we scan at n, then we will need to compare to one of the passed-in continuations
+    - idea: scanning at a value > 0 means we need to look up in the params (mynth)
+      get the continuation, and then that continuation has semantics equal to scanning result at this node (?)
 
 *)
 
+(* we need a lemma allowing us to "push" facts about
+locations through the codegen step
+(in particular - if we are ll_valid, then
+the labeled starting address equals the address
+it is stored in the output buffer)
+*)
+
+(* how to deal with incoming continuation?
+it may not get run at all.
+the incoming continuation is what we do next,
+in the absence of control flow.
+so, we should have some kind of condition
+relating it to the root
+
+the only place where we discard the current continuation is on a jump
+in this case, we are  jumping to a scope, which ought to have
+the same "final" continuation somewhere in it.
+
+*)
+
+value "List.subseqs ([1, 2, 3] :: nat list)"
+
+(* needed to describe relationship between descended childpath
+and the series of assertions it will require about descended nodes'
+scanning
+
+for each element in the tails list of the root descendent childpath,
+
+(do we need a similar "heads" function to describe how we actually get to the
+node)
+*)
+
+
+(* the idea behind pathsplits is that
+if we have nil, this cannot be a valid path (so no need to worry about case)
+if we have a singleton, then this belongs to parent, tail is nil
+(corresponding to case where we don't have to deal with further descendents*)
+
+(*
+fun pathsplits' :: "'a list \<Rightarrow> 'a list \<Rightarrow> ('a list * 'a list) list" where
+"pathsplits' [] = []"
+| "pathsplits' [h] = [([h], [])]"
+| "pathsplits' (h#t) = 
+   ((h#t), [])"
+*)
+fun tails :: "'a list \<Rightarrow> 'a list list" where
+"tails [] = []"
+| "tails (h#t) = ((h#t)#(tails t))"
+
+value "tails ([1, 2, 3, 4] :: nat list)"
+
+(*
+
+cases for final correctness theorem
+
+OVERALL thing that needs to be improved here:
+how to deal with scanning cases where the scanning depth is > 0?
+- idea: this will cause a jump into one of the passed-in continuations (?)
+  - No - it has the same semantics as a jump to the PC stored at a higher level descendent
+  - That is how we need to approach this.
+
+I. node case
+
+  1. Node is root
+    A. Then non scanning semantics are same as compiling and starting pc=0
+    B. Then scanning semantics are the same as setting pc = get_label (seq)
+        - Scan depth will cannot be greater than 0
+        - Or, are (\<lambda> _ . None) in the case that label is nil
+    C. Continuation list has to be empty
+      (Does "after" continuation need to be Some? - no, I don't think so)
+
+  2. Node is a descendent
+    A. passed in continuations have to match
+       
+       a. Final continuation must be same as root final continuation (?)
+       b. We need to follow the descendents path, and ensure that
+          each continuation either corresponds to (\<lambda> _ . None)
+          or to result of jumping to the PC value embedded at that Seq
+            - OR - can we get away with saying each continuation is result of calling
+              ll_sem in scanning mode on that Seq node - I think we may need to do this
+              actually, otherwise there will be more proof burden (?)
+            - what is a compact way to state this?
+
+      More ideas on how to state this:
+        - Do we need to state this for all descendents, or just the relevant ones?
+        - that is, 
+
+
+     B. Then non scanning semantics are the same as compiling full program,
+        and starting at pc = Seq's addr
+      
+     C. Scanning smeantics are the same as setting pc = address stored at
+        Seq's label (or None, if there is none)
+      - Or, if scan depth greater than 0, same as setting pc = get_label (ancestor)
+        - Should we keep an explicit list of ancestors as we go?
+
+II. list case
+
+(do we need it? i have a feeling we do)
+
+
+*)
+
+(*
+
+One big question that arises from the above.
+In our assumptions about the ancestors, do we actually need to specify the semantics of each one
+or do we get to assume that their semantics is the correct semantic of the jump we want?
+It feels like that may be assuming too much.
+
+Actually, maybe not! After all, we should be able to prove the "higher up" case of jumps
+(e.g. jumps to the root's dest) without any arguments about parameters
+
+How does the "scanning" case look in this case?
+
+*)
+
+(*
+
+ll_valid3' t \<longrightarrow>
+ll4_validate_jump_targets l t \<longrightarrow>
+(* want ll'_sem here - need to access continuation list *)
+ll'_sem t elle_denote elle_jmpd n None c st = Some st'' \<longrightarrow>
+program_sem (\<lambda> _ . ())
+            (fst st) n (snd st) = ProgramReturn (st') \<and>
+  c st = st''
+*)
 
 end
 
