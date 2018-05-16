@@ -2085,5 +2085,160 @@ program_sem (\<lambda> _ . ())
   c st = st''
 *)
 
+(* gather all of the sequence nodes traversed along the way *)
+(* is LL get node the best way here? *)
+fun followcp:: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow>
+               ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list option" where
+"followcp _ [] = None"
+| "followcp t [_] = Some [t]" (* ignore last child *)
+| "followcp t (ch#ct) =
+   (case ll_get_node t [ch] of
+    None \<Rightarrow> None
+    | Some t' \<Rightarrow> 
+      (case followcp t' ct of 
+       None \<Rightarrow> None
+       | Some l' \<Rightarrow> Some (t'#l')))"
+
+(* take in cont as an explicit parameter? 
+this actually seems pretty annoying, do we also need to reproduce the
+after-continuation?
+it may actually always be the same?
+yeah, i don't think we ever change the continuation in the recursive calls
+we are doing for the scope
+*)
+fun generate_conts ::
+"('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow>
+     (ellest \<Rightarrow> ellest option) list \<Rightarrow> 
+     (ellest \<Rightarrow> ellest option) \<Rightarrow>
+     ((ellest \<Rightarrow> ellest option) list) option" where
+
+"generate_conts t [] _ _ _ = None"
+
+(* should this case be (n-1)? *)
+| "generate_conts t [_] n scopes cont =
+   Some ((ll'_sem t elle_denote elle_jmpd (n-1) (Some 0) scopes cont)#scopes)"
+
+| "generate_conts t (ch#ct) n scopes cont =
+   (case ll_get_node t [ch] of
+    None \<Rightarrow> None
+    | Some t' \<Rightarrow> generate_conts t' ct (n - 1 - ch) 
+        ((ll'_sem t elle_denote elle_jmpd (n-1) (Some 0) scopes cont)#scopes) cont)"
+
+(* we need to do something slightly more elaborate
+when calculating the list of continuations.
+
+at root, the continuation list is empty
+
+at each step, we construct the following new continuation:
+- call ourselves on the current node, with 1 less fuel
+- use the continuation list generated from the last iteration
+
+so, this is a paramorphism that also needs an additional index parameter
+(the index parameter allows us to track fuel)
+
+also, we can precisely calculate the elle-fuel parameter
+in particular, fuel decrements when passing through a seq node
+as well as 1 per child.
+
+so, when following a childpath to construct a continuation list,
+we should be able to reproduce the fuel exactly.
+ *)
+
+(*
+
+Another key point. We need to deal with deeper scannings.
+What does it mean for a (descendent) to be scanned at a 
+deeper level?
+
+- First, the depth of the scanning (beyond 0) must be equal to the length of the 
+childpath of the descend relation
+- will have the effect of setting the PC to the root's label
+
+*)
+
+(*
+
+What about the "ll_list_sem" second half of this case?
+I think we can just restate the first case in terms of
+"LSeq e ls", hopefully that will suffice.
+
+*)
+
+fun setpc :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
+"setpc (e, e2, e3) n =
+  ((e \<lparr> vctx_pc := (int n) \<rparr>)
+  , e2
+  , e3)"
+
+fun clearprog :: "ellest \<Rightarrow> ellest" where
+"clearprog (e1, e, e3) =
+  (e1
+  , (e \<lparr> cctx_program := empty_program \<rparr>)
+  , e3)"
+
+(* throw away program and pc *)
+definition elleq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
+"elleq a b = (setpc (clearprog a) 0 = setpc (clearprog b) 0)"
+
+(* new pipeline *)
+
+definition ellecompile_untrusted :: "ll1 \<Rightarrow> ll4 option" where
+"ellecompile_untrusted l =
+(case (ll3_assign_label (ll3_init (ll_pass1 l))) of
+  Some l' \<Rightarrow> (case process_jumps_loop (get_process_jumps_fuel l') l' of
+              Some l'' \<Rightarrow> (case write_jump_targets [] (ll4_init l'') of
+                           Some l''' \<Rightarrow> Some l''')))"
+
+(* blargh, we need to change the type of check_ll3... *)
+(*
+definition ellecompile :: "ll1 \<Rightarrow> program option" where
+"ellecompile l =
+(case ellecompile_untrusted l of
+    Some l' \<Rightarrow>
+    (* check ll3 valid *)
+    (if check_ll3 l' then
+      (if ll4_validate_jump_targets [] l' then
+      (prog_init_cctx (codegen l'))
+      else None)
+    else None)
+    | _ \<Rightarrow> None)"
+*)
+
+(* need a function for dumping an ll4 to a program *)
+(* definition ll4_dump : "ll4 \<Rightarrow>  " *)
+
+(* wrap program sem to take in an ellest' *)
+fun my_program_sem :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
+"my_program_sem (vc, cc, net) n =
+  (Evm.program_sem
+    (\<lambda> _ . ())
+    c n net
+    (InstructionContinue vc))"
+
+(* need to use program_sem, unpacking the thing *)
+
+(* use valid3 induction principle? *)
+lemma elle_correct :
+"
+t \<in> ll_valid3' \<longrightarrow>
+validate_jump_targets [] t \<longrightarrow>
+(
+((! n st st'1 . ll'_sem n [] t None st = Some st'1 \<longrightarrow>
+  (? st'2 . elleq st'1 st'2 \<and> vm_sem (dump t) (setpc st 0) = st'2))
+ \<and>
+ (ll'_sem n [] t (Some 0) st = Some st'1 \<longrightarrow>
+    (? st'2 . elleq st'1 st'2 \<and> vm_sem (dump t) = st2)
+    (t = LSeq lab ls \<and> 
+      (? a . get_label t lab = Some a \<and> 
+      evm_sem (dump t) (setpc st a) = st')))))
+\<and>
+((t, t', k) \<in> ll'_descend) \<longrightarrow>
+  followcp t k = Some lt \<longrightarrow>
+  ll'_sem n [] None st = Some st' \<longrightarrow>
+  evm_sem (
+)
+"
+    
+
 end
 

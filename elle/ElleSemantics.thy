@@ -123,6 +123,12 @@ fun silly_ll1_sem ::
 "silly_ll1_sem x n c = ll1_sem x silly_denote silly_jmpred n None [] c"
 
 (* our real Elle semantics, using EVM *)
+(* type_synonym ellest = "variable_ctx * constant_ctx * network" *)
+
+(* change this to use InstructionResult *)
+(* also, we are going to have to copy-paste part of
+next_state when defining elle_denote
+*)
 type_synonym ellest = "variable_ctx * constant_ctx * network"
 
 (* TODO: check that instruction is allowed *)
@@ -267,6 +273,8 @@ lemma ll'_sem_same [rule_format]:
   apply(insert ll'_sem_same')
   apply(auto)
   done
+
+(* we probably need another one of these lemmas for ll_list_sem'? *)
 
 (* idea: now we need to prove that the two semantics we have for an ll4
 1. ll'_sem
