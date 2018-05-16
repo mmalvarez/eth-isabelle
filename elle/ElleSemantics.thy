@@ -18,9 +18,12 @@ and gather_ll1_labels_list :: "ll1 list \<Rightarrow> childpath \<Rightarrow> na
    gather_ll1_labels_list t cp (ofs+1) d"
 
 
-(* TODO: need to subtract off gas in LJmp case *)
+(* TODO: need to check resources in LJmp, LJmpI, Label case *)
+(* TODO: need to subtract off gas in LJmp, LJmpI, Label case *)
+(* this will require adding more parameters *)
 (* subtract_gas (meter_gas (PC JumpI) v c net)
 ((new_memory_consumption inst(vctx_memory_usage   v) (vctx_stack_default(( 0 :: int)) v) (vctx_stack_default(( 1 :: int)) v) (vctx_stack_default(( 2 :: int)) v) (vctx_stack_default(( 3 :: int)) v) (vctx_stack_default(( 4 :: int)) v) (vctx_stack_default(( 5 :: int)) v) (vctx_stack_default(( 6 :: int)) v))) *)
+(* *)
 fun ll1_sem :: 
   "ll1 \<Rightarrow>
    (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
