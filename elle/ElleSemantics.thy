@@ -23,12 +23,6 @@ and gather_ll1_labels_list :: "ll1 list \<Rightarrow> childpath \<Rightarrow> na
 (* this will require adding more parameters *)
 
 (* do instd and jmpd really need to return an option? *)
-(* for convenience, let's package these into one parameter of type llinterp
-llinterp is
-inst \<Rightarrow> 'a \<Rightarrow> 'a option
-'a \<Rightarrow> (bool * 'a) option
-
-*)
 
 (* idk exactly what these next comments are for - maybe unnecessary *)
 (* subtract_gas (meter_gas (PC JumpI) v c net)
@@ -142,24 +136,47 @@ fun silly_ll1_sem ::
 (* also, we are going to have to copy-paste part of
 next_state when defining elle_denote
 *)
-type_synonym ellest = "variable_ctx * constant_ctx * network"
+type_synonym ellest = "instruction_result * constant_ctx * network"
 
 (* TODO: check that instruction is allowed *)
 (* TODO: actually deal with InstructionToEnvironment reasonably *)
+(* part of this copied from next_state *)
 fun elle_denote :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
-"elle_denote i (vc, cc, n) =
- (case instruction_sem vc cc i n of
-  InstructionContinue vc' \<Rightarrow>
-    Some(vc', cc, n)
-  | InstructionToEnvironment _ vc' _ \<Rightarrow>
-    Some(vc', cc, n))"
+"elle_denote i (ir, cc, n) =
+    (case ir of
+      InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
+    | InstructionContinue v \<Rightarrow>
+        if check_resources v cc (vctx_stack   v) i n then
+          Some (instruction_sem v cc i n, cc, n)
+        else
+          Some 
+          (InstructionToEnvironment (ContractFail
+               ((case  inst_stack_numbers i of
+                  (consumed, produced) =>
+                  (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
+                   @ (if meter_gas i v cc n \<le>(vctx_gas   v) then [] else [OutOfGas])
+                )
+               ))
+               v None
+          , cc
+          , n))"
 
 (* TODO need to unpack correctly *)
 (* NB we make no update to keep the PC correct *)
 (* TODO: do we account for gas here?  I think we just need to
 subtract off verylow*)
+
+(* here we need to
+- unpack state
+- check if it is InstructionToEnvironment - if so don't touch it
+- 
+*)
 fun elle_jmpd :: "ellest \<Rightarrow> (bool * ellest) option" where
-"elle_jmpd (v, c, n) =
+"elle_jmpd (ir, c, n) =
+ (case ir of
+  InstructionToEnvironment _ _ _ \<Rightarrow> Some (False, (ir, c, n))
+| InstructionContinue v \<Rightarrow>
+  if check_resources v c (vctx_stack v) (PC JUMPI)
  (case (vctx_stack v) of
    cond # rest \<Rightarrow>
     (let new_env = (( v (| vctx_stack := (rest) |))) in

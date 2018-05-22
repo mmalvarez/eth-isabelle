@@ -2106,6 +2106,11 @@ it may actually always be the same?
 yeah, i don't think we ever change the continuation in the recursive calls
 we are doing for the scope
 *)
+(*
+check to make sure n is greater than 0
+if it is not, we'll need to do "const none"
+question though - when do we "cut off" continuations?
+*)
 fun generate_conts ::
 "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow>
      (ellest \<Rightarrow> ellest option) list \<Rightarrow> 
