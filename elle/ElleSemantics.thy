@@ -27,11 +27,19 @@ and gather_ll1_labels_list :: "ll1 list \<Rightarrow> childpath \<Rightarrow> na
 (* idk exactly what these next comments are for - maybe unnecessary *)
 (* subtract_gas (meter_gas (PC JumpI) v c net)
 ((new_memory_consumption inst(vctx_memory_usage   v) (vctx_stack_default(( 0 :: int)) v) (vctx_stack_default(( 1 :: int)) v) (vctx_stack_default(( 2 :: int)) v) (vctx_stack_default(( 3 :: int)) v) (vctx_stack_default(( 4 :: int)) v) (vctx_stack_default(( 5 :: int)) v) (vctx_stack_default(( 6 :: int)) v))) *)
+
+(* llinterp is instD, jmpD, jmpiD, labD *)
+type_synonym 'a llinterp =
+"((inst \<Rightarrow> 'a \<Rightarrow> 'a option) *
+  ('a \<Rightarrow> 'a option) *
+  ('a \<Rightarrow> (bool * 'a) option) *
+  ('a \<Rightarrow> 'a option))
+"
+
 (* *)
 fun ll1_sem :: 
   "ll1 \<Rightarrow>
-   (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
-   ('a \<Rightarrow> (bool * 'a) option) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   'a llinterp \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
@@ -40,8 +48,7 @@ fun ll1_sem ::
    ('a \<Rightarrow> 'a option)" 
 and ll1_list_sem ::
  "ll1 list \<Rightarrow>
-   (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
-   ('a \<Rightarrow> (bool * 'a) option) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   'a llinterp \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
@@ -53,20 +60,20 @@ where
 (* list_sem cases *)
 
 (* non seeking, nil means noop *)
- "ll1_list_sem [] denote jmpd n None scopes cont = cont"
+ "ll1_list_sem [] intp n None scopes cont = cont"
 (* when seeking, nil means we failed to find something we should have *)
-| "ll1_list_sem [] denote jmpd n (Some _) scopes cont = (\<lambda> _ . None)"
+| "ll1_list_sem [] intp n (Some _) scopes cont = (\<lambda> _ . None)"
 
-| "ll1_list_sem (h#t) denote jmpd n None scopes cont =
+| "ll1_list_sem (h#t) intp n None scopes cont =
    (if n = 0 then (\<lambda> _ . None)
-    else ll1_sem h denote jmpd (n - 1) None scopes
-    (ll1_list_sem t denote jmpd (n - 1) None scopes cont))"
+    else ll1_sem h intp (n - 1) None scopes
+    (ll1_list_sem t intp (n - 1) None scopes cont))"
 
-| "ll1_list_sem (h#t) denote jmpd n (Some d) ctx cont =
+| "ll1_list_sem (h#t) intp n (Some d) ctx cont =
    (if n = 0 then (\<lambda> _ . None) else
    (case gather_ll1_labels h [] d of
-    [] \<Rightarrow> ll1_list_sem t denote jmpd (n - 1) (Some d) ctx cont
-   | _ \<Rightarrow> ll1_sem h denote jmpd (n - 1) (Some (Suc d)) ctx (ll1_list_sem t denote jmpd (n - 1) None ctx cont)))"
+    [] \<Rightarrow> ll1_list_sem t intp (n - 1) (Some d) ctx cont
+   | _ \<Rightarrow> ll1_sem h intp (n - 1) (Some (Suc d)) ctx (ll1_list_sem t intp (n - 1) None ctx cont)))"
 
 
 (* first, deal with scanning cases *)
@@ -74,40 +81,45 @@ where
 however this only changed the PC, we don't care about that *)
 
 (* NB we only call ourselves in "seek" mode on a label when we are sure of finding a label *)
-| "ll1_sem (ll1.LLab d) _ _ n (Some d') _ cont = 
-   (if d + 1 = d' then cont
+| "ll1_sem (ll1.LLab d) (instD, jmpD, jmpiD, labD) n (Some d') _ cont = 
+   (if d + 1 = d' then 
+    (\<lambda> s . (case labD s of None \<Rightarrow> None
+                          | Some s' \<Rightarrow> cont s'))
     else (\<lambda> s . None ))"
 
-| "ll1_sem (ll1.LSeq ls) denote jmpd n (Some d) scopes cont =
+| "ll1_sem (ll1.LSeq ls) intp n (Some d) scopes cont =
    (if n = 0 then (\<lambda> _ . None)
     else 
-    ll1_list_sem ls denote jmpd (n - 1) (Some d)
-       ((ll1_sem (ll1.LSeq ls) denote jmpd (n - 1) (Some 0) scopes cont)#scopes)
+    ll1_list_sem ls intp (n - 1) (Some d)
+       ((ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) scopes cont)#scopes)
        cont)"
 
 (* for anything else, seeking is a no op *)
-| "ll1_sem _ _ _ n (Some d) _ cont = cont"
+| "ll1_sem _ intp n (Some d) _ cont = cont"
 
 (* "normal" (non-"scanning") cases *)
-| "ll1_sem (ll1.L i) denote _ n None scopes cont =
-  (\<lambda> s . case denote i s of
+| "ll1_sem (ll1.L i) (instD, jmpD, jmpiD, labD) n None scopes cont =
+  (\<lambda> s . case instD i s of
            Some r \<Rightarrow> cont r
           | None \<Rightarrow> None)"
-| "ll1_sem (ll1.LLab d) denote _ n None scopes cont = cont"
-| "ll1_sem (ll1.LJmp d) denote _ n None scopes cont = scopes ! d"
-| "ll1_sem (ll1.LJmpI d) denote jmpd n None scopes cont =
-(\<lambda> s . case (jmpd s) of
+| "ll1_sem (ll1.LLab d) (instD, jmpD, jmpiD, labD) n None scopes cont = 
+    (\<lambda> s . (case labD s of None \<Rightarrow> None
+                          | Some s' \<Rightarrow> cont s'))"
+| "ll1_sem (ll1.LJmp d) (instD, jmpD, jmpiD, labD) n None scopes cont = 
+    (\<lambda> s . (case jmpD s of None \<Rightarrow> None
+                          | Some s' \<Rightarrow> (scopes ! d) s'))"
+| "ll1_sem (ll1.LJmpI d) (instD, jmpD, jmpiD, labD) n None scopes cont =
+(\<lambda> s . case (jmpiD s) of
         None \<Rightarrow> None
         | Some (True, s') \<Rightarrow> ((scopes ! d) s')
         | Some (False, s') \<Rightarrow> cont s')"
 
-(* new idea for Seq case *)
-| "ll1_sem (ll1.LSeq ls) denote jmpd n None scopes cont =
+| "ll1_sem (ll1.LSeq ls) intp n None scopes cont =
    (if n = 0 then (\<lambda> _ . None)
     else
-     ll1_list_sem ls denote jmpd (n - 1) None
+     ll1_list_sem ls intp (n - 1) None
       (* this scope continuation was ll1_sem before *)
-      ((ll1_sem (ll1.LSeq ls) denote jmpd (n - 1) (Some 0) scopes cont)#scopes) cont)"
+      ((ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) scopes cont)#scopes) cont)"
 
 (* a sample instantiation of the parameters for our semantics *)
 (* state is a single nat, ll1.L increments
@@ -121,13 +133,17 @@ fun silly_denote :: "inst \<Rightarrow> nat \<Rightarrow> nat option" where
 fun silly_jmpred :: "nat \<Rightarrow> (bool * nat) option" where
 "silly_jmpred n = (Some (n \<noteq> 0, n))"
 
+definition silly_interp :: "nat llinterp" where
+"silly_interp =
+  (silly_denote, Some, silly_jmpred, Some)"
+
 fun silly_ll1_sem :: 
   "ll1 \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
 (* continuations corresponding to enclosing scopes *)
    (nat \<Rightarrow> nat option) \<Rightarrow> (* continuation *)
    (nat \<Rightarrow> nat option)" where
-"silly_ll1_sem x n c = ll1_sem x silly_denote silly_jmpred n None [] c"
+"silly_ll1_sem x n c = ll1_sem x silly_interp n None [] c"
 
 (* our real Elle semantics, using EVM *)
 (* type_synonym ellest = "variable_ctx * constant_ctx * network" *)
@@ -141,8 +157,8 @@ type_synonym ellest = "instruction_result * constant_ctx * network"
 (* TODO: check that instruction is allowed *)
 (* TODO: actually deal with InstructionToEnvironment reasonably *)
 (* part of this copied from next_state *)
-fun elle_denote :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
-"elle_denote i (ir, cc, n) =
+fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
+"elle_instD i (ir, cc, n) =
     (case ir of
       InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
     | InstructionContinue v \<Rightarrow>
@@ -160,6 +176,35 @@ fun elle_denote :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
                v None
           , cc
           , n))"
+
+(* OK - for now we need to coalesce failure cases into None *)
+(* otherwise we can get bad transient states on out of gas 
+(different stack contents)
+*)
+
+fun elle_jmpD :: "ellest \<Rightarrow> ellest option" where
+"elle_jmpD (ir, cc, n) =
+ (case ir of
+  InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
+ | InstructionContinue v \<Rightarrow>
+    (if check_resources v c (vctx_stack v) (PC JUMP) net then
+     else InstructionToEnvironment (ContractFail
+              ((case  inst_stack_numbers (PC JUMP) of
+                 (consumed, produced) =>
+                 (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
+                  @ (if meter_gas i v c net \<le>(vctx_gas   v) then [] else [OutOfGas])
+               )
+              ))
+              v None     
+"
+
+definition elle_interp :: "ellest llinterp" where
+"elle_interp =
+(elle_instD
+,elle_jmpD
+,elle_jmpiD
+,elle_labD)
+"
 
 (* TODO need to unpack correctly *)
 (* NB we make no update to keep the PC correct *)
