@@ -2167,6 +2167,22 @@ What about the "ll_list_sem" second half of this case?
 I think we can just restate the first case in terms of
 "LSeq e ls", hopefully that will suffice.
 
+hmm, or do we need to do something more?
+i think we need to say something like
+
+1. if we are the root, then our scanning and non-scanning semantics are as expected
+   (this case should look very similar to first case - I don't think we need a prefix)
+2. if prefix@list is descended from the root, then
+   we need cases based on where the label is.
+   (idea: either we have already found the label, and so we
+   call on the suffix in non-scanning mode
+   or, we didn't find the label yet)
+    - if "gather_labels" applied to prefix is True, then
+      scanning on suffix should result in None
+    - otherwise, "gather_labels" applied to suffix is True
+      and scanning on suffix will have semantics of a jump to that
+      label (similar to first case)
+
 *)
 
 fun setpc :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where

@@ -182,6 +182,24 @@ fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
 (different stack contents)
 *)
 
+(*
+
+semantics of jump in Elle:
+1. check to make sure we have enough stack space to do a push
+2. check to make sure we have enough gas for a push
+3. check to make sure we have enough resources for jump, after subtracting push's gas
+4. consume jump gas
+
+*)
+
+(*
+
+semantics of jumpI will be the same, except that
+
+* need to make sure stack is being updated correctly when 
+
+*)
+
 fun elle_jmpD :: "ellest \<Rightarrow> ellest option" where
 "elle_jmpD (ir, cc, n) =
  (case ir of
