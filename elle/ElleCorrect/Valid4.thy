@@ -2185,21 +2185,9 @@ i think we need to say something like
 
 *)
 
-fun setpc :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
-"setpc (e, e2, e3) n =
-  ((e \<lparr> vctx_pc := (int n) \<rparr>)
-  , e2
-  , e3)"
 
-fun clearprog :: "ellest \<Rightarrow> ellest" where
-"clearprog (e1, e, e3) =
-  (e1
-  , (e \<lparr> cctx_program := empty_program \<rparr>)
-  , e3)"
 
-(* throw away program and pc *)
-definition elleq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
-"elleq a b = (setpc (clearprog a) 0 = setpc (clearprog b) 0)"
+
 
 (* new pipeline *)
 

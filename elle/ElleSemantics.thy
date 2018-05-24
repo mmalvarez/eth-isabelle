@@ -121,6 +121,9 @@ however this only changed the PC, we don't care about that *)
       (* this scope continuation was ll1_sem before *)
       ((ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) scopes cont)#scopes) cont)"
 
+
+
+
 (* a sample instantiation of the parameters for our semantics *)
 (* state is a single nat, ll1.L increments
 except for SUB, which subtracts *)
@@ -154,6 +157,41 @@ next_state when defining elle_denote
 *)
 type_synonym ellest = "instruction_result * constant_ctx * network"
 
+fun getctx :: "instruction_result \<Rightarrow> variable_ctx" where
+"getctx (InstructionContinue v) = v"
+| "getctx (InstructionToEnvironment _ v _) = v"
+
+fun irmap :: "(variable_ctx \<Rightarrow> variable_ctx) \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
+"irmap f (InstructionContinue v) = InstructionContinue (f v)"
+| "irmap f (InstructionToEnvironment a v e) = 
+           (InstructionToEnvironment a (f v) e)"
+
+(* need a function that unwraps instruction result *)
+
+fun setpc :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
+"setpc (e, e2, e3) n =
+  (irmap (\<lambda> v . v \<lparr> vctx_pc := (int n) \<rparr>) e
+  , e2
+  , e3)"
+
+fun clearprog :: "ellest \<Rightarrow> ellest" where
+"clearprog (e1, e, e3) =
+  (e1
+  , (e \<lparr> cctx_program := empty_program \<rparr>)
+  , e3)"
+
+fun erreq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
+"erreq (InstructionToEnvironment (ContractFail _) _ _, e12, e13) 
+       (InstructionToEnvironment (ContractFail _) _ _, e22, e23) =
+        (e12 = e22 \<and> e13 = e23)"
+| "erreq a b = (a = b)"
+
+(* throw away program and pc *)
+(* then, if we have an error, ignore everything *)
+definition elleq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
+"elleq a b = erreq (setpc (clearprog a) 0) 
+                   (setpc (clearprog b) 0)"
+
 (* TODO: check that instruction is allowed *)
 (* TODO: actually deal with InstructionToEnvironment reasonably *)
 (* part of this copied from next_state *)
@@ -177,7 +215,81 @@ fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
           , cc
           , n))"
 
+fun elle_labD :: "ellest \<Rightarrow> ellest option" where
+"elle_labD est = elle_instD (Pc JUMPDEST) est"
+
+(* use pieces of check_resources here:
+- for jump, we just need the "meter_gas" statement
+- for jmpI, we also need to make sure there is an item
+on the stack
+*)
+(*
+better idea: somehow do the resource calculations for push and jump?
+- simulate pushing the address
+- check resources for jump/jumpi in simulated state
+
+this will handle the resource checks
+
+for resource (gas) subtraction, we can then just subtract
+"meter_gas" for push plus "meter_gas" for jump
+*)
+
+(* FOR JUMP steps are as follows.
+1. Check to make sure we have more than Gmid gas
+   - return outOfGas if not
+2. Check to make sure we have an extra stack slot
+   (because the EVM code will need one)
+    - return a Stack Overflow error if we don't have one
+3. Subtract off Gmid gas
+*)
+
+
+
+fun elle_jumpD :: "ellest \<Rightarrow> ellest option" where
+"elle_jumpD (ir, cc, n) =
+    (case ir of
+      InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
+    | InstructionContinue v \<Rightarrow>
+        if      (vctx_gas v) < Gmid then
+          Some (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n)
+        else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
+          Some (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n)
+        else
+          Some (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>), cc, n))"
+(*
+        if check_resources v cc (vctx_stack   v) i n then
+          Some (instruction_sem v cc i n, cc, n)
+        else
+          Some 
+          (InstructionToEnvironment (ContractFail
+               ((case  inst_stack_numbers i of
+                  (consumed, produced) =>
+                  (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
+                   @ (if meter_gas i v cc n \<le>(vctx_gas   v) then [] else [OutOfGas])
+                )
+               ))
+               v None
+          , cc
+          , n))"
+*)
+
+(* FOR JUMPI steps are as follows
+1. Check for Ghigh gas
+    - return outOfGas if not
+2. Make sure we have an extra stack slot, AND there is an element
+   at the top of the stack (condition)
+   - Return TooShortStack or StackOverflow as appropriate
+3. Subtract off Ghigh gas, remove top item from stack,
+return a Boolean based on whether the item is 0
+
+
+*)
+
 (* OK - for now we need to coalesce failure cases into None *)
+(* better idea: when comparing two final results,
+treat all failure cases as equal
+(this deals with the transient failure where we
+fail in between pushing and jumping) *)
 (* otherwise we can get bad transient states on out of gas 
 (different stack contents)
 *)
@@ -192,6 +304,23 @@ semantics of jump in Elle:
 
 *)
 
+fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest) option" where
+"elle_jumpiD (ir, cc, n) =
+    (case ir of
+      InstructionToEnvironment _ _ _ \<Rightarrow> Some (False, (ir, cc, n))
+    | InstructionContinue v \<Rightarrow>
+        if      (vctx_gas v) < Ghigh then
+          Some (False, (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n))
+        else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
+          Some (False, (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n))
+        else (case vctx_stack v of
+          [] \<Rightarrow> Some (False, (InstructionToEnvironment (ContractFail [TooShortStack]) v None, cc, n))
+          | cond#rest \<Rightarrow>
+           let new_env = (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>)) in
+            strict_if (cond =(((word_of_int 0) ::  256 word)))
+             (\<lambda> _ . Some (True, (new_env, cc, n) ))
+             (\<lambda> _  .Some (False, (new_env, cc, n)))))"
+
 (*
 
 semantics of jumpI will be the same, except that
@@ -200,27 +329,12 @@ semantics of jumpI will be the same, except that
 
 *)
 
-fun elle_jmpD :: "ellest \<Rightarrow> ellest option" where
-"elle_jmpD (ir, cc, n) =
- (case ir of
-  InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
- | InstructionContinue v \<Rightarrow>
-    (if check_resources v c (vctx_stack v) (PC JUMP) net then
-     else InstructionToEnvironment (ContractFail
-              ((case  inst_stack_numbers (PC JUMP) of
-                 (consumed, produced) =>
-                 (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
-                  @ (if meter_gas i v c net \<le>(vctx_gas   v) then [] else [OutOfGas])
-               )
-              ))
-              v None     
-"
 
 definition elle_interp :: "ellest llinterp" where
 "elle_interp =
 (elle_instD
-,elle_jmpD
-,elle_jmpiD
+,elle_jumpD
+,elle_jumpiD
 ,elle_labD)
 "
 
@@ -234,20 +348,6 @@ subtract off verylow*)
 - check if it is InstructionToEnvironment - if so don't touch it
 - 
 *)
-fun elle_jmpd :: "ellest \<Rightarrow> (bool * ellest) option" where
-"elle_jmpd (ir, c, n) =
- (case ir of
-  InstructionToEnvironment _ _ _ \<Rightarrow> Some (False, (ir, c, n))
-| InstructionContinue v \<Rightarrow>
-  if check_resources v c (vctx_stack v) (PC JUMPI)
- (case (vctx_stack v) of
-   cond # rest \<Rightarrow>
-    (let new_env = (( v (| vctx_stack := (rest) |))) in
-    strict_if (cond =(((word_of_int 0) ::  256 word)))
-           (\<lambda> _ . Some (True, (new_env, c, n) ))
-           (\<lambda> _ .Some (False, (new_env, c, n))))
-  | _ \<Rightarrow> None)"
-
 definition elle_init_block :: "block_info"
   where
 "elle_init_block =\<lparr>
@@ -295,7 +395,7 @@ definition elle_init_cctx :: constant_ctx
 
 
 definition ellest_init :: "int \<Rightarrow> ellest" where
-"ellest_init g = (elle_init_vctx g, elle_init_cctx, Metropolis)"
+"ellest_init g = (InstructionContinue (elle_init_vctx g), elle_init_cctx, Metropolis)"
 
 fun elle_sem' :: 
   "ll1 \<Rightarrow>
@@ -303,14 +403,13 @@ fun elle_sem' ::
   (* continuations corresponding to enclosing scopes *)
    (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
    (ellest \<Rightarrow> ellest option)" where
-"elle_sem' x n c = ll1_sem x elle_denote elle_jmpd n None [] c"
+"elle_sem' x n c = ll1_sem x elle_interp n None [] c"
 
 (* denote jmpd *)
 
 (* TODO: build an ll' sem, using purge_ll_annot *)
 fun ll'_sem ::  "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
-   (inst \<Rightarrow> 'a \<Rightarrow> 'a option) \<Rightarrow> (* inst interpretation *)
-   ('a \<Rightarrow> (bool * 'a) option) \<Rightarrow> (* whether JmpI should execute or noop in any given state *)
+   'a llinterp \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
@@ -326,7 +425,7 @@ fun ll'_sem' ::
   (* continuations corresponding to enclosing scopes *)
    (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
    (ellest \<Rightarrow> ellest option)" where
-"ll'_sem' x n c = ll'_sem x elle_denote elle_jmpd n None [] c"
+"ll'_sem' x n c = ll'_sem x elle_interp n None [] c"
 
 (* prove that if two lls are equal, throwing away annotations,
 the semantics are also the same
