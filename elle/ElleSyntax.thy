@@ -164,8 +164,8 @@ type_synonym ll4l = "ll4 * ll4p"
 
 (* needed for semantics as well as compiler *)
 (* not quite actually, but let's keep it for now *)
-fun gather_ll3_labels :: "ll3 \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
-and gather_ll3_labels_list :: "ll3 list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where
+fun gather_ll3_labels :: "('a, 'b, 'c, 'd, 'e) ll3' \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> childpath list" 
+and gather_ll3_labels_list :: "('a, 'b, 'c, 'd, 'e) ll3' list \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> childpath list" where
 "gather_ll3_labels (_, llt.L _ _) _ _ = []"
 | "gather_ll3_labels (_, llt.LJmp _ _ _) _ _ = []"
 | "gather_ll3_labels (_, llt.LJmpI _ _ _) _ _ = []"

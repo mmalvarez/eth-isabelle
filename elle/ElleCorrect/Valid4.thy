@@ -2111,6 +2111,10 @@ check to make sure n is greater than 0
 if it is not, we'll need to do "const none"
 question though - when do we "cut off" continuations?
 *)
+(* TODO: we can probably fix this by changing the continuations
+to concrete trees we are going to call our thing on.
+(what to do about )
+*)
 fun generate_conts ::
 "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow>
      (ellest \<Rightarrow> ellest option) list \<Rightarrow> 
@@ -2121,34 +2125,43 @@ fun generate_conts ::
 
 (* should this case be (n-1)? *)
 | "generate_conts t [_] n scopes cont =
-   Some ((ll'_sem t elle_denote elle_jmpd (n-1) (Some 0) scopes cont)#scopes)"
+  (if n = 0 then None else
+   Some ((ll'_sem t elle_interp (n-1) (Some 0) scopes cont)#scopes))"
 
 | "generate_conts t (ch#ct) n scopes cont =
+   (if n < ch + 1 then None
+   else
    (case ll_get_node t [ch] of
     None \<Rightarrow> None
     | Some t' \<Rightarrow> generate_conts t' ct (n - 1 - ch) 
-        ((ll'_sem t elle_denote elle_jmpd (n-1) (Some 0) scopes cont)#scopes) cont)"
+        ((ll'_sem t elle_interp (n-1) (Some 0) scopes cont)#scopes) cont))"
 
-(* we need to do something slightly more elaborate
-when calculating the list of continuations.
+(* use get_label or get_node *)
+(* use accumulator so we get the results in reverse (as desired) *)
+fun get_addrs ::
+"ll4 \<Rightarrow> childpath \<Rightarrow>
+     nat option list \<Rightarrow>
+     (nat option list) option" where
+"get_addrs _ _ [] = None"
+| "get_addrs (_, LSeq [] ls) [_] acc = Some (None#acc)"
+| "get_addrs (x, LSeq e ls) [_] acc =
+   (case ll_get_node (x, LSeq e ls) e of
+    Some ((qa,_), LLab el d) \<Rightarrow> Some (Some qa#acc)
+    | _ \<Rightarrow> None)"
 
-at root, the continuation list is empty
+| "get_addrs (x, LSeq [] ls) (ch#ct) acc =
+    (case ll_get_node (x, LSeq [] ls) [ch] of
+     Some t \<Rightarrow> get_addrs t ct (None#acc)
+     | _ \<Rightarrow> None)"
 
-at each step, we construct the following new continuation:
-- call ourselves on the current node, with 1 less fuel
-- use the continuation list generated from the last iteration
+| "get_addrs (x, LSeq e ls) (ch#ct) acc =
+   (case ll_get_node (x, LSeq e ls) e of
+    Some ((qa, _), LLab el d) \<Rightarrow>
+      (case ll_get_node (x, LSeq e ls) [ch] of
+       Some t \<Rightarrow> get_addrs t ct (Some qa # acc)
+    | _ \<Rightarrow> None))"
 
-so, this is a paramorphism that also needs an additional index parameter
-(the index parameter allows us to track fuel)
-
-also, we can precisely calculate the elle-fuel parameter
-in particular, fuel decrements when passing through a seq node
-as well as 1 per child.
-
-so, when following a childpath to construct a continuation list,
-we should be able to reproduce the fuel exactly.
- *)
-
+| "get_addrs _ _ _ = None"
 (*
 
 Another key point. We need to deal with deeper scannings.
@@ -2185,10 +2198,6 @@ i think we need to say something like
 
 *)
 
-
-
-
-
 (* new pipeline *)
 
 definition ellecompile_untrusted :: "ll1 \<Rightarrow> ll4 option" where
@@ -2198,53 +2207,88 @@ definition ellecompile_untrusted :: "ll1 \<Rightarrow> ll4 option" where
               Some l'' \<Rightarrow> (case write_jump_targets [] (ll4_init l'') of
                            Some l''' \<Rightarrow> Some l''')))"
 
-(* blargh, we need to change the type of check_ll3... *)
-(*
-definition ellecompile :: "ll1 \<Rightarrow> program option" where
+definition ellecompile :: "ll1 \<Rightarrow> constant_ctx option" where
 "ellecompile l =
 (case ellecompile_untrusted l of
     Some l' \<Rightarrow>
     (* check ll3 valid *)
     (if check_ll3 l' then
       (if ll4_validate_jump_targets [] l' then
-      (prog_init_cctx (codegen l'))
+        Some (prog_init_cctx (codegen' l'))
       else None)
     else None)
     | _ \<Rightarrow> None)"
-*)
 
 (* need a function for dumping an ll4 to a program *)
-(* definition ll4_dump : "ll4 \<Rightarrow>  " *)
 
 (* wrap program sem to take in an ellest' *)
 fun my_program_sem :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
-"my_program_sem (vc, cc, net) n =
-  (Evm.program_sem
+"my_program_sem (ir, cc, net) n =
+  ((Evm.program_sem
     (\<lambda> _ . ())
-    c n net
-    (InstructionContinue vc))"
+    cc n net ir), cc, net)"
 
-(* need to use program_sem, unpacking the thing *)
+(*
+
+initial states:
+- for elle, it will just be state st
+- for EVM, it will be st, with the program counter set to some specific value
+  - AND the program set to the corresponding program
+*)
+
+fun ll4_load :: "ll4 \<Rightarrow> ellest \<Rightarrow> ellest" where
+"ll4_load t el =
+   setprog el (Evm.program_of_lst (codegen' t) ProgramInAvl.program_content_of_lst)
+"
 
 (* use valid3 induction principle? *)
+(* note, we actually need the thing to be an ll4 so we can call dump on it *)
+(* Note: both ll'_sem and the compiler take (same) arguments describing
+   initial state, network, etc *)
+(* hmm, do we need to store the initial fuel to calculate continuations? *)
+(* need to include cont as an argument *)
+(* to find the addresses for deeper "scanning" cases:
+we need to take a prefix of the childpath from t to t'
+(take the first "length - d" elements of childpath) *)
 lemma elle_correct :
 "
 t \<in> ll_valid3' \<longrightarrow>
 validate_jump_targets [] t \<longrightarrow>
 (
 ((! n st st'1 . ll'_sem n [] t None st = Some st'1 \<longrightarrow>
-  (? st'2 . elleq st'1 st'2 \<and> vm_sem (dump t) (setpc st 0) = st'2))
+  (? st'2 . elleq st'1 st'2 \<and> 
+            my_program_sem (ll4_load t (setpc st 0)) n = st'2))
  \<and>
- (ll'_sem n [] t (Some 0) st = Some st'1 \<longrightarrow>
-    (? st'2 . elleq st'1 st'2 \<and> vm_sem (dump t) = st2)
-    (t = LSeq lab ls \<and> 
+ (! n st st'1 . ll'_sem n [] t (Some 0) st = Some st'1 \<longrightarrow>
+    (? st'2 . elleq st'1 st'2 \<and>
+    (? lab ls . t = LSeq lab ls \<and> 
       (? a . get_label t lab = Some a \<and> 
-      evm_sem (dump t) (setpc st a) = st')))))
+      my_program_sem (ll4_load t (setpc st a)) n = st'2)))) \<and>
+ (! d . d > 0 \<longrightarrow> 
+    (! n st . ll'_sem n [] t (Some d) st = None)))
 \<and>
 ((t, t', k) \<in> ll'_descend) \<longrightarrow>
-  followcp t k = Some lt \<longrightarrow>
-  ll'_sem n [] None st = Some st' \<longrightarrow>
-  evm_sem (
+  (* NB: we may be underconstraining nc *)
+  (* also, what about the resulting continuation? *)
+  (* here we need to insert something about the stack of addresses to jump to *)
+  (! nc cs cont . generate_conts t k nc [] cont = Some cs \<longrightarrow>
+          ((! n st st'1 . ll'_sem n cs t' None st = Some st'1 \<longrightarrow>
+              (? st'2 . elleq st'1 st'2 \<and>
+                    my_program_sem (ll4_load t (setpc st 0)) n = st'2)) \<and>
+           (! n st st'1 . ll'_sem n cs (Some 0) st = Some st'1 \<longrightarrow>
+               (? st'2 . elleq st'1 st'2 \<and>
+                 (? lab ls . t = LSeq lab ls \<and> 
+                   (? a . get_label t lab = Some a \<and> 
+                    my_program_sem (ll4_load t (setpc st a)) n = st'2)))) \<and>
+           (! d . d > 0 \<longrightarrow>
+              (! n st st'1 . ll'_sem n cs (Some d) st = Some st'1 \<longrightarrow>
+                (? st'2 . elleq st'1 st'2 \<and>
+                 (? lab ls . t = LSeq lab ls \<and> 
+                   (? a . get_label t lab = Some a \<and> 
+            (* for higher-up labels, how can we figure out the address? *)
+            (* maybe we can add this to the list of returned continuations? *)
+            (* need to call "get_addrs"  *)
+                    my_program_sem (ll4_load t (setpc st a)) n = st'2)))) \<and>
 )
 "
     

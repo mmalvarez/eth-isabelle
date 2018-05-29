@@ -1643,10 +1643,10 @@ lemma numnodes_child [rule_format] :
 
 
 lemma gather_ll3_fact [rule_format] :
-" (! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+" (! q e ls . (t :: ('a, 'b, 'c, 'd, 'e) ll3') = (q, LSeq e ls) \<longrightarrow>
 (! x cp off d . x \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
     (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost)))
-\<and> (! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ll3 list) cp off d) \<longrightarrow>
+\<and> (! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off d) \<longrightarrow>
     (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost))"
 proof(induction rule:my_ll_induct)
   case (1 q e i)
@@ -1680,7 +1680,7 @@ next
     done qed
 
 lemma gather_ll3_fact2 [rule_format] :
-"(! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ll3 list) cp off d) \<longrightarrow>
+"(! x cp off d . x \<in> set (gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off d) \<longrightarrow>
     (? n cpost . n < length ls \<and> x = cp@[n+off]@cpost))"
   apply(insert gather_ll3_fact)
   apply(blast)
@@ -1689,12 +1689,12 @@ lemma gather_ll3_fact2 [rule_format] :
 (* I am not even sure if we need the length argument! *)
 lemma gather_ll3_nil_gen' [rule_format]:
 " 
-(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! q e ls . (t :: ('a, 'b, 'c, 'd, 'e) ll3') = (q, LSeq e ls) \<longrightarrow>
 (! cp off n . gather_ll3_labels_list ls cp off n = [] \<longrightarrow>
    (! cp' . length cp' = length cp \<longrightarrow>
    (! off' . gather_ll3_labels_list ls cp' off' n = []))))
 \<and>
-(! cp off n . gather_ll3_labels_list ls cp off n = [] \<longrightarrow>
+(! cp off n . gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off n = [] \<longrightarrow>
    (! cp' . length cp' = length cp \<longrightarrow>
    (! off' . gather_ll3_labels_list ls cp' off' n = [])))"
 proof(induction rule:my_ll_induct)
@@ -1737,12 +1737,12 @@ gather_ll3_labels_list ls cp off n = [] \<Longrightarrow>
 
 lemma gather_ll3_singleton_gen' [rule_format]:
 " 
-(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! q e ls . (t :: ('a, 'b, 'c, 'd, 'e) ll3') = (q, LSeq e ls) \<longrightarrow>
 (! cp x off cpost n . gather_ll3_labels_list ls cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
    (! cp' . length cp' = length cp \<longrightarrow>
    (! off' . gather_ll3_labels_list ls cp' off' n = [cp'@[x+off']@cpost]))))
 \<and>
-(! cp x off cpost n . gather_ll3_labels_list ls cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
+(! cp x off cpost n . gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
    (! cp' . length cp' = length cp \<longrightarrow>
    (! off' . gather_ll3_labels_list ls cp' off' n = [cp'@[x+off']@cpost])))"
 proof(induction rule:my_ll_induct)
@@ -1916,7 +1916,7 @@ next
 
 
 lemma gather_ll3_singleton_gen2 [rule_format]:
-"(! cp x off cpost n . gather_ll3_labels_list ls cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
+"(! cp x off cpost n . gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off n =  [cp@[x+off]@cpost] \<longrightarrow>
    (! cp' . length cp' = length cp \<longrightarrow>
    (! off' . gather_ll3_labels_list ls cp' off' n = [cp'@[x+off']@cpost])))"
   apply(insert gather_ll3_singleton_gen'[of "((0,0),LSeq [] [])" ls])
@@ -1932,7 +1932,7 @@ lemma gather_ll3_singleton_gen2 [rule_format]:
 done
 
 lemma gather_ll3_correct2_child [rule_format]:
-"  (! c . c < length ls \<longrightarrow>
+"  (! c . c < length (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) \<longrightarrow>
        (! a b ba n . ls ! c = ((a, b), llt.LLab ba n) \<longrightarrow>
        (! cp off . cp @ [c+off] \<in> set (gather_ll3_labels_list ls cp off n))))"
 proof(induction ls)
@@ -1951,14 +1951,14 @@ qed
 
 lemma gather_ll3_correct2_child2' [rule_format] :
 "
-(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! q e ls . (t :: ('a, 'b, 'c, 'd, 'e) ll3') = (q, LSeq e ls) \<longrightarrow>
 (! c . c < length ls \<longrightarrow>
   (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
    (! d cp off1 off2 post . (cp@[c+off1]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off1]) 0 (Suc d))  \<longrightarrow>
           (cp@[c+off1]@post) \<in> set (gather_ll3_labels_list ls cp off1 d)
 ))))
 \<and>
-(! c . c < length ls \<longrightarrow>
+(! c . c < length (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) \<longrightarrow>
   (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
    (! d cp off1 off2 post . (cp@[c+off1]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off1]) 0 (Suc d))  \<longrightarrow>
           (cp@[c+off1]@post) \<in> set (gather_ll3_labels_list ls cp off1 d)
@@ -1998,7 +1998,7 @@ qed
 (* how are we going to handle changes of offset? *)
 (* idea: off is our starting offset, want off+c *)
 lemma gather_ll3_correct2_child2 [rule_format] :
-"(! c . c < length ls \<longrightarrow>
+"(! c . c < length (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) \<longrightarrow>
   (! a b e lsdec . ls ! c = ((a, b), llt.LSeq e lsdec) \<longrightarrow>
    (! d cp off post . (cp@[c+off]@post) \<in> set(gather_ll3_labels_list lsdec (cp@[c+off]) 0 (Suc d))  \<longrightarrow>
           (cp@[c+off]@post) \<in> set (gather_ll3_labels_list ls cp off d)
@@ -2072,11 +2072,11 @@ qed
 
 lemma gather_ll3_correct1' [rule_format] :
 "
-(! q e ls . (t :: ll3) = (q, LSeq e ls) \<longrightarrow>
+(! q e ls . (t :: ('a, 'b, 'c, 'd, 'e) ll3') = (q, LSeq e ls) \<longrightarrow>
 (! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
    (? q' b . ((q, LSeq e ls), (q', LLab b (d + length post)), (n)#post) \<in> ll3'_descend)))
 \<and>
-(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off d) \<longrightarrow>
    (? q' b . (! q e . ((q, LSeq e ls), (q', LLab b (d + length post)), (n)#post) \<in> ll3'_descend))
 )"
 proof(induction rule:my_ll_induct)
@@ -2155,7 +2155,7 @@ next
 qed
 
 lemma gather_ll3_correct1 [rule_format]:
-"(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list ls cp off d) \<longrightarrow>
+"(! d cp n off post . (cp@[n+off]@post) \<in> set (gather_ll3_labels_list (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list) cp off d) \<longrightarrow>
    (? q' b . (! q e . ((q, LSeq e ls), (q', LLab b (d + length post)), (n)#post) \<in> ll3'_descend))
 )"
   apply(insert gather_ll3_correct1'[of "((0,0),LSeq [] [])" ls])
@@ -2374,8 +2374,8 @@ lemma ll_valid3'_child :
 
 
 lemma check_ll3_valid :
-"((q,t) \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
-\<and> (((x,x'), ls) \<in> ll_validl_q \<longrightarrow> 
+"(((q,t) :: ('a, 'b, 'c, 'd, 'e) ll3') \<in> ll_valid_q \<longrightarrow> check_ll3 (q, t) = True \<longrightarrow> (q, t) \<in> ll_valid3')
+\<and> (((x,x'), (ls :: ('a, 'b, 'c, 'd, 'e) ll3' list)) \<in> ll_validl_q \<longrightarrow> 
      (! e . check_ll3 ((x,x'), LSeq e ls) = True \<longrightarrow> ((x,x'), LSeq e ls) \<in> ll_valid3'))"
 proof(induction rule:ll_valid_q_ll_validl_q.induct)
 case (1 i x e)

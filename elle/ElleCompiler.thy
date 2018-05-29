@@ -165,8 +165,7 @@ termination
   apply(case_tac ba, auto)
   done
 
-
-fun check_ll3 :: "ll3  \<Rightarrow> bool" where
+fun check_ll3 :: "('a, 'b, 'c, 'd, 'e) ll3' \<Rightarrow> bool" where
 "check_ll3 (_, llt.L _ _) = True"
 | "check_ll3 (_, llt.LJmp _ _ _) = True"
 | "check_ll3 (_, llt.LJmpI _ _ _) = True"

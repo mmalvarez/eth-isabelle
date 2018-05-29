@@ -180,6 +180,13 @@ fun clearprog :: "ellest \<Rightarrow> ellest" where
   , (e \<lparr> cctx_program := empty_program \<rparr>)
   , e3)"
 
+fun setprog :: "ellest \<Rightarrow> program \<Rightarrow> ellest" where
+"setprog (e1, e2, e3) p =
+  (e1
+  , (e2 \<lparr> cctx_program := p \<rparr> )
+  , e3
+  )"
+
 fun erreq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
 "erreq (InstructionToEnvironment (ContractFail _) _ _, e12, e13) 
        (InstructionToEnvironment (ContractFail _) _ _, e22, e23) =
