@@ -1,5 +1,5 @@
 theory ElleTest
-  imports Main String ElleCompiler "ElleCorrect/Valid4"
+  imports Main String ElleCompiler (*"ElleCorrect/Valid4"*)
 begin
 
 (* This file is now all about trying to output code *)
@@ -120,74 +120,74 @@ value "(case (pipeline' progif 30) of
 value "pipeline progif 30"
 
 definition ll1_sem_test1 where
-"ll1_sem_test1 f i = silly_ll1_sem (ll1.LSeq [ll1.LLab 0, ll1.LJmpI 0]) f (Some) i"
-value "ll1_sem_test1 20 0"
-value "ll1_sem_test1 20 3"
+"ll1_sem_test1 = silly_ll1_sem (ll1.LSeq [ll1.LLab 0, ll1.LJmpI 0])"
+value "ll1_sem_test1 20 (Some 0)"
+value "ll1_sem_test1 20 (Some 3)"
 
 definition ll1_sem_test2 where
-"ll1_sem_test2 f i = silly_ll1_sem
+"ll1_sem_test2 = silly_ll1_sem
   (ll1.LSeq [
     ll1.LSeq [ ll1.LJmpI 0,
                ll1.L (Arith SUB),
                ll1.LJmp 1, 
                ll1.LLab 0,
                ll1.L (Arith ADD),
-               ll1.LLab 1 ]]) f (Some) i"
+               ll1.LLab 1 ]])"
 
-value "ll1_sem_test2 100 0"
-value "ll1_sem_test2 100 1"
-value "ll1_sem_test2 100 2"
+value "ll1_sem_test2 100 (Some 0)"
+value "ll1_sem_test2 100 (Some 1)"
+value "ll1_sem_test2 100 (Some 2)"
 
 definition ll1_sem_test2' where
-"ll1_sem_test2' f i = silly_ll1_sem
+"ll1_sem_test2' = silly_ll1_sem
   (ll1.LSeq [ll1.LJmpI 0,
                ll1.L (Arith ADD),
-               ll1.LLab 0]) f (Some) i"
+               ll1.LLab 0]) "
 
-value "ll1_sem_test2' 100 0"
-value "ll1_sem_test2' 100 27"
+value "ll1_sem_test2' 100 (Some 0)"
+value "ll1_sem_test2' 100 (Some 27)"
 
-
+(* TODO: is this really testing what we want? *)
 definition ll1_sem_test3 where
-"ll1_sem_test3 f i = silly_ll1_sem
+"ll1_sem_test3  = silly_ll1_sem
 (ll1.LSeq [ll1.LSeq [ll1.LJmpI 1,
                      ll1.LLab 0,
                      ll1.L (Arith SUB),
                      ll1.LJmpI 1,
-                     ll1.LJmp 0, ll1.LLab 1]]) f Some i"
-value "ll1_sem_test3 120 4"
-value "ll1_sem_test3 120 0"
+                     ll1.LJmp 0, ll1.LLab 1]])"
+value "ll1_sem_test3 120 (Some 4)"
+value "ll1_sem_test3 120 (Some 0)"
 
 (* NB *)
-value "ll1_sem_test3 20 15"
-value "ll1_sem_test3 21 15"
+value "ll1_sem_test3 9 (Some 15)"
+value "ll1_sem_test3 10 (Some 15)"
 
 (* test to ensure things are being run in correct order,
 as well as check correctness for sequences without labels *)
 definition ll1_sem_test4 where
-"ll1_sem_test4 f i = silly_ll1_sem
-(ll1.LSeq [ll1.L (Arith SUB), ll1.L (Arith ADD)]) f Some i"
+"ll1_sem_test4 = silly_ll1_sem
+(ll1.LSeq [ll1.L (Arith SUB), ll1.L (Arith ADD)])"
 
-value "ll1_sem_test4 10 0"
-value "ll1_sem_test4 10 1"
+value "ll1_sem_test4 10 (Some 0)"
+value "ll1_sem_test4 10 (Some 1)"
 
 
 (* ensure invalid jumps crash *)
 definition ll1_sem_test5 where
-"ll1_sem_test5 f i = silly_ll1_sem
-(ll1.LSeq [ll1.LJmpI 0]) f Some i"
+"ll1_sem_test5 = silly_ll1_sem
+(ll1.LSeq [ll1.LJmpI 0])"
 
-value "ll1_sem_test5 10 1"
+value "ll1_sem_test5 10 (Some 1)"
 
 
 (* semantics tests *)
 value   "elle_sem' (ll1.L (Stack (PUSH_N ([byteFromNat 0]))))
-10 Some (ellest_init 42)"
+10 (ellest_init 42)"
 
 value  "elle_sem' (ll1.LSeq [ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
                                    ll1.L (Stack (PUSH_N ([byteFromNat 1]))),
                                    ll1.L (Arith ADD)])
-10 Some (ellest_init 42)"
+10 (ellest_init 42)"
 
 value  "program_sem (\<lambda> _ . ()) (prog_init_cctx [Stack (PUSH_N [byteFromNat 0])]) 20 Metropolis
 (InstructionContinue (elle_init_vctx 42))"

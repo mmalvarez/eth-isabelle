@@ -30,11 +30,20 @@ and gather_ll1_labels_list :: "ll1 list \<Rightarrow> childpath \<Rightarrow> na
 
 (* llinterp is instD, jmpD, jmpiD, labD *)
 type_synonym 'a llinterp =
-"((inst \<Rightarrow> 'a \<Rightarrow> 'a option) *
-  ('a \<Rightarrow> 'a option) *
-  ('a \<Rightarrow> (bool * 'a) option) *
-  ('a \<Rightarrow> 'a option))
+"((inst \<Rightarrow> 'a \<Rightarrow> 'a) *
+  ('a \<Rightarrow> 'a) *
+  ('a \<Rightarrow> (bool * 'a)) *
+  ('a \<Rightarrow> 'a))
 "
+
+datatype 'a llresult =
+  LRFail
+  | LRNext 'a
+  | LRJump 'a nat
+
+
+(* need to deduct LRJump returned results?
+*)
 
 (* *)
 fun ll1_sem :: 
@@ -42,38 +51,38 @@ fun ll1_sem ::
    'a llinterp \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
-(* continuations corresponding to enclosing scopes *)
-   (('a \<Rightarrow> 'a option) list) \<Rightarrow>
-   ('a \<Rightarrow> 'a option) \<Rightarrow> (* continuation *)
-   ('a \<Rightarrow> 'a option)" 
+   'a \<Rightarrow> 'a llresult" 
 and ll1_list_sem ::
  "ll1 list \<Rightarrow>
    'a llinterp \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
-   (('a \<Rightarrow> 'a option) list) \<Rightarrow>
-   ('a \<Rightarrow> 'a option) \<Rightarrow> (* continuation *)
-   ('a \<Rightarrow> 'a option)" 
+   'a \<Rightarrow> 'a llresult" 
 where
 
 (* list_sem cases *)
 
 (* non seeking, nil means noop *)
- "ll1_list_sem [] intp n None scopes cont = cont"
+ "ll1_list_sem [] intp n None x = LRNext x"
 (* when seeking, nil means we failed to find something we should have *)
-| "ll1_list_sem [] intp n (Some _) scopes cont = (\<lambda> _ . None)"
+| "ll1_list_sem [] intp n (Some _) x = LRFail"
 
-| "ll1_list_sem (h#t) intp n None scopes cont =
-   (if n = 0 then (\<lambda> _ . None)
-    else ll1_sem h intp (n - 1) None scopes
-    (ll1_list_sem t intp (n - 1) None scopes cont))"
+| "ll1_list_sem (h#t) intp n None x =
+   (if n = 0 then LRFail
+    else (case ll1_sem h intp (n - 1) None x of
+          LRFail \<Rightarrow> LRFail
+         | LRNext x' \<Rightarrow> ll1_list_sem t intp (n - 1) None x'
+         | LRJump x' d \<Rightarrow> LRJump x' d))"
 
-| "ll1_list_sem (h#t) intp n (Some d) ctx cont =
-   (if n = 0 then (\<lambda> _ . None) else
+| "ll1_list_sem (h#t) intp n (Some d) x =
+   (if n = 0 then LRFail else
    (case gather_ll1_labels h [] d of
-    [] \<Rightarrow> ll1_list_sem t intp (n - 1) (Some d) ctx cont
-   | _ \<Rightarrow> ll1_sem h intp (n - 1) (Some (Suc d)) ctx (ll1_list_sem t intp (n - 1) None ctx cont)))"
+    [] \<Rightarrow> ll1_list_sem t intp (n - 1) (Some d) x
+    | _ \<Rightarrow> (case ll1_sem h intp (n - 1) (Some (Suc d)) x of
+            LRFail \<Rightarrow> LRFail
+            | LRNext x' \<Rightarrow> ll1_list_sem t intp (n - 1) None x'
+            | LRJump x' d \<Rightarrow> LRJump x' d)))"
 
 
 (* first, deal with scanning cases *)
@@ -81,45 +90,51 @@ where
 however this only changed the PC, we don't care about that *)
 
 (* NB we only call ourselves in "seek" mode on a label when we are sure of finding a label *)
-| "ll1_sem (ll1.LLab d) (instD, jmpD, jmpiD, labD) n (Some d') _ cont = 
-   (if d + 1 = d' then 
-    (\<lambda> s . (case labD s of None \<Rightarrow> None
-                          | Some s' \<Rightarrow> cont s'))
-    else (\<lambda> s . None ))"
+| "ll1_sem (ll1.LLab d) (instD, jmpD, jmpiD, labD) n (Some d') x = 
+   (if d + 1 = d' then LRNext (labD x) else LRFail)"
 
+
+
+| "ll1_sem (ll1.LSeq ls) intp n (Some d) x =
+   (if n = 0 then LRFail
+    else 
+    (case ll1_list_sem ls intp (n - 1) (Some d) x of
+          LRFail \<Rightarrow> LRFail
+         | LRNext x' \<Rightarrow> LRNext x'
+         | LRJump x' 0 \<Rightarrow> ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) x'
+         | LRJump x' n \<Rightarrow> LRJump x' (n - 1)))"
+
+(*
 | "ll1_sem (ll1.LSeq ls) intp n (Some d) scopes cont =
-   (if n = 0 then (\<lambda> _ . None)
+   (if n = 0 then LRFail
     else 
     ll1_list_sem ls intp (n - 1) (Some d)
        ((ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) scopes cont)#scopes)
        cont)"
-
+*)
 (* for anything else, seeking is a no op *)
-| "ll1_sem _ intp n (Some d) _ cont = cont"
+| "ll1_sem _ intp n (Some d) x = LRNext x"
 
 (* "normal" (non-"scanning") cases *)
-| "ll1_sem (ll1.L i) (instD, jmpD, jmpiD, labD) n None scopes cont =
-  (\<lambda> s . case instD i s of
-           Some r \<Rightarrow> cont r
-          | None \<Rightarrow> None)"
-| "ll1_sem (ll1.LLab d) (instD, jmpD, jmpiD, labD) n None scopes cont = 
-    (\<lambda> s . (case labD s of None \<Rightarrow> None
-                          | Some s' \<Rightarrow> cont s'))"
-| "ll1_sem (ll1.LJmp d) (instD, jmpD, jmpiD, labD) n None scopes cont = 
-    (\<lambda> s . (case jmpD s of None \<Rightarrow> None
-                          | Some s' \<Rightarrow> (scopes ! d) s'))"
-| "ll1_sem (ll1.LJmpI d) (instD, jmpD, jmpiD, labD) n None scopes cont =
-(\<lambda> s . case (jmpiD s) of
-        None \<Rightarrow> None
-        | Some (True, s') \<Rightarrow> ((scopes ! d) s')
-        | Some (False, s') \<Rightarrow> cont s')"
+| "ll1_sem (ll1.L i) (instD, jmpD, jmpiD, labD) n None x =
+   LRNext (instD i x)"
+| "ll1_sem (ll1.LLab d) (instD, jmpD, jmpiD, labD) n None x = 
+    LRNext (labD x)"
+| "ll1_sem (ll1.LJmp d) (instD, jmpD, jmpiD, labD) n None x = 
+    LRJump (jmpD x) d"
+| "ll1_sem (ll1.LJmpI d) (instD, jmpD, jmpiD, labD) n None x =
+(case (jmpiD x) of
+        (True, s') \<Rightarrow> LRJump s' d
+        | (False, s') \<Rightarrow> LRNext s')"
 
-| "ll1_sem (ll1.LSeq ls) intp n None scopes cont =
-   (if n = 0 then (\<lambda> _ . None)
+| "ll1_sem (ll1.LSeq ls) intp n None x =
+   (if n = 0 then LRFail
     else
-     ll1_list_sem ls intp (n - 1) None
-      (* this scope continuation was ll1_sem before *)
-      ((ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) scopes cont)#scopes) cont)"
+     (case ll1_list_sem ls intp (n - 1) None x of
+           LRFail \<Rightarrow> LRFail
+         | LRNext x' \<Rightarrow> LRNext x'
+         | LRJump x' 0 \<Rightarrow> ll1_sem (ll1.LSeq ls) intp (n - 1) (Some 0) x'
+         | LRJump x' n \<Rightarrow> LRJump x' (n - 1)))"
 
 
 
@@ -128,25 +143,26 @@ however this only changed the PC, we don't care about that *)
 (* state is a single nat, ll1.L increments
 except for SUB, which subtracts *)
 
-fun silly_denote :: "inst \<Rightarrow> nat \<Rightarrow> nat option" where
-"silly_denote (Arith SUB) 0 = None"
-|"silly_denote (Arith SUB) (Suc n) = Some n"
-|"silly_denote _ n = Some (Suc n)"
+fun silly_denote :: "inst \<Rightarrow> nat option \<Rightarrow> nat option" where
+"silly_denote _ None = None"
+| "silly_denote (Arith SUB) (Some 0) = None"
+|"silly_denote (Arith SUB) (Some (Suc n)) = Some n"
+|"silly_denote _ (Some n) = Some (Suc n)"
 
-fun silly_jmpred :: "nat \<Rightarrow> (bool * nat) option" where
-"silly_jmpred n = (Some (n \<noteq> 0, n))"
+fun silly_jmpred :: "nat option \<Rightarrow> (bool * nat option)" where
+"silly_jmpred None = (False, None)"
+| "silly_jmpred (Some n) = (n \<noteq> 0, Some n)"
 
-definition silly_interp :: "nat llinterp" where
+definition silly_interp :: "nat option llinterp" where
 "silly_interp =
-  (silly_denote, Some, silly_jmpred, Some)"
+  (silly_denote, id, silly_jmpred, id)"
 
 fun silly_ll1_sem :: 
   "ll1 \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
 (* continuations corresponding to enclosing scopes *)
-   (nat \<Rightarrow> nat option) \<Rightarrow> (* continuation *)
-   (nat \<Rightarrow> nat option)" where
-"silly_ll1_sem x n c = ll1_sem x silly_interp n None [] c"
+   nat option \<Rightarrow> nat option llresult" where
+"silly_ll1_sem x n = ll1_sem x silly_interp n None"
 
 (* our real Elle semantics, using EVM *)
 (* type_synonym ellest = "variable_ctx * constant_ctx * network" *)
@@ -202,15 +218,14 @@ definition elleq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
 (* TODO: check that instruction is allowed *)
 (* TODO: actually deal with InstructionToEnvironment reasonably *)
 (* part of this copied from next_state *)
-fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
+fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest" where
 "elle_instD i (ir, cc, n) =
     (case ir of
-      InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
+      InstructionToEnvironment _ _ _ \<Rightarrow> (ir, cc, n)
     | InstructionContinue v \<Rightarrow>
         if check_resources v cc (vctx_stack   v) i n then
-          Some (instruction_sem v cc i n, cc, n)
-        else
-          Some 
+          (instruction_sem v cc i n, cc, n)
+        else 
           (InstructionToEnvironment (ContractFail
                ((case  inst_stack_numbers i of
                   (consumed, produced) =>
@@ -222,7 +237,7 @@ fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest option" where
           , cc
           , n))"
 
-fun elle_labD :: "ellest \<Rightarrow> ellest option" where
+fun elle_labD :: "ellest \<Rightarrow> ellest" where
 "elle_labD est = elle_instD (Pc JUMPDEST) est"
 
 (* use pieces of check_resources here:
@@ -251,34 +266,20 @@ for resource (gas) subtraction, we can then just subtract
 *)
 
 
-
-fun elle_jumpD :: "ellest \<Rightarrow> ellest option" where
+(* off by one in checking for stack overflow?
+actually i think this is ok. we need to check for "greater than or equal to 1024" *)
+fun elle_jumpD :: "ellest \<Rightarrow> ellest" where
 "elle_jumpD (ir, cc, n) =
     (case ir of
-      InstructionToEnvironment _ _ _ \<Rightarrow> Some (ir, cc, n)
+      InstructionToEnvironment _ _ _ \<Rightarrow> (ir, cc, n)
     | InstructionContinue v \<Rightarrow>
         if      (vctx_gas v) < Gmid then
-          Some (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n)
+          (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n)
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
-          Some (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n)
+          (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n)
         else
-          Some (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>), cc, n))"
-(*
-        if check_resources v cc (vctx_stack   v) i n then
-          Some (instruction_sem v cc i n, cc, n)
-        else
-          Some 
-          (InstructionToEnvironment (ContractFail
-               ((case  inst_stack_numbers i of
-                  (consumed, produced) =>
-                  (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
-                   @ (if meter_gas i v cc n \<le>(vctx_gas   v) then [] else [OutOfGas])
-                )
-               ))
-               v None
-          , cc
-          , n))"
-*)
+          (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>), cc, n))"
+
 
 (* FOR JUMPI steps are as follows
 1. Check for Ghigh gas
@@ -292,14 +293,6 @@ return a Boolean based on whether the item is 0
 
 *)
 
-(* OK - for now we need to coalesce failure cases into None *)
-(* better idea: when comparing two final results,
-treat all failure cases as equal
-(this deals with the transient failure where we
-fail in between pushing and jumping) *)
-(* otherwise we can get bad transient states on out of gas 
-(different stack contents)
-*)
 
 (*
 
@@ -311,30 +304,23 @@ semantics of jump in Elle:
 
 *)
 
-fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest) option" where
+fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest)" where
 "elle_jumpiD (ir, cc, n) =
     (case ir of
-      InstructionToEnvironment _ _ _ \<Rightarrow> Some (False, (ir, cc, n))
+      InstructionToEnvironment _ _ _ \<Rightarrow> (False, (ir, cc, n))
     | InstructionContinue v \<Rightarrow>
         if      (vctx_gas v) < Ghigh then
-          Some (False, (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n))
+          (False, (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n))
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
-          Some (False, (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n))
+          (False, (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n))
         else (case vctx_stack v of
-          [] \<Rightarrow> Some (False, (InstructionToEnvironment (ContractFail [TooShortStack]) v None, cc, n))
+          [] \<Rightarrow> (False, (InstructionToEnvironment (ContractFail [TooShortStack]) v None, cc, n))
           | cond#rest \<Rightarrow>
            let new_env = (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>)) in
             strict_if (cond =(((word_of_int 0) ::  256 word)))
-             (\<lambda> _ . Some (True, (new_env, cc, n) ))
-             (\<lambda> _  .Some (False, (new_env, cc, n)))))"
+             (\<lambda> _ . (True, (new_env, cc, n) ))
+             (\<lambda> _  . (False, (new_env, cc, n)))))"
 
-(*
-
-semantics of jumpI will be the same, except that
-
-* need to make sure stack is being updated correctly when 
-
-*)
 
 
 definition elle_interp :: "ellest llinterp" where
@@ -408,9 +394,8 @@ fun elle_sem' ::
   "ll1 \<Rightarrow>
    nat \<Rightarrow> (* fuel for elle jumps *)
   (* continuations corresponding to enclosing scopes *)
-   (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
-   (ellest \<Rightarrow> ellest option)" where
-"elle_sem' x n c = ll1_sem x elle_interp n None [] c"
+   (ellest \<Rightarrow> ellest llresult)" where
+"elle_sem' x n = ll1_sem x elle_interp n None"
 
 (* denote jmpd *)
 
@@ -420,29 +405,25 @@ fun ll'_sem ::  "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
    nat \<Rightarrow> (* fuel *)
    nat option \<Rightarrow> (* depth, if we are scanning for a label *)
 (* continuations corresponding to enclosing scopes *)
-   (('a \<Rightarrow> 'a option) list) \<Rightarrow>
-   ('a \<Rightarrow> 'a option) \<Rightarrow> (* continuation *)
-   ('a \<Rightarrow> 'a option)" where
+   ('a \<Rightarrow> 'a llresult)" where
 "ll'_sem x =
   ll1_sem (ll_purge_annot x)"
 
 fun ll'_sem' ::
   "('lix, 'llx, 'ljx, 'ljix, 'lsx, 'ptx, 'pnx) ll \<Rightarrow>
    nat \<Rightarrow> (* fuel for elle jumps *)
-  (* continuations corresponding to enclosing scopes *)
-   (ellest \<Rightarrow> ellest option) \<Rightarrow> (* continuation *)
-   (ellest \<Rightarrow> ellest option)" where
-"ll'_sem' x n c = ll'_sem x elle_interp n None [] c"
+   (ellest \<Rightarrow> ellest llresult)" where
+"ll'_sem' x n = ll'_sem x elle_interp n None"
 
 (* prove that if two lls are equal, throwing away annotations,
 the semantics are also the same
 use ll'_sem *)
 lemma ll'_sem_same' :
 "(! t2 . ll_purge_annot (t1 :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) = ll_purge_annot t2 \<longrightarrow>
-  (! d jd n depth s c . ll'_sem t1 d jd n depth s c = ll'_sem t2 d jd n depth s c))
+  (! n depth x . ll'_sem t1 n depth x = ll'_sem t2 n depth x))
 \<and>
 (! q e q2 e2 ls2 . ll_purge_annot (q, LSeq e (ls :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) = ll_purge_annot (q2, LSeq e2 ls2) \<longrightarrow>
-   (! d jd n depth s c . ll'_sem (q, LSeq e ls) d jd n depth s c = ll'_sem (q2, LSeq e2 ls2) d jd n depth s c))"
+   (! n depth x . ll'_sem (q, LSeq e ls) n depth x = ll'_sem (q2, LSeq e2 ls2) n depth x))"
 proof(induction rule:my_ll_induct)
 case (1 q e i)
   then show ?case by auto
@@ -468,7 +449,7 @@ qed
 
 lemma ll'_sem_same [rule_format]:
 "(! t2 . ll_purge_annot (t1 :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) = ll_purge_annot t2 \<longrightarrow>
-  (! d jd n depth s c . ll'_sem t1 d jd n depth s c = ll'_sem t2 d jd n depth s c))"
+  (!  n depth x . ll'_sem t1 n depth x = ll'_sem t2 n depth x))"
   apply(insert ll'_sem_same')
   apply(auto)
   done
