@@ -12,6 +12,7 @@ TODO: handle parsing of options later, probably in Isabelle *)
 let main =
 	if Array.length Sys.argv > 1 then
 		let content = load_file (Sys.argv. (1)) in
+                (* print_endline content; *)
 	        let out = FourL.FourL.compiler content in
 	        (match out with
 	         None -> prerr_endline "ERROR: compilation error"

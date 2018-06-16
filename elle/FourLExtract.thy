@@ -6,6 +6,7 @@ definition compilerFuel where "compilerFuel = 100"
 
 value "hexwrite [Evm.byteFromNat 125]"
 
+(*
 definition compiler_string :: "string \<Rightarrow> string option" where
 "compiler_string s =
   (case llll_parse_complete s of
@@ -15,10 +16,10 @@ definition compiler_string :: "string \<Rightarrow> string option" where
       None \<Rightarrow> None
       | Some wl \<Rightarrow> Some (hexwrite wl)
    ))"
-
+*)
 definition compiler :: "String.literal \<Rightarrow> String.literal option" where
 "compiler l =
-  (case compiler_string (String.literal.explode l) of
+  (case fourL_compiler_string (String.literal.explode l) of
    None \<Rightarrow> None
   | Some s \<Rightarrow> Some (String.implode s))"
 
@@ -35,6 +36,8 @@ module_name FourL file "./generated/FourL.sml"
 (* need a "code-printing" tweak
 - use OCaml strings, not char lists
 - use OCaml ints, not strs *)
+
+value "compiler (String.implode ''(seq 1 2)'')"
 
 
 

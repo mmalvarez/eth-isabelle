@@ -1765,6 +1765,14 @@ next
     done
 qed
 
+lemma write_jump_targets_same [rule_format] :
+"
+(! l t' . write_jump_targets l (t :: ll4) = Some t' \<longrightarrow>
+  ll_purge_annot t = ll_purge_annot t')"
+  apply(insert write_jump_targets_same')
+  apply(auto)
+  done
+
 (* write_jump_targets_qvalid - or is this needed? 
 i think we need it to build a link between the address in EVM and the ll semantics *)
 
@@ -2115,6 +2123,7 @@ question though - when do we "cut off" continuations?
 to concrete trees we are going to call our thing on.
 (what to do about )
 *)
+(*
 fun generate_conts ::
 "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow> nat \<Rightarrow>
      (ellest \<Rightarrow> ellest option) list \<Rightarrow> 
@@ -2135,7 +2144,7 @@ fun generate_conts ::
     None \<Rightarrow> None
     | Some t' \<Rightarrow> generate_conts t' ct (n - 1 - ch) 
         ((ll'_sem t elle_interp (n-1) (Some 0) scopes cont)#scopes) cont))"
-
+*)
 (* use get_label or get_node *)
 (* use accumulator so we get the results in reverse (as desired) *)
 fun get_addrs ::
@@ -2205,7 +2214,35 @@ definition ellecompile_untrusted :: "ll1 \<Rightarrow> ll4 option" where
 (case (ll3_assign_label (ll3_init (ll_pass1 l))) of
   Some l' \<Rightarrow> (case process_jumps_loop (get_process_jumps_fuel l') l' of
               Some l'' \<Rightarrow> (case write_jump_targets [] (ll4_init l'') of
-                           Some l''' \<Rightarrow> Some l''')))"
+                           Some l''' \<Rightarrow> Some l'''
+                           | _ \<Rightarrow> None)
+             | _ \<Rightarrow> None)
+ | _ \<Rightarrow> None)"
+
+lemma ellecompile_untrusted_same :
+"ellecompile_untrusted l1 = Some l4 \<Longrightarrow> ll_purge_annot l4 = l1"
+  apply(insert ellecompile_untrusted_def[of l1]) apply(simp)
+  apply(case_tac "ll3_assign_label (ll3_init (ll_pass1 l1))", auto)
+  apply(case_tac "process_jumps_loop
+              (get_process_jumps_fuel ((a, b), ba))
+              ((a, b), ba)", auto)
+  apply(rename_tac boo)
+  apply(case_tac "write_jump_targets []
+              (ll4_init ((aa, bb), boo))", auto)
+  apply(subgoal_tac "ll_pass1 l1 = ll_pass1 l1")
+   apply(drule_tac ll_pass1_same) apply(simp_all)
+  apply(subgoal_tac "ll3_init (ll_pass1 l1) = ll3_init (ll_pass1 l1)")
+   apply(drule_tac ll3_init_same) apply(simp_all)
+  apply(drule_tac ll3_assign_label_same) apply(simp_all)
+  apply(drule_tac process_jumps_loop_same) apply(simp_all)
+  apply(subgoal_tal "ll4_init ((aa, bb), boo) = ((aa, bb), boo)")
+  apply(drule_tac write_jump_targets_same) apply(auto)
+
+  apply(subgoal_tac "ll3_assign_label (ll3_init (ll_pass1 l1)) =
+                     ll3_assign_label (ll3_init (ll_pass1 l1))")
+  apply(drule_tac ll3_assign_label_same) apply(simp_all)
+  apply(frule_tac ll3_assign_label_same)
+  apply(frule_tac ll3_init_same)
 
 definition ellecompile :: "ll1 \<Rightarrow> constant_ctx option" where
 "ellecompile l =

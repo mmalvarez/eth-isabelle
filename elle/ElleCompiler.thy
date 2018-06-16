@@ -330,12 +330,20 @@ fun process_jumps_loop :: "nat \<Rightarrow> ll3 \<Rightarrow> ll3 option" where
 
 (* count up the number of jumps, and multiply by 32 *)
 
-fun get_process_jumps_fuel :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> nat" where
-"get_process_jumps_fuel (_, LJmp _ _ s) = 32 - s"
-| "get_process_jumps_fuel (_, LJmpI _ _s) = 32 - s"
-| "get_process_jumps_fuel (_, LSeq _ ls) =
-    List.foldl (\<lambda> a b . a + b) 0 (List.map get_process_jumps_fuel ls)"
-| "get_process_jumps_fuel _ = 0"
+fun get_process_jumps_fuel' :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> nat" where
+"get_process_jumps_fuel' (_, LJmp _ _ s) = 32 - s"
+| "get_process_jumps_fuel' (_, LJmpI _ _s) = 32 - s"
+| "get_process_jumps_fuel' (_, LSeq _ ls) =
+    List.foldl (\<lambda> a b . a + b) 0 (List.map get_process_jumps_fuel' ls)"
+| "get_process_jumps_fuel' _ = 0"
+
+(* add one extra. this is needed e.g. in cases where there are no jump statements,
+but we still need fuel to get through the check *)
+definition get_process_jumps_fuel :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> nat" where
+"get_process_jumps_fuel l = 1 + get_process_jumps_fuel' l"
+
+definition ll1_get_process_jumps_fuel :: "ll1 \<Rightarrow> nat" where
+"ll1_get_process_jumps_fuel l = get_process_jumps_fuel (ll_pass1 l)"
 
 fun mynth :: "'a option list \<Rightarrow> nat \<Rightarrow> 'a option" where
     "mynth [] _ = None"

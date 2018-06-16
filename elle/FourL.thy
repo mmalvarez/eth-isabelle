@@ -1,5 +1,5 @@
 theory FourL
-  imports Main ElleSyntax ElleCompiler
+  imports Main ElleSyntax ElleCompiler ElleUtils
 begin
 
 (* deal with literals:
@@ -20,6 +20,7 @@ datatype llllarith =
    | LAOr
    | LAXor
    | LANot
+   | LAExp
 
 datatype lllllogic =
   LLAnd
@@ -88,15 +89,16 @@ Raw means we need to basically save the first non-void result *)
 
 (* TODO: is this the right ("jnz") semantics? *)
 (* Idea: literals translate into pushes *)
-fun llll_compile :: "llll \<Rightarrow> ll1" where
+fun llll_compile :: "llll \<Rightarrow> ll1"
+(*and llll_arith_compile :: "llllarith \<Rightarrow> ll1" *) where
 "llll_compile (L4L_Str s) = ll1.L (Evm.inst.Stack (PUSH_N (truncate_string s)))"
 | "llll_compile (L4L_Nat i) = ll1.L (Evm.inst.Stack (PUSH_N (intToBytes (int i))))"
 | "llll_compile (L4I i) = ll1.L i"
 | "llll_compile (L4Seq l) = ll1.LSeq (map llll_compile l)"
 | "llll_compile (L4When c l) =
-   ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l, ll1.LLab 0]" (* wrong logic *)
+   ll1.LSeq [llll_compile c, ll1.L (Arith ISZERO), ll1.LJmpI 0, llll_compile l, ll1.LLab 0]" (* wrong logic *)
 | "llll_compile (L4If c l1 l2) = 
-   ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l2, ll1.LLab 0]"
+   ll1.LSeq [ ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l2, ll1.LJmp 1, ll1.LLab 0, llll_compile l1, ll1.LLab 1]]"
 (* TODO: we can have a more efficient loop *)
 | "llll_compile (L4While c l) = 
    ll1.LSeq [
@@ -108,6 +110,10 @@ fun llll_compile :: "llll \<Rightarrow> ll1" where
              llll_compile l,
              ll1.LJmp 0,
              ll1.LLab 2]]]"
+(* TODO: for addition e.g., handle multiple results properly *)
+| "llll_compile (L4Arith LAPlus ls) = ll1.LSeq ((ll1.L (Arith ADD))#(map llll_compile ls))"
+| "llll_compile (L4Arith LAExp ls) = ll1.LSeq ((ll1.L (Arith EXP))#(map llll_compile ls))"
+| "llll_compile (L4Comp LCEq l1 l2) = ll1.LSeq [ll1.L (Arith inst_EQ), (llll_compile l1), llll_compile l2]"
 
 (* whitespace characters: bytes 9-13, 32 *)
 definition isWs :: "char \<Rightarrow> bool"
@@ -220,7 +226,7 @@ type_synonym ('a, 'b) parser =
     ('a, 'b) parser' \<Rightarrow> (* captures recursive call to entire grammar parser (e.g. for parens) *)
     'b"
 
-
+(* basic hex utils *)
 
 (* does the r parameter need to change? *)
 
@@ -433,9 +439,9 @@ value "lookupS [(''a'',1), (''a'',2)] ''a'' :: nat option"
 
 (* TODO: have vars_tab argument to anything but parse1_def?  *)
 (* TODO: have llll_parse1_seq for parsing a sequence of arguments *)
-fun llll_parse1 :: "funs_tab  \<Rightarrow> stree \<Rightarrow> (llll * funs_tab) option " 
-and llll_parse1_def :: "string \<Rightarrow> funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree list \<Rightarrow> (llll * funs_tab )option"
-and llll_parse1_args :: "funs_tab \<Rightarrow> stree list \<Rightarrow> (llll list * funs_tab )option" 
+fun llll_parse1 :: "funs_tab  \<Rightarrow> stree \<Rightarrow> (llll * llll option * funs_tab) option " 
+and llll_parse1_def :: "string \<Rightarrow> funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree list \<Rightarrow> (llll * llll option * funs_tab )option"
+and llll_parse1_args :: "funs_tab \<Rightarrow> stree list \<Rightarrow> (llll list * llll option * funs_tab )option" 
 where
 
 (*
@@ -457,13 +463,14 @@ a bunch of already-parsed parameter values and converts them to an llll option
 what this means is that we return a function that constructs a series of funstab entries (?) *)
 (* TODO: double check reversing is the right thing here *)
 | "llll_parse1_def name ft vt (h#[]) = 
-  Some (L4Seq [], (name, (\<lambda> l . 
+  Some (L4Seq [], None, (name, (\<lambda> l . 
     (case mkConsts vt (rev l) of
      None \<Rightarrow> None
   (* TODO: are we leaving out something important by extracting the first parameter?? *)
+  (* what do we do if a definition has a returnlll in it? For now, we ignore that payload. *)
     | Some ft' \<Rightarrow> (case (llll_parse1 (ft'@ft) h) of
                          None \<Rightarrow> None
-                        | Some (l, _) \<Rightarrow> Some l ))
+                        | Some (l, _, _) \<Rightarrow> Some l ))
  ))#ft)"
 
 | "llll_parse1_def name ft vt (h#t) = 
@@ -472,48 +479,62 @@ what this means is that we return a function that constructs a series of funstab
     | _ \<Rightarrow> None)"
 
 | "llll_parse1_args ft [] = None"
+(* is payload handling correct here? *)
 | "llll_parse1_args ft (h#[]) = 
     (case llll_parse1 ft h of
      None \<Rightarrow> None
-    | Some (l, ft') \<Rightarrow> Some ([l], ft'))"
+    | Some (l, x, ft') \<Rightarrow> Some ([l], x, ft'))"
+(* TODO - double check this one *)
 | "llll_parse1_args ft (h#t) = 
     (case llll_parse1 ft h of
      None \<Rightarrow> None
-    | Some (h', ft') \<Rightarrow> (case llll_parse1_args ft' t of
+    | Some (h', None, ft') \<Rightarrow> (case llll_parse1_args ft' t of
                         None \<Rightarrow> None
-                        | Some (t', ft'') \<Rightarrow> Some (h'#t', ft'')))"
+                        | Some (t', x, ft'') \<Rightarrow> Some (h'#t', x, ft''))
+    | Some (h', Some pay, ft') \<Rightarrow> Some ([h'], Some pay, ft'))"
 (* idea: we have already seen a head symbol, so we just need
 to parse a list of strees as follows: parse the head, track the modifications
 to the function context, thread those to the tail
 *)
 
-(* TODO: this does not deal with nullary macros correctly, I think. Need a case for those. *)
+(* TODO: this does not deal with nullary macros correctly, I think. Need a case for those. 
+actually it looks like this is right...?*)
 | "llll_parse1 ft (STStr s) =
   (case run_parse_opt' parseNat s of
     None \<Rightarrow> (case lookupS ft s of
                       None \<Rightarrow> None
                       | Some f \<Rightarrow> (case f [] of 
                                      None \<Rightarrow> None
-                                    | Some l \<Rightarrow> Some (l, ft)))
-   | Some n \<Rightarrow> Some (L4L_Nat n, ft))" (* TODO: string literals are also a thing *)
+                                    | Some l \<Rightarrow> Some (l, None, ft)))
+   | Some n \<Rightarrow> Some (L4L_Nat n, None, ft))" (* TODO: string literals are also a thing *)
 
 | "llll_parse1 ft (STStrs (h#t)) = 
    (case h of
      STStr hs \<Rightarrow>
       (if hs = ''def''
           then (case t of
+                 (* make sure the name starts with an apostrophe, then drop it off *)
+
                  STStr(h2)#t' \<Rightarrow> (case llll_parse1_def h2 ft [] t' of
                                   None \<Rightarrow> None
                                 | Some p \<Rightarrow> Some p)
                 | _ \<Rightarrow> None)
           else
-          (case ((lookupS ft hs) :: (llll list \<Rightarrow> llll option) option) of
-            None \<Rightarrow> None
-           | Some f \<Rightarrow> (case llll_parse1_args ft t of
-                        None \<Rightarrow> None
-                       | Some (ls, ft') \<Rightarrow> (case f ls of
-                                     None \<Rightarrow> None
-                                     | Some l \<Rightarrow> Some(l, ft')))))
+          (if hs = ''returnlll''
+            then (case t of
+                  [paysrc] \<Rightarrow> 
+                    (case llll_parse1 ft paysrc of
+                      Some (ls, None, ft') \<Rightarrow> Some (L4Seq [], Some ls, ft')
+                      | _ \<Rightarrow> None)
+                  | _ \<Rightarrow> None)
+            else
+            (case ((lookupS ft hs) :: (llll list \<Rightarrow> llll option) option) of
+              None \<Rightarrow> None
+             | Some f \<Rightarrow> (case llll_parse1_args ft t of
+                          None \<Rightarrow> None
+                         | Some (ls, x, ft') \<Rightarrow> (case f ls of
+                                       None \<Rightarrow> None
+                                       | Some l \<Rightarrow> Some(l, x, ft'))))))
     | _ \<Rightarrow> None)"
 | "llll_parse1 ft  (STStrs []) = None"
 (*
@@ -576,20 +597,75 @@ definition default_llll_funs :: funs_tab where
 ]
 "
 
-definition llll_parse1_default :: "stree \<Rightarrow> llll option" where
+definition llll_parse1_default :: "stree \<Rightarrow> (llll * llll option) option" where
 "llll_parse1_default st = 
   (case llll_parse1 default_llll_funs st of
    None \<Rightarrow> None
-   | Some (l, _) \<Rightarrow> Some l)"
+   | Some (l, x, _) \<Rightarrow> Some (l, x))"
 
-definition llll_parse_complete :: "string \<Rightarrow> llll option" where
+definition llll_parse_complete :: "string \<Rightarrow> (llll * llll option) option" where
 "llll_parse_complete s =
   (case llll_parse0 s of
    None \<Rightarrow> None
   | Some st \<Rightarrow> llll_parse1_default st)"
 
+(* used if there is a payload - creates the "interlude" that returns
+the code to be deployed *)
 
-value "llll_parse_complete ''(seq (+ 2 3) (- 1 2))''"
+(*
+fun llll_combine_payload :: "llll \<Rightarrow> llll \<Rightarrow> nat \<Rightarrow> inst list" where
+"llll_combine_payload l1 l2 =
+*)
+
+fun ilsz :: "inst list \<Rightarrow> nat" where
+"ilsz [] = 0"
+| "ilsz (h#t) =
+   nat (Evm.inst_size h) + ilsz t"
+
+(* 9 is the size of all the non-variable "interlude" instructions :
+PUSH_N (sans payload)
+DUP
+PUSH_N (sans payload)
+PUSH_N (0)
+CODECOPY
+PUSH_N (0)
+RETURN
+*)
+definition base_interlude_size :: nat where
+"base_interlude_size = 9"
+
+fun llll_combine_payload_sub :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> (nat * nat) option " where
+"llll_combine_payload_sub fuel presz paysz startbytes endbytes =
+ (if fuel = 0 then None
+  else (if encode_size (paysz) = endbytes
+        then (if encode_size (presz + startbytes + endbytes + base_interlude_size) = startbytes
+              then Some (startbytes, endbytes)
+              else llll_combine_payload_sub (fuel - 1) presz paysz (startbytes + 1) endbytes)
+        else llll_combine_payload_sub (fuel - 1) presz paysz startbytes (endbytes + 1)))"
+
+(* 32 bytes for each address pushed *)
+definition combine_payload_fuel :: nat where
+"combine_payload_fuel = 32 + 32"
+
+(* assumes that sizes of startbytes and endbytes calculated correctly *)
+definition makeInterlude :: "nat \<Rightarrow> nat \<Rightarrow> inst list \<Rightarrow> inst list \<Rightarrow> inst list" where
+"makeInterlude startbytes endbytes prelude payload =
+ prelude @ 
+ [Evm.inst.Stack (PUSH_N (output_address (ilsz payload)))] @
+ [Evm.inst.Dup 0] @
+ [Evm.inst.Stack (PUSH_N (output_address (ilsz prelude + startbytes + endbytes + base_interlude_size)))] @
+ [Evm.inst.Stack (PUSH_N (output_address 0))] @
+ [Evm.inst.Memory CODECOPY] @
+ [Evm.inst.Stack (PUSH_N (output_address 0))] @
+ [Evm.inst.Misc RETURN] @
+ payload"
+
+
+(*
+fun llll_combine_payload :: "inst list \<Rightarrow> inst list \<Rightarrow> nat \<Rightarrow> inst list" where
+"llll_combine_payload l1 l2 n =
+*)
+value "llll_parse_complete ''(seq (+ 2 3) (- 1 2) (returnlll (- 1 2)))''"
 
 value "llll_parse_complete ''(seq (+ 2 3) (+ 1 2))''"
 
@@ -600,5 +676,44 @@ value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
 value "llll_parse_complete ''(seq (def a 1) (+ 2 3) (+ 1 a)))''"
 
 value "llll_parse_complete ''(seq (def a 1) (def a 2) a)''"
+
+(* finally, we need to integrate our function for making the interlude *)
+(* then, plug this into FourLExtract *)
+definition il2wl :: "inst list \<Rightarrow> 8 word list" where
+"il2wl il = List.concat (map Evm.inst_code il)"
+
+
+definition fourL_compiler_string :: "string \<Rightarrow> string option" where
+"fourL_compiler_string s =
+  (case llll_parse_complete s of
+   None \<Rightarrow> None
+  | Some (l4pre, None) \<Rightarrow>
+   ( case pipeline (llll_compile l4pre) (get_process_jumps_fuel (ll_pass1 (llll_compile l4pre))) of
+      None \<Rightarrow> None
+      | Some wl \<Rightarrow> Some (hexwrite wl)
+   )
+  | Some (l4pre, Some l4pay) \<Rightarrow>
+    (case pipeline'' (llll_compile l4pre) (get_process_jumps_fuel (ll_pass1 (llll_compile l4pre))) of
+     None \<Rightarrow> None
+     | Some il_pre \<Rightarrow> (case pipeline'' (llll_compile l4pay) (get_process_jumps_fuel (ll_pass1 (llll_compile l4pay))) of
+        None \<Rightarrow> None
+        | Some il_pay \<Rightarrow>
+          (case llll_combine_payload_sub combine_payload_fuel (ilsz il_pre) (ilsz il_pay) 0 0 of
+            None \<Rightarrow> None
+            | Some (startbytes, endbytes) \<Rightarrow> 
+              Some (hexwrite (il2wl (makeInterlude startbytes endbytes il_pre il_pay)))
+           )
+ )))"
+
+value "llll_parse_complete  ''(seq 1 2)''"
+
+value "fourL_compiler_string  ''(seq 1 2)''"
+
+
+value "case llll_parse_complete ''(seq 1 2)'' of
+       None \<Rightarrow> None
+       | Some (pre, None) \<Rightarrow> pipeline'' (llll_compile pre) (ll1_get_process_jumps_fuel (llll_compile pre))
+      | _ \<Rightarrow> None"
+
 end
 
