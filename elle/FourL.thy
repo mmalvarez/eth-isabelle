@@ -47,9 +47,12 @@ def and mac as defined here need a recursive llll argument
 datatype llll =
    L4L_Str "string"
    | L4L_Nat "nat"
-   | L4Def "string" "string list"
-   | L4Mac "string" "llll list" 
-  | L4I "inst"
+(* now we handle defs/macros before the llll stage (parsing) *)
+(*   | L4Def "string" "string list" *)
+(*   | L4Mac "string" "llll list"  *)
+   | L4I0 "inst"
+   | L4I1 "inst" "llll"
+   | L4I2 "inst" "llll" "llll"
   | L4Seq "llll list"
   | L4Arith "llllarith" "llll list"
   | L4Logic "lllllogic" "llll list"
@@ -93,7 +96,9 @@ fun llll_compile :: "llll \<Rightarrow> ll1"
 (*and llll_arith_compile :: "llllarith \<Rightarrow> ll1" *) where
 "llll_compile (L4L_Str s) = ll1.L (Evm.inst.Stack (PUSH_N (truncate_string s)))"
 | "llll_compile (L4L_Nat i) = ll1.L (Evm.inst.Stack (PUSH_N (intToBytes (int i))))"
-| "llll_compile (L4I i) = ll1.L i"
+| "llll_compile (L4I0 i) = ll1.L i"
+| "llll_compile (L4I1 i l) = ll1.LSeq (llll_compile l # [ll1.L i])"
+| "llll_compile (L4I2 i l1 l2) = ll1.LSeq (llll_compile l2 # llll_compile l1 # [ll1.L i])"
 | "llll_compile (L4Seq l) = ll1.LSeq (map llll_compile l)"
 | "llll_compile (L4When c l) =
    ll1.LSeq [llll_compile c, ll1.L (Arith ISZERO), ll1.LJmpI 0, llll_compile l, ll1.LLab 0]" (* wrong logic *)
@@ -111,9 +116,10 @@ fun llll_compile :: "llll \<Rightarrow> ll1"
              ll1.LJmp 0,
              ll1.LLab 2]]]"
 (* TODO: for addition e.g., handle multiple results properly *)
-| "llll_compile (L4Arith LAPlus ls) = ll1.LSeq ((ll1.L (Arith ADD))#(map llll_compile ls))"
-| "llll_compile (L4Arith LAExp ls) = ll1.LSeq ((ll1.L (Arith EXP))#(map llll_compile ls))"
-| "llll_compile (L4Comp LCEq l1 l2) = ll1.LSeq [ll1.L (Arith inst_EQ), (llll_compile l1), llll_compile l2]"
+| "llll_compile (L4Arith LAPlus ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith ADD)])"
+| "llll_compile (L4Arith LAExp ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith EXP)])"
+| "llll_compile (L4Arith LADiv ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith DIV)])"
+| "llll_compile (L4Comp LCEq l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith inst_EQ)]"
 
 (* whitespace characters: bytes 9-13, 32 *)
 definition isWs :: "char \<Rightarrow> bool"
@@ -194,7 +200,7 @@ the problem is that this seems to break termination. *)
 fun fourLParse :: "string \<Rightarrow> string * llll option" where
 "fourParse
 *)
-value "LemExtraDefs.char_to_digit (CHR ''B'')"
+value "LemExtraDefs.char_to_digit (CHR ''A'')"
 
 (*
 type_synonym ('a, 'b) parser =
@@ -226,8 +232,35 @@ type_synonym ('a, 'b) parser =
     ('a, 'b) parser' \<Rightarrow> (* captures recursive call to entire grammar parser (e.g. for parens) *)
     'b"
 
-(* basic hex utils *)
+value "CHR ''b''"
 
+definition hex_parse_table :: "(char * nat) list" where
+"hex_parse_table =
+  [(CHR ''0'', 0)
+  ,(CHR ''1'', 1)
+  ,(CHR ''2'', 2)
+  ,(CHR ''3'', 3)
+  ,(CHR ''4'', 4)
+  ,(CHR ''5'', 5)
+  ,(CHR ''6'', 6)
+  ,(CHR ''7'', 7)
+  ,(CHR ''8'', 8)
+  ,(CHR ''9'', 9)
+  ,(CHR ''A'', 10), (CHR ''a'', 10)
+  ,(CHR ''B'', 11), (CHR ''b'', 11)
+  ,(CHR ''C'', 12), (CHR ''c'', 12)
+  ,(CHR ''D'', 13), (CHR ''d'', 13)
+  ,(CHR ''E'', 14), (CHR ''e'', 14)
+  ,(CHR ''F'', 15), (CHR ''f'', 15)
+  ]"
+
+(* basic hex utils *)
+fun parseHexNumeral :: "(nat, 'a) parser" where
+"parseHexNumeral [] s f r = f []"
+| "parseHexNumeral (h#t) s f r =
+   (case Map.map_of hex_parse_table h of
+    None \<Rightarrow> f (h#t)
+    | Some n \<Rightarrow> s n t)"
 (* does the r parameter need to change? *)
 
 fun parseNumeral :: "(nat, 'a) parser" where
@@ -251,6 +284,16 @@ function(sequential) parseNatSub :: "nat \<Rightarrow> (nat, 'a) parser" where
    "
   by pat_completeness auto
 termination sorry
+
+function(sequential) parseHexSub :: "nat \<Rightarrow> (nat, 'a) parser" where
+"parseHexSub i [] su fa r = su i []"
+| "parseHexSub i (h#t) su fa r =
+   parseHexNumeral (h#t)
+                   (\<lambda> n l . parseHexSub (16 * i + n) l su fa r)
+                   (\<lambda> l . su i l) r"
+  by pat_completeness auto
+termination sorry
+
 (*
 function(sequential) parseIntSub :: "int \<Rightarrow> (int, 'a) parser" where
 "parseIntSub i [] su fa r  = su i []"
@@ -269,6 +312,7 @@ fun parseNat :: "(nat, 'a) parser" where
     (\<lambda> n l . parseNatSub n l su fa r)
     fa r"
 
+
 (* more helpers: matching a keyword (literal string) *)
 (* matching an empty keyword is technically valid *)
 fun parseKeyword :: "string \<Rightarrow> (unit, 'a) parser" where
@@ -279,6 +323,15 @@ fun parseKeyword :: "string \<Rightarrow> (unit, 'a) parser" where
        parseKeyword t t' su fa r
     else fa (h'#t'))"
 
+
+fun parseHex :: "(nat, 'a) parser" where
+"parseHex ((h0)#(hx)#h#t) su fa r =
+  (if (h0 = CHR ''0'' \<and> hx = CHR ''x'') then
+    (parseHexNumeral (h#t)
+   (\<lambda> n l . parseHexSub n l su fa r)
+    fa r)
+  else fa (h0#hx#h#t))"
+| "parseHex l su fa r = fa l"
 
 (* execute a parser on a string *)
 function(sequential) run_parse :: "('a, 'b) parser \<Rightarrow> ('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> string \<Rightarrow> 'b" where
@@ -437,6 +490,12 @@ value "lookupS [(''a'',1), (''a'',2)] ''a'' :: nat option"
 
 (* TODO: support "lit", "lll" constructs *)
 
+
+value "String.char_of_nat 39"
+
+definition apos :: char where
+"apos = String.char_of_nat 39"
+
 (* TODO: have vars_tab argument to anything but parse1_def?  *)
 (* TODO: have llll_parse1_seq for parsing a sequence of arguments *)
 fun llll_parse1 :: "funs_tab  \<Rightarrow> stree \<Rightarrow> (llll * llll option * funs_tab) option " 
@@ -463,15 +522,20 @@ a bunch of already-parsed parameter values and converts them to an llll option
 what this means is that we return a function that constructs a series of funstab entries (?) *)
 (* TODO: double check reversing is the right thing here *)
 | "llll_parse1_def name ft vt (h#[]) = 
-  Some (L4Seq [], None, (name, (\<lambda> l . 
-    (case mkConsts vt (rev l) of
-     None \<Rightarrow> None
+  (case name of
+   [] \<Rightarrow> None
+   | [hdchr] \<Rightarrow> None
+   | hdchr#name' \<Rightarrow>
+     (if hdchr \<noteq> apos then None
+      else Some (L4Seq [], None, (name', (\<lambda> l . 
+        (case mkConsts vt (rev l) of
+           None \<Rightarrow> None
   (* TODO: are we leaving out something important by extracting the first parameter?? *)
   (* what do we do if a definition has a returnlll in it? For now, we ignore that payload. *)
-    | Some ft' \<Rightarrow> (case (llll_parse1 (ft'@ft) h) of
-                         None \<Rightarrow> None
-                        | Some (l, _, _) \<Rightarrow> Some l ))
- ))#ft)"
+           | Some ft' \<Rightarrow> (case (llll_parse1 (ft'@ft) h) of
+                                None \<Rightarrow> None
+                              | Some (l, _, _) \<Rightarrow> Some l ))
+ ))#ft)))"
 
 | "llll_parse1_def name ft vt (h#t) = 
    (case h of
@@ -499,23 +563,30 @@ to the function context, thread those to the tail
 
 (* TODO: this does not deal with nullary macros correctly, I think. Need a case for those. 
 actually it looks like this is right...?*)
+(* need to attempt to parse hex first *)
 | "llll_parse1 ft (STStr s) =
-  (case run_parse_opt' parseNat s of
-    None \<Rightarrow> (case lookupS ft s of
+  (case run_parse_opt' parseHex s of
+    None \<Rightarrow>
+    (case run_parse_opt' parseNat s of
+      None \<Rightarrow> (case lookupS ft s of
                       None \<Rightarrow> None
                       | Some f \<Rightarrow> (case f [] of 
                                      None \<Rightarrow> None
                                     | Some l \<Rightarrow> Some (l, None, ft)))
-   | Some n \<Rightarrow> Some (L4L_Nat n, None, ft))" (* TODO: string literals are also a thing *)
+      | Some n \<Rightarrow> Some (L4L_Nat n, None, ft))
+    | Some n \<Rightarrow> Some (L4L_Nat n, None, ft)) " (* TODO: string literals are also a thing *)
 
+(* arguments of the definition are going to be in an extra layer of parens *)
 | "llll_parse1 ft (STStrs (h#t)) = 
    (case h of
      STStr hs \<Rightarrow>
       (if hs = ''def''
           then (case t of
                  (* make sure the name starts with an apostrophe, then drop it off *)
-
-                 STStr(h2)#t' \<Rightarrow> (case llll_parse1_def h2 ft [] t' of
+                  STStr(h2) # STStrs (l) # [d] \<Rightarrow> (case llll_parse1_def h2 ft [] (l@[d]) of
+                                  None \<Rightarrow> None
+                                | Some p \<Rightarrow> Some p)
+                | STStr(h2) # [d] \<Rightarrow> (case llll_parse1_def h2 ft [] [d] of
                                   None \<Rightarrow> None
                                 | Some p \<Rightarrow> Some p)
                 | _ \<Rightarrow> None)
@@ -575,11 +646,19 @@ definition default_llll_funs :: funs_tab where
 [
 (* control constructs *)
 (* TODO make this pop all but last result *)
-(''seq'', (\<lambda> l . Some (L4Seq l)))
+ (''seq'', (\<lambda> l . Some (L4Seq l)))
+,(''if'', (\<lambda> l . case l of
+                 c # br1 # [br2] \<Rightarrow> Some (L4If c br1 br2)
+                 | _ \<Rightarrow> None))
+,(''when'', (\<lambda> l . case l of
+                 c # [br] \<Rightarrow> Some (L4When c br)
+                 | _ \<Rightarrow> None))
 (* integer arithmetic *)
 ,(''+'', (\<lambda> l . Some (L4Arith LAPlus l)))
 ,(''-'', (\<lambda> l . Some (L4Arith LAMinus l)))
 ,(''*'', (\<lambda> l . Some (L4Arith LATimes l)))
+,(''div'', (\<lambda> l . Some (L4Arith LADiv l)))
+,(''exp'', (\<lambda> l . Some (L4Arith LAExp l)))
 ,(''/'', (\<lambda> l . Some (L4Arith LADiv l)))
 ,(''%'', (\<lambda> l . Some (L4Arith LAMod l)))
 (* bitwise logic *)
@@ -592,7 +671,19 @@ definition default_llll_funs :: funs_tab where
 ,(''||'', (\<lambda> l . Some (L4Logic LLOr l)))
 ,(''!'', (\<lambda> l . Some (L4Logic LLNot l)))
 (* comparisons - for later*)
+,(''='', (\<lambda> l . case l of
+                lhs#[rhs] \<Rightarrow> Some (L4Comp LCEq lhs rhs)
+                | _ \<Rightarrow> None))
 (* other constructs, loads/stores - for later*)
+,(''mstore'', (\<lambda> l . case l of
+                loc#[sz] \<Rightarrow> Some (L4I2 (Memory MSTORE) loc sz)
+                | _ \<Rightarrow> None))
+,(''return'', (\<lambda> l . case l of
+                loc#[sz] \<Rightarrow> Some (L4I2 (Misc RETURN) loc sz)
+                | _ \<Rightarrow> None))
+,(''calldataload'', (\<lambda> l . case l of
+                [loc] \<Rightarrow> Some (L4I1 (Stack CALLDATALOAD) loc)
+                | _ \<Rightarrow> None))
 (* data insertion - for later*)
 ]
 "
@@ -667,16 +758,54 @@ fun llll_combine_payload :: "inst list \<Rightarrow> inst list \<Rightarrow> nat
 *)
 value "llll_parse_complete ''(seq (+ 2 3) (- 1 2) (returnlll (- 1 2)))''"
 
-value "llll_parse_complete ''(seq (+ 2 3) (+ 1 2))''"
+value "llll_parse_complete ''(seq (+ 0x022 3) (+ 1 2))''"
 
 value "llll_parse0 ''(seq (+ 2 3) (+ 1 a))''"
 
 value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
 
-value "llll_parse_complete ''(seq (def a 1) (+ 2 3) (+ 1 a)))''"
+value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
+
+
+value "llll_parse_complete ''(seq (def 'a 1) (+ 2 3) (+ 1 a)))''"
 
 value "llll_parse_complete ''(seq (def a 1) (def a 2) a)''"
 
+(* echo *)
+
+value "llll_parse_complete
+  ''(seq
+  (def 'scratch 0x00)
+  (def 'identity 0xac37eebb)
+  (def 'function (function-hash code-body) (+ 1 2)))''"
+
+value "llll_parse_complete
+''(seq
+  (def 'scratch 0x00)
+  (def 'identity 0xac37eebb)
+  (def 'function (function-hash code-body)
+    (when (= (div (calldataload 0x00) (exp 2 224)) function-hash)
+      code-body))
+  (def 'plus (avar bvar) (+ avar bvar))
+  (returnlll
+    (function identity
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))''"
+(*     
+    (function identity 1)))''"
+*)
+(*
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))
+''"
+*)
+(*
+    (when (= (div (calldataload 0x00) (exp 2 224)) function-hash)
+      code-body))
+  ''"
+*)
 (* finally, we need to integrate our function for making the interlude *)
 (* then, plug this into FourLExtract *)
 definition il2wl :: "inst list \<Rightarrow> 8 word list" where

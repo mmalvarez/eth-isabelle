@@ -1,0 +1,11 @@
+(seq
+  (def 'scratch 0x00)
+  (def 'identity 0xac37eebb)
+  (def 'function (function-hash code-body)
+    (when (= (div (calldataload 0x00) (exp 2 224)) function-hash)
+      code-body))
+  (returnlll
+    (function identity
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))

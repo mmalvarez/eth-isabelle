@@ -1,6 +1,5 @@
 Files in this directory are generated automatically by Isabelle's code generator.
-They then need to be compiled with OCaml to produce a standalone binary, something like
+They then need to be compiled with OCaml to produce a standalone binary,
+You can use the MAKEFILE for this purpose, which requires only OCaml, not Isabelle, 
+As long as you have FourL.ml already.
 
-NB there is currently a bug in how we are outputting our bytecode, the order is wrong or something
-
-ocamlc -o llllc unix.cma nums.cma FourL.ml ../FourLShim.ml
