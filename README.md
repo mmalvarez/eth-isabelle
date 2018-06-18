@@ -49,7 +49,7 @@ once you have built the `llllc` executable:
 
 `cd elle/tests`
 
-`../generated/llllc add.lll`
+`../generated/llllc echo.lll`
 
 (or any other lll file in the directory)
 

@@ -1,9 +1,12 @@
 All files except
 * the [.sml], [.ml] and [.thy] files in [lem] directory and
+the files in elle/tests
 are distributed under Apache License Version 2.0.
 
 The [.sml], [.ml] and [.thy] files in [lem] directory are distributed under the terms in [lem/lem-license].
 
+The files in elle/tests are property of their owners, as described in elle/README.
+Other files in elle/tests are subject to the Apache License Version 2.0.
 
 
                                  Apache License
