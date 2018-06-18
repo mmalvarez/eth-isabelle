@@ -137,34 +137,53 @@ fun stree_append :: "stree \<Rightarrow> stree \<Rightarrow> stree" where
 "stree_append (STStr x) _ = STStr x"
 | "stree_append (STStrs xs) s = STStrs (xs @ [s])"
 
+definition newline :: "char" where
+"newline = String.char_of_nat 10"
+
 (* TODO: support comments
 idea: add an extra flag (" we are in a comment") when we see a ;
 clear it when we see a newline *)
 (* With thanks to Alex Sanchez-Stern *)
-fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list  \<Rightarrow> stree option" where
-"llll_parse' [] _ _ = None"
-| "llll_parse' (h#t) token parsed =
-   (if h = CHR ''(''
-       then llll_parse' t token ((STStrs [])#parsed)
-    else (if h = CHR '')''
-          then (case parsed of
-                [] \<Rightarrow> None
-                | ph#[] \<Rightarrow> if token \<noteq> [] then Some (stree_append ph (STStr token))
-                                         else Some ph
-                | ph1#ph2#pt \<Rightarrow> if token \<noteq> [] then llll_parse' t [] (stree_append ph2 (stree_append ph1 (STStr token)) # pt)
-                                              else llll_parse' t [] (stree_append ph2 ph1#pt))
-    else (if isWs h
-          then (if token \<noteq> [] then 
-                (case parsed of
-                   [] \<Rightarrow> None
-                   | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt))
-                else llll_parse' t [] parsed) 
-    else llll_parse' t (token@[h]) parsed)))"
+fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> bool \<Rightarrow> stree option" where
+"llll_parse' [] _ _ _ = None"
+(* TODO: ensure partial token handling works w/r/t comments *)
+| "llll_parse' (h#t) token parsed isComment =
+   (if isComment then
+       (if h = newline then
+           (if token \<noteq> [] then 
+                  (case parsed of
+                     [] \<Rightarrow> None
+                     | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt) False)
+                  else llll_parse' t [] parsed False)
+           else llll_parse' t token parsed isComment
+           )
+
+   else 
+      (if h = CHR '';''  then llll_parse' t token parsed True
+      else (if h = CHR ''(''
+          then llll_parse' t token ((STStrs [])#parsed) False
+        else (if h = CHR '')''
+              then (case parsed of
+                    [] \<Rightarrow> None
+                    | ph#[] \<Rightarrow> if token \<noteq> [] then Some (stree_append ph (STStr token))
+                                             else Some ph
+                    | ph1#ph2#pt \<Rightarrow> if token \<noteq> [] then llll_parse' t [] (stree_append ph2 (stree_append ph1 (STStr token)) # pt) False
+                                                  else llll_parse' t [] (stree_append ph2 ph1#pt) False)
+        else (if isWs h
+              then (if token \<noteq> [] then 
+                    (case parsed of
+                       [] \<Rightarrow> None
+                       | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt) False)
+                    else llll_parse' t [] parsed False) 
+        else llll_parse' t (token@[h]) parsed False)))))"
 
 fun llll_parse0 :: "string \<Rightarrow> stree option" where
-"llll_parse0 s = llll_parse' s [] []"
+"llll_parse0 s = llll_parse' s [] [] False"
 
-value "llll_parse0 ''(+ 11 1)''"
+value "llll_parse0 '';;a b c
+(+ 11 1)''"
+
+value "llll_parse0 '';a b c (+ 11 1)''"
 
 value "llll_parse0 ''(+ 11 (+ 1 1) (- 2 1))''"
 
@@ -684,6 +703,11 @@ definition default_llll_funs :: funs_tab where
 ,(''calldataload'', (\<lambda> l . case l of
                 [loc] \<Rightarrow> Some (L4I1 (Stack CALLDATALOAD) loc)
                 | _ \<Rightarrow> None))
+,(''sstore'', (\<lambda> l . case l of
+                loc#[sz] \<Rightarrow> Some (L4I2 (Storage SSTORE) loc sz)
+                | _ \<Rightarrow> None))
+,(''sload'', (\<lambda> l . case l of
+                [loc] \<Rightarrow> Some (L4I1 (Storage SLOAD) loc)))
 (* data insertion - for later*)
 ]
 "
@@ -792,6 +816,8 @@ value "llll_parse_complete
       (seq
         (mstore scratch (calldataload 0x04))
         (return scratch 32)))))''"
+
+(* erc20 *)
 (*     
     (function identity 1)))''"
 *)
@@ -811,6 +837,14 @@ value "llll_parse_complete
 definition il2wl :: "inst list \<Rightarrow> 8 word list" where
 "il2wl il = List.concat (map Evm.inst_code il)"
 
+(* translations to word-lists for string literals *)
+definition chartow :: "char \<Rightarrow> 8 word" where
+"chartow c = Evm.byteFromNat (String.char.nat_of_char c)"
+
+definition strtowl :: "string \<Rightarrow> 8 word list" where
+"strtowl s = List.map chartow s"
+
+(* translations to word lists for int literals *)
 
 definition fourL_compiler_string :: "string \<Rightarrow> string option" where
 "fourL_compiler_string s =
