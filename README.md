@@ -2,19 +2,66 @@
 
 This repository contains
 
-* an EVM implementation in Lem `lem/evm.lem`
-* a Keccak-256 implementation in Lem `lem/keccak.lem`
-* a form of functional correctness defined in Lem `lem/evmNonExec.lem`
-* a relational semantics that captures the environment's nondeterministic behavior `RelationalSem.thy`
-* some example verified contracts in `example`
-* a parser that parses hex code and emits an Isabelle/HOL expression representing the program `parser/hexparser.rb`
+* (EI) an EVM implementation in Lem `lem/evm.lem`
+* (EI) a Keccak-256 implementation in Lem `lem/keccak.lem`
+* (EI) a form of functional correctness defined in Lem `lem/evmNonExec.lem`
+* (EI) a relational semantics that captures the environment's nondeterministic behavior `RelationalSem.thy`
+* (EI) some example verified contracts in `example`
+* (EI) a parser that parses hex code and emits an Isabelle/HOL expression representing the program `parser/hexparser.rb`
 * Elle, a work-in-progress verified compiler from a structured language to EVM in `elle`
+
+Items marked (EI) are part of the original [eth-isabelle](https://github.com/pirapira/eth-isabelle) distribution.
 
 When you see `\<Rightarrow>` in the source, try using the [Isabelle2017](https://isabelle.in.tum.de/index.html) interface.  There you see `⇒` instead.
 
 ## Elle
 
-This fork of eth-isabelle contains Elle, a compiler targeting EVM implemented in Isabelle that aims to be foundationally verified somewhat along the lines of CompCert[http://compcert.inria.fr/]
+This fork of eth-isabelle contains Elle, a compiler targeting EVM implemented in Isabelle that aims to be foundationally verified somewhat along the lines of [CompCert](http://compcert.inria.fr/)
+
+## Building the LLLLC Standalone Executable
+
+To build Elle's LLL compiler (llllc), only OCaml is needed (tested on version 4.02.3).
+
+`cd elle/generated`
+
+`make`
+
+This should produce an executable, `llllc`.
+
+To check the proofs of Elle and regenerate the file `elle/generated/FourL.ml`, which serves
+as the source file used to build the OCaml standalone version of Elle, run
+
+`make cleanGenerated`
+
+and then check the file `elle/FourLExtract.thy` using the Isabelle IDE. If you don't
+have Isabelle and Lem installed, you won't be able to regenerate `elle/generated/FourL.ml`, so be careful.
+
+(adding support for a command-line build of `elle/generated/FourL.ml` is a TODO)
+
+For more info on how to do this (which requires installing Lem and Isabelle),
+see [the Eth-Isabelle README](./EthIsabelle_README.md).
+
+## Testing the Elle Standalone Executable
+
+Elle's llllc aims to be compatible in terms of inputs and outputs with the lll compiler
+included in [Solidity](https://github.com/ethereum/solidity). To test out the compiler,
+once you have built the `llllc` executable:
+
+`cd elle/tests`
+
+`../generated/llllc add.lll`
+
+(or any other lll file in the directory)
+
+Currently the major limitations of Elle are the following (resolving both are TODOs):
+
+- Only supports a single payload returned by `returnlll`; furthermore, it will ignore all
+constructor code that takes place after the first `returnlll`.
+
+- Does not yet support lll's `lit` construct for embedding literals in a program.
+
+- Core compiler verification proofs are incomplete; this should be considered an unverified
+version of Elle.
 
 ### Elle Syntax
 
@@ -49,83 +96,5 @@ The development of the Elle project is generously funded by ConsenSys.
 A previous version of the compiler exists in `examples/LLLL.thy`. It contains a number of lemmas that have ended up
 being unnecessary so far but may prove useful or educational.
 
-## The original readme follows:
-
-### Lem?
-
-[Lem](https://www.cl.cam.ac.uk/~pes20/lem/) is a language that can be translated into [Coq](https://coq.inria.fr/), [Isabelle/HOL](https://isabelle.in.tum.de/), [HOL4](https://hol-theorem-prover.org/), [OCaml](http://www.ocaml.org/), HTML and [LaTeX](https://www.latex-project.org/).
-
-## Prerequisites
-
-* [Isabelle2017](https://isabelle.in.tum.de/installation.html)
-* [lem](http://www.cl.cam.ac.uk/~pes20/lem/built-doc/lem-manual.html#installation)
-* [OCaml](http://www.ocaml.org/) 4.02.3
-* [opam](https://opam.ocaml.org/) 1.2.2
-* Some opam packages: use `opam install ocamlfind batteries yojson bignum easy-format bisect_ppx ocamlbuild sha secp256k1`
-* [ECC-OCaml from mrsmkl](https://github.com/mrsmkl/ECC-OCaml)
-* [secp256k1](https://github.com/bitcoin-core/secp256k1)
-    * On Ubuntu Artful, `apt install secp256k1-0 secp256k1-dev` is enough
-    * On older versions of Ubuntu, installation from the current `master` branch is necessary
-    * configure option `--enable-module-recovery` is needed
-
-## How to read the proofs
-
-First translate the Lem definitions into Isabelle/HOL:
-```
-$ make lem-thy
-```
-
-Then, use Isabelle2017 to open `./examples/AlwaysFail.thy`.  The prerequisite Isabelle/HOL files are automatically opened.
-
-## How to run VM tests and state tests
-
-Make sure the tests submodule is cloned
-```
-$ git submodule init tests
-$ git submodule update tests
-```
-
-Extract the OCaml definitions
-```
-$ make lem-ocaml
-```
-
-And move to `tester` directory.
-```
-$ cd tester
-```
-
-One way is to run the VM Test.
-```
-$ sh compile.sh
-$ ./runVmTest.native
-```
-(When `./runVmTest.native` takes an argument, it executes only the test cases whose names contain the argument as a substring.)
-
-
-Another way is to run the VM Test and measure the coverage.
-```
-$ sh measure_coverage.sh
-```
-
-Moreover, it's possible to run Blockchain Tests.
-```
-$ ./runBlockchainTest.native
-```
-
-## Makefile goals
-
-* `make doc` produces `output/document.pdf` as well as `lem/*.pdf`.
-* `make lem-thy` compiles the Lem sources into Isabelle/HOL
-* `make lem-hol` compiles the Lem sources into HOL4
-* `make lem-coq; cd lem; make` compiles the Lem sources into Coq (and then compiles the Coq sources)
-* `make lem-pdf` compiles some of the Lem sources into PDF through LaTeX
-* `make all-isabelle` checks all Isabelle/HOL sources (but not the ones compiled from Lem)
-* `make` does everything above
-* `script/gen_coq.sh` generates a distribution useful for Coq users
-
-## Links
-
-* For a bigger picture, see [overview of Yoichi's formal verification efforts on smart contracts](https://github.com/pirapira/ethereum-formal-verification-overview/blob/master/README.md#formal-verification-of-ethereum-contracts-yoichis-attempts)
-* For updates, visit [a gitter channel](https://gitter.im/ethereum/formal-methods)
-* A related project [EVM formalization in K framework](https://github.com/kframework/evm-semantics)
+Yoichi Hirai's original readme for Eth-Isabelle, describing the framework on which Elle is built,
+can be found [here](./EthIsabelle_README.md)

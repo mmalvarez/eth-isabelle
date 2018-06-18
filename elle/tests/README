@@ -1,0 +1,13 @@
+Included in this directory are various tests for Elle.
+They can also be compiled with the stock lll compiler, to compare outputs.
+Ones marked with star should compile correctly on the current Elle.
+
+add.lll - simple addition expression *
+def.lll - macro definition *
+echo.lll - Dan Ellison's echo contract *
+erc20.lll - Ben Edgington's ERC20 token
+if.lll, seq.lll, seq2.lll, when.lll - control flow tests *
+raw.lll - "raw" sequencing constrct from lll
+revert.lll - reverting a transaction
+weirdstring.lll - test lll string syntax
+
