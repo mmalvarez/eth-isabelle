@@ -39,7 +39,7 @@ have Isabelle and Lem installed, you won't be able to regenerate `elle/generated
 (adding support for a command-line build of `elle/generated/FourL.ml` is a TODO)
 
 For more info on how to do this (which requires installing Lem and Isabelle),
-see [the Eth-Isabelle README](./EthIsabelle_README.md).
+see [the Eth-Isabelle README](./README_EthIsabelle.md).
 
 ## Testing the Elle Standalone Executable
 
@@ -97,4 +97,4 @@ A previous version of the compiler exists in `examples/LLLL.thy`. It contains a 
 being unnecessary so far but may prove useful or educational.
 
 Yoichi Hirai's original readme for Eth-Isabelle, describing the framework on which Elle is built,
-can be found [here](./EthIsabelle_README.md)
+can be found [here](./README_EthIsabelle.md)
