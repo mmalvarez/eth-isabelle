@@ -43,7 +43,7 @@ next
     done
 qed 
 
-lemma ll4_init_same :
+lemma ll4_init_same' :
 "((! t' . ll4_init t = t' \<longrightarrow>
   ll_purge_annot t' = ll_purge_annot t)
 \<and>
@@ -120,6 +120,12 @@ done next
     done
 
 qed
+
+lemma ll4_init_same [rule_format] :
+"(! t' . ll4_init t = t' \<longrightarrow>
+  ll_purge_annot t' = ll_purge_annot t)"
+  apply(insert ll4_init_same') apply(auto)
+  done
 
 lemma ll3_bump_qvalid [rule_format]:
 "(((m,m'), (l :: ll3 list)) \<in> ll_validl_q \<longrightarrow>
@@ -2193,7 +2199,8 @@ hmm, or do we need to do something more?
 i think we need to say something like
 
 1. if we are the root, then our scanning and non-scanning semantics are as expected
-   (this case should look very similar to first case - I don't think we need a prefix)
+   (this case should look very similar to first case - I don't 
++think we need a prefix)
 2. if prefix@list is descended from the root, then
    we need cases based on where the label is.
    (idea: either we have already found the label, and so we
@@ -2219,6 +2226,7 @@ definition ellecompile_untrusted :: "ll1 \<Rightarrow> ll4 option" where
              | _ \<Rightarrow> None)
  | _ \<Rightarrow> None)"
 
+(*
 lemma ellecompile_untrusted_same :
 "ellecompile_untrusted l1 = Some l4 \<Longrightarrow> ll_purge_annot l4 = l1"
   apply(insert ellecompile_untrusted_def[of l1]) apply(simp)
@@ -2235,7 +2243,8 @@ lemma ellecompile_untrusted_same :
    apply(drule_tac ll3_init_same) apply(simp_all)
   apply(drule_tac ll3_assign_label_same) apply(simp_all)
   apply(drule_tac process_jumps_loop_same) apply(simp_all)
-  apply(subgoal_tal "ll4_init ((aa, bb), boo) = ((aa, bb), boo)")
+  apply(subgoal_tac "ll4_init ((aa, bb), boo) = ll4_init ((aa, bb), boo)")
+  apply(drule_tac ll4_init_same)
   apply(drule_tac write_jump_targets_same) apply(auto)
 
   apply(subgoal_tac "ll3_assign_label (ll3_init (ll_pass1 l1)) =
@@ -2243,7 +2252,7 @@ lemma ellecompile_untrusted_same :
   apply(drule_tac ll3_assign_label_same) apply(simp_all)
   apply(frule_tac ll3_assign_label_same)
   apply(frule_tac ll3_init_same)
-
+*)
 definition ellecompile :: "ll1 \<Rightarrow> constant_ctx option" where
 "ellecompile l =
 (case ellecompile_untrusted l of
@@ -2287,6 +2296,9 @@ fun ll4_load :: "ll4 \<Rightarrow> ellest \<Rightarrow> ellest" where
 (* to find the addresses for deeper "scanning" cases:
 we need to take a prefix of the childpath from t to t'
 (take the first "length - d" elements of childpath) *)
+
+(* abandoning work on this for now to focus on alternate semantics *)
+(*
 lemma elle_correct :
 "
 t \<in> ll_valid3' \<longrightarrow>
@@ -2328,7 +2340,6 @@ validate_jump_targets [] t \<longrightarrow>
                     my_program_sem (ll4_load t (setpc st a)) n = st'2)))) \<and>
 )
 "
-    
-
+*)
 end
 

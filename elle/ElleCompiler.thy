@@ -424,7 +424,24 @@ fun codegen' :: "ll4 \<Rightarrow> inst list" where
   | "codegen' (_, (LJmpI a _ _)) =
      (Evm.inst.Stack (PUSH_N (output_address a))) #[Pc JUMPI]"
   | "codegen' (_, (LSeq _ ls)) = List.concat (map codegen' ls)"
-     
+
+fun codegen'_check :: "ll4 \<Rightarrow> inst list option" where
+    "codegen'_check (_, (L _ i)) = Some [i]"
+  | "codegen'_check (_, (LLab _ _)) = Some [Pc JUMPDEST]"
+  | "codegen'_check (_, (LJmp a _ s)) =
+      (if length (output_address a) = s then
+         Some ((Evm.inst.Stack (PUSH_N (output_address a))) # [Pc JUMP])
+         else None)"
+  | "codegen'_check (_, (LJmpI a _ s)) =
+     (if length (output_address a) = s then
+         Some ((Evm.inst.Stack (PUSH_N (output_address a))) #[Pc JUMPI])
+         else None)"
+  | "codegen'_check (_, (LSeq _ ls)) = 
+      (case List.those (map codegen'_check ls) of
+            None \<Rightarrow> None
+           | Some ls' \<Rightarrow> Some (List.concat ls'))"
+
+(* should use codegen'_check for maximum safety *)
 definition codegen :: "ll4 \<Rightarrow> 8 word list" where
 "codegen ls = List.concat (map Evm.inst_code (codegen' ls))"
 

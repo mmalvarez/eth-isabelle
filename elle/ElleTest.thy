@@ -1,5 +1,5 @@
 theory ElleTest
-  imports Main String ElleCompiler (*"ElleCorrect/Valid4"*)
+  imports Main String ElleCompiler "ElleCorrect/Valid4"
 begin
 
 (* This file is now all about trying to output code *)
@@ -108,6 +108,9 @@ ll1.LLab 1
 "
 
 value "pipeline' progif 30"
+
+value "ellecompile_untrusted progif"
+value "ellecompile progif"
 
 (* check of validate_jump_targets
 new question: is validate_jump_targets enough to prove everything we need?
