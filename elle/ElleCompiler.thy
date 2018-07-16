@@ -425,6 +425,9 @@ fun codegen' :: "ll4 \<Rightarrow> inst list" where
      (Evm.inst.Stack (PUSH_N (output_address a))) #[Pc JUMPI]"
   | "codegen' (_, (LSeq _ ls)) = List.concat (map codegen' ls)"
 
+(* NB this is only going to check the stack instructions
+you still need to run the checkers on the ll4 for a correct
+compilation *)
 fun codegen'_check :: "ll4 \<Rightarrow> inst list option" where
     "codegen'_check (_, (L _ i)) = Some [i]"
   | "codegen'_check (_, (LLab _ _)) = Some [Pc JUMPDEST]"

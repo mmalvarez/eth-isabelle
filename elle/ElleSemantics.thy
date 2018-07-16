@@ -218,6 +218,11 @@ definition elleq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
 (* TODO: check that instruction is allowed *)
 (* TODO: actually deal with InstructionToEnvironment reasonably *)
 (* part of this copied from next_state *)
+(* TODO: either need to use a modified version of check_resources
+that doesn't rely on the PC
+or need to embed the compiled program into our source syntax
+tree, which seems extremely questionable.
+*)
 fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest" where
 "elle_instD i (ir, cc, n) =
     (case ir of
