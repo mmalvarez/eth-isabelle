@@ -165,14 +165,19 @@ fun silly_ll1_sem ::
 "silly_ll1_sem x n = ll1_sem x silly_interp n None"
 
 (* our real Elle semantics, using EVM *)
-(* type_synonym ellest = "variable_ctx * constant_ctx * network" *)
 
 (* change this to use InstructionResult *)
 (* also, we are going to have to copy-paste part of
 next_state when defining elle_denote
 *)
-type_synonym ellest = "instruction_result * constant_ctx * network"
 
+record ellest =
+  ellest_ir :: instruction_result
+  ellest_cc :: constant_ctx
+  ellest_net :: network
+(*
+type_synonym ellest = "instruction_result * constant_ctx * network"
+*)
 fun getctx :: "instruction_result \<Rightarrow> variable_ctx" where
 "getctx (InstructionContinue v) = v"
 | "getctx (InstructionToEnvironment _ v _) = v"
@@ -185,24 +190,21 @@ fun irmap :: "(variable_ctx \<Rightarrow> variable_ctx) \<Rightarrow> instructio
 (* need a function that unwraps instruction result *)
 
 fun setpc :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
-"setpc (e, e2, e3) n =
-  (irmap (\<lambda> v . v \<lparr> vctx_pc := (int n) \<rparr>) e
-  , e2
-  , e3)"
+"setpc e n =
+  (e \<lparr> ellest_ir :=  (irmap (\<lambda> v . v \<lparr> vctx_pc := (int n) \<rparr>)
+                            (ellest_ir e))\<rparr> )"
 
 fun clearprog :: "ellest \<Rightarrow> ellest" where
-"clearprog (e1, e, e3) =
-  (e1
-  , (e \<lparr> cctx_program := empty_program \<rparr>)
-  , e3)"
+"clearprog e =
+  ( e \<lparr> ellest_cc := (ellest_cc e) \<lparr> cctx_program := empty_program \<rparr> \<rparr>)"
+
 
 fun setprog :: "ellest \<Rightarrow> program \<Rightarrow> ellest" where
-"setprog (e1, e2, e3) p =
-  (e1
-  , (e2 \<lparr> cctx_program := p \<rparr> )
-  , e3
-  )"
+"setprog e p =
+  (e \<lparr> ellest_cc := (ellest_cc e) \<lparr> cctx_program := p \<rparr> \<rparr>)"
 
+(* i think these are no longer needed *)
+(*
 fun erreq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
 "erreq (InstructionToEnvironment (ContractFail _) _ _, e12, e13) 
        (InstructionToEnvironment (ContractFail _) _ _, e22, e23) =
@@ -214,7 +216,7 @@ fun erreq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
 definition elleq :: "ellest \<Rightarrow> ellest \<Rightarrow> bool" where
 "elleq a b = erreq (setpc (clearprog a) 0) 
                    (setpc (clearprog b) 0)"
-
+*)
 (* TODO: check that instruction is allowed *)
 (* TODO: actually deal with InstructionToEnvironment reasonably *)
 (* part of this copied from next_state *)
@@ -224,23 +226,23 @@ or need to embed the compiled program into our source syntax
 tree, which seems extremely questionable.
 *)
 fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest" where
-"elle_instD i (ir, cc, n) =
-    (case ir of
-      InstructionToEnvironment _ _ _ \<Rightarrow> (ir, cc, n)
+"elle_instD i e =
+    (case ellest_ir e of
+      InstructionToEnvironment _ _ _ \<Rightarrow> e
     | InstructionContinue v \<Rightarrow>
-        if check_resources v cc (vctx_stack   v) i n then
-          (instruction_sem v cc i n, cc, n)
-        else 
-          (InstructionToEnvironment (ContractFail
+        if check_resources v (ellest_cc e) (vctx_stack   v) i (ellest_net e) then
+          (e \<lparr> ellest_ir := instruction_sem v (ellest_cc e) i (ellest_net e) \<rparr>)
+        else (e \<lparr> ellest_ir :=
+              (InstructionToEnvironment (ContractFail
                ((case  inst_stack_numbers i of
                   (consumed, produced) =>
                   (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
-                   @ (if meter_gas i v cc n \<le>(vctx_gas   v) then [] else [OutOfGas])
+                   @ (if meter_gas i v (ellest_cc e) (ellest_net e) \<le>(vctx_gas   v) then [] else [OutOfGas])
                 )
                ))
-               v None
-          , cc
-          , n))"
+               v None)
+ \<rparr>))
+"
 
 fun elle_labD :: "ellest \<Rightarrow> ellest" where
 "elle_labD est = elle_instD (Pc JUMPDEST) est"
@@ -274,16 +276,16 @@ for resource (gas) subtraction, we can then just subtract
 (* off by one in checking for stack overflow?
 actually i think this is ok. we need to check for "greater than or equal to 1024" *)
 fun elle_jumpD :: "ellest \<Rightarrow> ellest" where
-"elle_jumpD (ir, cc, n) =
-    (case ir of
-      InstructionToEnvironment _ _ _ \<Rightarrow> (ir, cc, n)
+"elle_jumpD e =
+    (case ellest_ir e of
+      InstructionToEnvironment _ _ _ \<Rightarrow> e
     | InstructionContinue v \<Rightarrow>
         if      (vctx_gas v) < Gmid then
-          (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n)
+          (e \<lparr> ellest_ir := InstructionToEnvironment (ContractFail [OutOfGas]) v None \<rparr>)
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
-          (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n)
+          (e \<lparr> ellest_ir := InstructionToEnvironment (ContractFail [TooLongStack]) v None \<rparr> )
         else
-          (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>), cc, n))"
+          (e \<lparr> ellest_ir := InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>) \<rparr>))"
 
 
 (* FOR JUMPI steps are as follows
@@ -310,21 +312,21 @@ semantics of jump in Elle:
 *)
 
 fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest)" where
-"elle_jumpiD (ir, cc, n) =
-    (case ir of
-      InstructionToEnvironment _ _ _ \<Rightarrow> (False, (ir, cc, n))
+"elle_jumpiD e =
+    (case ellest_ir e of
+      InstructionToEnvironment _ _ _ \<Rightarrow> (False, e)
     | InstructionContinue v \<Rightarrow>
         if      (vctx_gas v) < Ghigh then
-          (False, (InstructionToEnvironment (ContractFail [OutOfGas]) v None, cc, n))
+          (False, (e \<lparr> ellest_ir := (InstructionToEnvironment (ContractFail [OutOfGas]) v None) \<rparr>))
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
-          (False, (InstructionToEnvironment (ContractFail [TooLongStack]) v None, cc, n))
+          (False, (e \<lparr> ellest_ir := (InstructionToEnvironment (ContractFail [TooLongStack]) v None) \<rparr>))
         else (case vctx_stack v of
-          [] \<Rightarrow> (False, (InstructionToEnvironment (ContractFail [TooShortStack]) v None, cc, n))
+          [] \<Rightarrow> (False, (e \<lparr> ellest_ir := (InstructionToEnvironment (ContractFail [TooShortStack]) v None) \<rparr> ))
           | cond#rest \<Rightarrow>
-           let new_env = (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>)) in
+           let new_env = (e \<lparr> ellest_ir := (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>)) \<rparr>) in
             strict_if (cond =(((word_of_int 0) ::  256 word)))
-             (\<lambda> _ . (True, (new_env, cc, n) ))
-             (\<lambda> _  . (False, (new_env, cc, n)))))"
+             (\<lambda> _ . (True, (new_env) ))
+             (\<lambda> _  . (False, (new_env)))))"
 
 
 
@@ -393,7 +395,9 @@ definition elle_init_cctx :: constant_ctx
 
 
 definition ellest_init :: "int \<Rightarrow> ellest" where
-"ellest_init g = (InstructionContinue (elle_init_vctx g), elle_init_cctx, Metropolis)"
+"ellest_init g = \<lparr> ellest_ir = InstructionContinue (elle_init_vctx g),
+                   ellest_cc = elle_init_cctx,
+                   ellest_net = Metropolis \<rparr>"
 
 fun elle_sem' :: 
   "ll1 \<Rightarrow>

@@ -66,87 +66,105 @@ resultant cp_next is none?
 that doesn't have a label (e.g. only allows jumps in descendents) *)
 
 
+definition bogus_prog :: program where
+"bogus_prog = Evm.program.make (\<lambda> _ . Some (Pc JUMPDEST)) 0"
+
+
 (* make this not use type parameters? *)
 (* here is the old version that has type parameters *)
-
-inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> 'x llinterp \<Rightarrow> childpath \<Rightarrow> 'x \<Rightarrow> 'x \<Rightarrow> bool" where
+(* Key - here we need to make sure that we return InstructionToEnviroment
+on the cases where we are stopping... 
+use an empty and bogus program*)
+(*
+i think we can't maintain parametricity here...
+also -  is returning the full ellest every time the right way to do this?
+*)
+inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow>
+            constant_ctx \<Rightarrow> network \<Rightarrow>
+            instruction_result \<Rightarrow> instruction_result \<Rightarrow> bool" where
 (* last node is an instruction *)
-"\<And> t cp x e i instD jmpD jmpiD labD st st'.
+"\<And> t cp x e i cc net st st'.
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
-    instD i st = st' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st'"
+    ellest_ir (elle_instD i (clearprog \<lparr>ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>)) = st' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st'"
 (* instruction in the middle *)
-| "\<And> t cp x e i cp' instD jmpD jmpiD labD st st' st''.
+| "\<And> t cp x e i cc net cp' st st' st''.
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    instD i st = st' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp' st' st'' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st''"
+    ellest_ir (elle_instD i (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr> bogus_prog)) = st' \<Longrightarrow>
+    elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st''"
 (* last node is a label label *)
-| "\<And> t cp x e d instD jmpD jmpiD labD st st'.
+| "\<And> t cp x e d cc net st st'.
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
-    labD st = st' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st'"
+    ellest_ir (elle_labD (clearprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>)) = st' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st'"
 (* label in the middle *)
-| "\<And> t cp x e d cp' instD jmpD jmpiD labD st st'.
+| "\<And> t cp x e d cp' cc net st st'.
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    labD st = st' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp' st' st'' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st''"
-(* jump - TODO *)
+    ellest_ir (elle_labD (setprog \<lparr>ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr> bogus_prog)) = st' \<Longrightarrow>
+    elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
+    elle_alt_sem t cp  cc net st st''"
+(* jump - perhaps worth double checking *)
 (* note that this and jmpI cases do not allow us to resolve jumps at the
 root. this limitation doesn't really matter in practice as we can just
 wrap in a Seq [] *)
-| "\<And> t cpre cj xj ej dj nj cl instD jmpD jmpiD labD st st' st''.
+| "\<And> t cpre cj xj ej dj nj cl cc net st st' st''.
     ll_get_node t (cpre@cj) = Some (xj, LJmp ej dj nj) \<Longrightarrow>
     dj + 1 = length cj \<Longrightarrow>
     ll_get_node t (cpre@cl) = Some (xl, LLab el dl) \<Longrightarrow>
     dl + 1 = length cl \<Longrightarrow>
-    jmpD st = st' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) (cpre@cl) st' st'' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st''"
+    ellest_ir (elle_jumpD (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net\<rparr> bogus_prog)) = st' \<Longrightarrow>
+    elle_alt_sem t (cpre@cl) cc net st' st'' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st''"
 (* jmpI, jump taken - TODO *)
-| "\<And> t cpre cj xj ej dj nj cl  instD jmpD jmpiD labD st st' st''.
+| "\<And> t cpre cj xj ej dj nj cl cc net elst' st st' st''.
     ll_get_node t (cpre@cj) = Some (xj, LJmpI ej dj nj) \<Longrightarrow>
     dj + 1 = length cj \<Longrightarrow>
     ll_get_node t (cpre@cl) = Some (xl, LLab el dl) \<Longrightarrow>
     dl + 1 = length cl \<Longrightarrow>
-    jmpiD st = (True, st') \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp' st' st'' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st''"
+    elle_jumpiD (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr> bogus_prog) = (True, elst') \<Longrightarrow>
+    ellest_ir elst' = st' \<Longrightarrow>
+    elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st''"
 (* jmpI, jump not taken, at end *)
-| "\<And> t cp x e d n instD jmpD jmpiD labD st st'.
+| "\<And> t cp x e d n cc net elst' st st'.
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
-    jmpiD st = (False, st') \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st'"
+    elle_jumpiD (clearprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>) = (False, elst') \<Longrightarrow>
+    ellest_ir elst' = st' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st'"
 (* jmpI, jump not taken, in middle *)
-| "\<And> t cp x e d n cp' instD jmpD jmpiD labD st st'.
+| "\<And> t cp x e d n cp' cc net elst' st st'.
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    jmpiD st = (False, st') \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st' st'' \<Longrightarrow>
-    elle_alt_sem t (instD, jmpD, jmpiD, labD) cp st st''"
+    elle_jumpiD (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net\<rparr> bogus_prog) = (False, elst') \<Longrightarrow>
+    ellest_ir elst' = st' \<Longrightarrow>
+    elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st''"
 (* empty sequence, end *)
-| "\<And> t cp x e i z.
+(* should this have the same semantics as STOP ? *)
+| "\<And> t cp cc net x e st st'.
     ll_get_node t cp = Some (x, LSeq e []) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow> 
-    elle_alt_sem t i cp z z"
+    ellest_ir (elle_instD (Misc STOP) (clearprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>)) = st' \<Longrightarrow>
+    elle_alt_sem t cp cc net st st'"
 (* empty sequence, in the middle *)
-| "\<And> t cp x e i cp' z z'. 
+| "\<And> t cp x e cp' cc net z z'. 
     ll_get_node t cp = Some (x, LSeq e []) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    elle_alt_sem t i cp' z z' \<Longrightarrow>
-    elle_alt_sem t i cp z z'"
+    elle_alt_sem t cp' cc net z z' \<Longrightarrow>
+    elle_alt_sem t cp cc net z z'"
 (* end vs not end *)
 (* nonempty sequence *)
-| "\<And> t cp x e h rest z z' .
+| "\<And> t cp x e h rest cc net z z' .
     ll_get_node t cp = Some (x, LSeq e (h#rest)) \<Longrightarrow>
-    elle_alt_sem t i (cp@[0]) z z' \<Longrightarrow>
-    elle_alt_sem t i cp z z'"
+    elle_alt_sem t (cp@[0]) cc net z z' \<Longrightarrow>
+    elle_alt_sem t cp cc net z z'"
+
 (*
 look up childpath (minus last element) at root
 if this is 
@@ -154,40 +172,40 @@ if this is
 
 
 lemma elle_alt_sem_test :
-"elle_alt_sem t i cp st st' \<Longrightarrow>
+"elle_alt_sem t cp cc net st st' \<Longrightarrow>
   True"
 proof(induction rule:elle_alt_sem.induct)
-case (1 t cp x e i instD jmpD jmpiD labD st st')
+  case (1 t cp x e i cc net st st')
+then show ?case by auto
+next
+  case (2 t cp x e i cc net cp' st st' st'')
   then show ?case by auto
 next
-  case (2 t cp x e i cp' instD jmpD jmpiD labD st st' st'')
-  then show ?case by auto
+  case (3 t cp x e d cc net st st')
+  then show ?case sorry
 next
-  case (3 t cp x e d instD jmpD jmpiD labD st st')
-  then show ?case by auto
+  case (4 st'' t cp x e d cp' cc net st st')
+  then show ?case sorry
 next
-  case (4 st'' t cp x e d cp' instD jmpD jmpiD labD st st')
-  then show ?case by auto
+  case (5 xl el dl cp t cpre cj xj ej dj nj cl cc net st st' st'')
+then show ?case sorry
 next
-  case (5 xl el dl cp t cpre cj xj ej dj nj cl instD jmpD jmpiD labD st st' st'')
-  then show ?case by auto
+  case (6 xl el dl cp' cp t cpre cj xj ej dj nj cl cc net elst' st st' st'')
+  then show ?case sorry
 next
-  case (6 xl el dl cp' cp t cpre cj xj ej dj nj cl instD jmpD jmpiD labD st st' st'')
-  then show ?case by auto
+  case (7 t cp x e d n cc net elst' st st')
+  then show ?case sorry
 next
-  case (7 t cp x e d n instD jmpD jmpiD labD st st')
-  then show ?case by auto
+  case (8 st'' t cp x e d n cp' cc net elst' st st')
+  then show ?case sorry
 next
-  case (8 st'' t cp x e d n cp' instD jmpD jmpiD labD st st')
-  then show ?case by auto
+  case (9 t cp cc net x e st st')
+  then show ?case sorry
 next
-  case (9 t cp x e i z)
-  then show ?case by auto
+  case (10 t cp x e cp' cc net z z')
+  then show ?case sorry
 next
-  case (10 t cp x e i cp' z z')
-  then show ?case by auto
-next
-  case (11 i t cp x e h rest z z')
+case (11 t cp x e h rest cc net z z')
   then show ?case sorry
 qed
 
@@ -854,8 +872,6 @@ qed
 (* among other things, need to not allow codesize and extcodesize instructions,
 as these depend on already knowing the size of the code segment, which at the
 source level we do not *)
-definition bogus_prog :: program where
-"bogus_prog = Evm.program.make "(\<lambda> _ . 
 
 
 (* now we need a swapped version that takes ll_get_node as first premise *)
@@ -1220,29 +1236,99 @@ another option: use a bogus program for our input such that vctx_advance_pc
 will always advance the pc by 1 (of course this will mean nothing)
 idea: program is just an infinite stream of noops (?)
 *)
+
 lemma elle_alt_correct :
-"elle_alt_sem ((t :: ll4)) intp cp est est' (* (ir, cc, net) (ir', cc', net') *) \<Longrightarrow>
+"elle_alt_sem ((t :: ll4)) cp cc net st st' \<Longrightarrow>
  (t \<in> ll_valid3' \<longrightarrow>
   (! tend ttree . t = ((0, tend), ttree) \<longrightarrow>
  ll4_validate_jump_targets [] t \<longrightarrow>
- intp = elle_interp \<longrightarrow>
  (! targstart targend tdesc . ll_get_node t cp = Some ((targstart, targend), tdesc) \<longrightarrow>
-   (! vi . fst est = InstructionContinue vi \<longrightarrow>
+   (! vi . st = InstructionContinue vi \<longrightarrow>
     (* require that prog already be loaded beofre this point? *)
-   (! prog . ll4_load_lst_validate (fst (snd est)) t = Some prog \<longrightarrow>
+   (! prog . ll4_load_lst_validate cc t = Some prog \<longrightarrow>
    (! act vc venv fuel stopper . program_sem stopper
                prog 
-               fuel (snd (snd est)) 
+               fuel net 
 (* is this arithmetic around fst (fst t) right? *)
 (* perhaps we need a secondary proof that validity implies
 that targstart will be greater than or equal to fst (fst t) *)
-               (setpc_ir (fst est) (targstart  (*- fst (fst t) *))) = 
+               (setpc_ir st (targstart  (*- fst (fst t) *))) = 
                    (* fuel can be arbitrary, but we require to compute to a final result *)
                    InstructionToEnvironment act vc venv \<longrightarrow>
                   (* the issue may have to do with distinguishing between errors? *)
                   (* TODO: in some cases we end up having to compare unloaded programs? *)
-                  setpc_ir (fst est') 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
-proof(induction rule:elle_alt_sem.induct)
+                  setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
+  using [[simp_trace_new]]
+  using [[linarith_split_limit=4]]
+proof(induction rule:elle_alt_sem.induct) 
+case (1 t cp x e i cc net st st')
+  then show ?case 
+    apply(clarify)
+    apply(case_tac fuel, clarify) apply(simp)
+    apply(case_tac i, clarify)
+    apply(simp)
+    apply(split if_split_asm) apply(clarsimp)
+                 apply(split option.split_asm) apply(clarsimp)
+                 apply(split option.split_asm) apply(clarsimp)
+    apply(split option.split_asm)
+                 apply(clarsimp)
+                 apply(clarsimp)
+    apply(split option.split_asm)
+                  apply(clarsimp)
+                  apply(split if_split_asm) apply(clarsimp) apply(case_tac x1, clarsimp) apply(case_tac n, clarsimp)
+    apply(simp add: check_resources_def)
+    apply(clarsimp)
+
+                    apply(simp add:program.defs ellest.defs)
+         apply(frule_tac valid3'_qvalid)
+         apply(frule_tac qvalid_desc_bounded1) apply(simp)
+                    apply(frule_tac qvalid_codegen'_check1) apply(simp) apply(simp)
+                    apply(clarify)
+
+    (* idea for a contradiction here: descended guy must be qvalid
+       but, we also know targstart = targend \<rightarrow> contradicts the fact
+       that this must be an instruction *)
+         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp) apply(simp)
+    apply(rotate_tac -1)
+         apply(drule_tac ll_valid_q.cases, simp) 
+         apply(subgoal_tac "length (inst_code i) \<noteq> 0")
+          apply(rule_tac[2] inst_code_nonzero) apply(auto)
+
+next
+  case (2 t cp x e i cc net cp' st st' st'')
+  then show ?case sorry
+next
+  case (3 t cp x e d cc net st st')
+  then show ?case sorry
+next
+  case (4 st'' t cp x e d cp' cc net st st')
+  then show ?case sorry
+next
+  case (5 xl el dl cp t cpre cj xj ej dj nj cl cc net st st' st'')
+  then show ?case sorry
+next
+  case (6 xl el dl cp' cp t cpre cj xj ej dj nj cl cc net elst' st st' st'')
+  then show ?case sorry
+next
+  case (7 t cp x e d n cc net elst' st st')
+  then show ?case sorry
+next
+  case (8 st'' t cp x e d n cp' cc net elst' st st')
+  then show ?case sorry
+next
+  case (9 t cp cc net x e st st')
+  then show ?case sorry
+next
+  case (10 t cp x e cp' cc net z z')
+  then show ?case sorry
+next
+  case (11 t cp x e h rest cc net z z')
+  then show ?case sorry
+qed
+
+qed
+(* old proof follows *)
+(*
 case (1 t cp x e i instD jmpD jmpiD labD st st')
   then show ?case 
     apply(clarify)
@@ -1352,15 +1438,19 @@ program loaded... this leads me to think our theorem statement is wrong *)
                    apply(simp add:check_resources_def)
                 apply(case_tac x2a) apply(clarsimp)
                     apply(case_tac "vctx_stack vi") apply(clarsimp)
-                    apply(clarsimp) apply(case_tac list) apply(clarsimp) (* False goal emerges here *) apply(clarsimp) 
+                    apply(clarsimp) apply(case_tac list) apply(clarsimp)
+ (* problem - comparing InstructionContinue to InstructionToEnvironment *)    
+ (* False goal emerges here *) apply(clarsimp)
                     apply(simp add:program.defs) apply(split option.split_asm)
-    apply(split option.split_asm)         
-                      apply(clarsimp) apply(clarsimp) apply(simp add:program.defs)
+                     apply(split option.split_asm)
+                      apply(simp add:program.defs bogus_prog_def)
+                     apply(simp add:program.defs bogus_prog_def)
+                     apply(split option.split_asm)
+                     apply(simp add:program.defs bogus_prog_def)
+                     apply(simp add:program.defs bogus_prog_def)
+
     apply(split option.split_asm)
-                     apply(clarsimp)
-    apply(simp)
-(* to draw a contradiction here, i need to show the instruction must be the last one *)
-    apply(simp)
+(* or - just use program content simp? *)
 (*
                  apply(case_tac n) apply(simp)
                   apply(case_tac st) apply(simp) apply(split if_split_asm)
@@ -1567,6 +1657,7 @@ next
     apply(clarsimp)
     sorry
 qed
+*)
 
 (*
 fun cp_next :: "('a, 'b, 'c, 'd, 'e, 'f) ll \<Rightarrow> childpath \<Rightarrow> childpath option" where
