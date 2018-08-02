@@ -194,10 +194,18 @@ fun setpc :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
   (e \<lparr> ellest_ir :=  (irmap (\<lambda> v . v \<lparr> vctx_pc := (int n) \<rparr>)
                             (ellest_ir e))\<rparr> )"
 
+definition clearpc' :: "instruction_result \<Rightarrow> instruction_result" where
+"clearpc' = irmap (\<lambda> v . (v \<lparr> vctx_pc := 0 \<rparr>))"
+
+definition clearprog' :: "constant_ctx \<Rightarrow> constant_ctx" where
+"clearprog' = (\<lambda> c . (c \<lparr> cctx_program := empty_program \<rparr>))"
+
 fun clearprog :: "ellest \<Rightarrow> ellest" where
 "clearprog e =
   ( e \<lparr> ellest_cc := (ellest_cc e) \<lparr> cctx_program := empty_program \<rparr> \<rparr>)"
 
+definition setprog' :: "constant_ctx \<Rightarrow> program \<Rightarrow> constant_ctx" where
+"setprog' = (\<lambda> c p . (c \<lparr> cctx_program := p \<rparr>))"
 
 fun setprog :: "ellest \<Rightarrow> program \<Rightarrow> ellest" where
 "setprog e p =
@@ -244,8 +252,28 @@ fun elle_instD :: "inst \<Rightarrow> ellest \<Rightarrow> ellest" where
  \<rparr>))
 "
 
+(* primed versions of denotation functions opearate on unpacked states *)
+fun elle_instD' :: "inst \<Rightarrow> constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
+"elle_instD' i cc net ir =
+  (case ir of
+      InstructionToEnvironment _ _ _ \<Rightarrow> ir
+    | InstructionContinue v \<Rightarrow>
+        if check_resources v cc (vctx_stack   v) i net then instruction_sem v cc i net
+        else (InstructionToEnvironment (ContractFail
+               ((case  inst_stack_numbers i of
+                  (consumed, produced) =>
+                  (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
+                   @ (if meter_gas i v cc net \<le>(vctx_gas   v) then [] else [OutOfGas])
+                )
+               ))
+               v None))
+"
+
 fun elle_labD :: "ellest \<Rightarrow> ellest" where
 "elle_labD est = elle_instD (Pc JUMPDEST) est"
+
+fun elle_labD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
+"elle_labD' c n i = elle_instD' (Pc JUMPDEST) c n i"
 
 (* use pieces of check_resources here:
 - for jump, we just need the "meter_gas" statement
@@ -286,6 +314,18 @@ fun elle_jumpD :: "ellest \<Rightarrow> ellest" where
           (e \<lparr> ellest_ir := InstructionToEnvironment (ContractFail [TooLongStack]) v None \<rparr> )
         else
           (e \<lparr> ellest_ir := InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>) \<rparr>))"
+
+fun elle_jumpD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
+"elle_jumpD' c n ir =
+    (case ir of
+      InstructionToEnvironment _ _ _ \<Rightarrow> ir
+    | InstructionContinue v \<Rightarrow>
+        if      (vctx_gas v) < Gmid then
+          (InstructionToEnvironment (ContractFail [OutOfGas]) v None )
+        else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
+          (InstructionToEnvironment (ContractFail [TooLongStack]) v None )
+        else
+          (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>)))"
 
 
 (* FOR JUMPI steps are as follows
@@ -328,6 +368,22 @@ fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest)" where
              (\<lambda> _ . (True, (new_env) ))
              (\<lambda> _  . (False, (new_env)))))"
 
+fun elle_jumpiD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result \<Rightarrow> (bool * instruction_result)" where
+"elle_jumpiD' c n ir =
+    (case ir of
+      InstructionToEnvironment _ _ _ \<Rightarrow> (False, ir)
+    | InstructionContinue v \<Rightarrow>
+        if      (vctx_gas v) < Ghigh then
+          (False, ((InstructionToEnvironment (ContractFail [OutOfGas]) v None) ))
+        else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
+          (False, ((InstructionToEnvironment (ContractFail [TooLongStack]) v None) ))
+        else (case vctx_stack v of
+          [] \<Rightarrow> (False, ((InstructionToEnvironment (ContractFail [TooShortStack]) v None) ))
+          | cond#rest \<Rightarrow>
+           let new_env = ((InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>))) in
+            strict_if (cond =(((word_of_int 0) ::  256 word)))
+             (\<lambda> _ . (True, (new_env) ))
+             (\<lambda> _  . (False, (new_env)))))"
 
 
 definition elle_interp :: "ellest llinterp" where

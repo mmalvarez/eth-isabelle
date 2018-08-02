@@ -25,7 +25,49 @@ fun cp_next :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Righta
         Some _ \<Rightarrow> Some (rev ((final + 1)#rrest))
         | None \<Rightarrow> cp_next t (rev rrest) 
 ))
- "  
+ "
+
+inductive cp_nexti :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow> childpath \<Rightarrow> bool" where
+"\<And> t cpp q e ld n . ll_get_node t cpp = Some (q, LSeq e ld) \<Longrightarrow>
+                   n + 1 < length ld \<Longrightarrow>
+                   cp_nexti t (cpp@[n]) (cpp@[n+1])"
+| "\<And> t cpp q e ld n cpp' . ll_get_node t cpp = Some (q, LSeq e ld) \<Longrightarrow>
+            n + 1 = length ld \<Longrightarrow>
+            cp_nexti t cpp cpp' \<Longrightarrow>
+            cp_nexti t (cpp@[n]) cpp'"
+
+(*
+lemma ll_validl_split :
+"! x1 x3 l2 . ((x1,x3), l1@l2) \<in> ll_validl_q \<longrightarrow>
+  (? x2 . ((x1, x2), l1) \<in> ll_validl_q \<and>
+         ((x2, x3), l2) \<in> ll_validl_q)"
+
+proof(induction l1)
+  case Nil
+  then show ?case 
+    apply(auto)
+    apply(rule_tac x = x1 in exI)
+    apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+next
+  case (Cons a l1)
+  then show ?case 
+    apply(auto)
+    apply(drule_tac ll_validl_q.cases) apply(auto)
+    apply(drule_tac x = n' in spec) apply(drule_tac x = n'' in spec)
+    apply(drule_tac x = l2 in spec) apply(auto)
+    apply(rule_tac x = x2 in exI) apply(auto simp add:ll_valid_q_ll_validl_q.intros)
+    done
+   
+qed
+*)
+
+
+(*
+inductive cp_lasti :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow> bool" where
+"
+*)
+            
 
 value "cp_next ((0,0), LSeq () [((0,0), L () (Arith ADD)), 
                                 ((0,0), L () (Arith ADD)),
@@ -79,6 +121,10 @@ use an empty and bogus program*)
 i think we can't maintain parametricity here...
 also -  is returning the full ellest every time the right way to do this?
 *)
+(*
+we need to avoid the PC overflowing spuriously, which is done by always resetting the
+pc to 0
+*)
 inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow>
             constant_ctx \<Rightarrow> network \<Rightarrow>
             instruction_result \<Rightarrow> instruction_result \<Rightarrow> bool" where
@@ -86,71 +132,68 @@ inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpa
 "\<And> t cp x e i cc net st st'.
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
-    ellest_ir (elle_instD i (clearprog \<lparr>ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>)) = st' \<Longrightarrow>
+    elle_instD' i (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t cp cc net st st'"
 (* instruction in the middle *)
 | "\<And> t cp x e i cc net cp' st st' st''.
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    ellest_ir (elle_instD i (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr> bogus_prog)) = st' \<Longrightarrow>
+    elle_instD' i (setprog' cc bogus_prog) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
     elle_alt_sem t cp cc net st st''"
 (* last node is a label label *)
 | "\<And> t cp x e d cc net st st'.
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
-    ellest_ir (elle_labD (clearprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>)) = st' \<Longrightarrow>
+    elle_labD' (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t cp cc net st st'"
 (* label in the middle *)
 | "\<And> t cp x e d cp' cc net st st'.
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    ellest_ir (elle_labD (setprog \<lparr>ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr> bogus_prog)) = st' \<Longrightarrow>
+    elle_labD' (setprog' cc bogus_prog) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
     elle_alt_sem t cp  cc net st st''"
 (* jump - perhaps worth double checking *)
 (* note that this and jmpI cases do not allow us to resolve jumps at the
 root. this limitation doesn't really matter in practice as we can just
-wrap in a Seq [] *)
+wrap in a Seq []. (or do we even need that now? ) *)
 | "\<And> t cpre cj xj ej dj nj cl cc net st st' st''.
     ll_get_node t (cpre@cj) = Some (xj, LJmp ej dj nj) \<Longrightarrow>
     dj + 1 = length cj \<Longrightarrow>
     ll_get_node t (cpre@cl) = Some (xl, LLab el dl) \<Longrightarrow>
     dl + 1 = length cl \<Longrightarrow>
-    ellest_ir (elle_jumpD (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net\<rparr> bogus_prog)) = st' \<Longrightarrow>
+    elle_jumpD' (setprog' cc bogus_prog) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t (cpre@cl) cc net st' st'' \<Longrightarrow>
-    elle_alt_sem t cp cc net st st''"
-(* jmpI, jump taken - TODO *)
-| "\<And> t cpre cj xj ej dj nj cl cc net elst' st st' st''.
+    elle_alt_sem t (cpre@cj) cc net st st''"
+(* jmpI, jump taken *)
+| "\<And> t cpre cj xj ej dj nj cl cc net st st' st''.
     ll_get_node t (cpre@cj) = Some (xj, LJmpI ej dj nj) \<Longrightarrow>
     dj + 1 = length cj \<Longrightarrow>
     ll_get_node t (cpre@cl) = Some (xl, LLab el dl) \<Longrightarrow>
     dl + 1 = length cl \<Longrightarrow>
-    elle_jumpiD (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr> bogus_prog) = (True, elst') \<Longrightarrow>
-    ellest_ir elst' = st' \<Longrightarrow>
+    elle_jumpiD' (setprog' cc bogus_prog) net (clearpc' st) = (True, st') \<Longrightarrow>
     elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
     elle_alt_sem t cp cc net st st''"
 (* jmpI, jump not taken, at end *)
-| "\<And> t cp x e d n cc net elst' st st'.
+| "\<And> t cp x e d n cc net st st'.
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
-    elle_jumpiD (clearprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>) = (False, elst') \<Longrightarrow>
-    ellest_ir elst' = st' \<Longrightarrow>
+    elle_jumpiD' (setprog' cc bogus_prog) net (clearpc' st) = (False, st') \<Longrightarrow>
     elle_alt_sem t cp cc net st st'"
 (* jmpI, jump not taken, in middle *)
-| "\<And> t cp x e d n cp' cc net elst' st st'.
+| "\<And> t cp x e d n cp' cc net st st'.
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
     cp_next t cp = Some cp' \<Longrightarrow>
-    elle_jumpiD (setprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net\<rparr> bogus_prog) = (False, elst') \<Longrightarrow>
-    ellest_ir elst' = st' \<Longrightarrow>
+    elle_jumpiD' (setprog' cc bogus_prog) net (clearpc' st) = (False, st') \<Longrightarrow>
     elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
     elle_alt_sem t cp cc net st st''"
 (* empty sequence, end *)
-(* should this have the same semantics as STOP ? *)
+(* should this have the same semantics as STOP ? yes, i think so*)
 | "\<And> t cp cc net x e st st'.
     ll_get_node t cp = Some (x, LSeq e []) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow> 
-    ellest_ir (elle_instD (Misc STOP) (clearprog \<lparr> ellest_ir = st, ellest_cc = cc, ellest_net = net \<rparr>)) = st' \<Longrightarrow>
+    elle_instD' (Misc STOP) (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t cp cc net st st'"
 (* empty sequence, in the middle *)
 | "\<And> t cp x e cp' cc net z z'. 
@@ -174,40 +217,7 @@ if this is
 lemma elle_alt_sem_test :
 "elle_alt_sem t cp cc net st st' \<Longrightarrow>
   True"
-proof(induction rule:elle_alt_sem.induct)
-  case (1 t cp x e i cc net st st')
-then show ?case by auto
-next
-  case (2 t cp x e i cc net cp' st st' st'')
-  then show ?case by auto
-next
-  case (3 t cp x e d cc net st st')
-  then show ?case sorry
-next
-  case (4 st'' t cp x e d cp' cc net st st')
-  then show ?case sorry
-next
-  case (5 xl el dl cp t cpre cj xj ej dj nj cl cc net st st' st'')
-then show ?case sorry
-next
-  case (6 xl el dl cp' cp t cpre cj xj ej dj nj cl cc net elst' st st' st'')
-  then show ?case sorry
-next
-  case (7 t cp x e d n cc net elst' st st')
-  then show ?case sorry
-next
-  case (8 st'' t cp x e d n cp' cc net elst' st st')
-  then show ?case sorry
-next
-  case (9 t cp cc net x e st st')
-  then show ?case sorry
-next
-  case (10 t cp x e cp' cc net z z')
-  then show ?case sorry
-next
-case (11 t cp x e h rest cc net z z')
-  then show ?case sorry
-qed
+  sorry
 
 fun clearprog_cctx :: "constant_ctx \<Rightarrow> constant_ctx" where
 "clearprog_cctx e =
@@ -632,6 +642,13 @@ lemma qvalid_get_node1 [rule_format] :
     (ad, d) \<in> ll_valid_q))"
   apply(insert qvalid_get_node'[of a t])
   apply(auto)
+  done
+
+lemma qvalid_get_node2 [rule_format] :
+" ((((a1, a2), (l:: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) \<in> ll_validl_q \<longrightarrow> 
+    (! cp ad d . ll_get_node_list l cp = Some (ad, d) \<longrightarrow>
+    (ad, d) \<in> ll_valid_q)))"
+  apply(insert qvalid_get_node') apply(fastforce)
   done
 
 lemma inst_code_nonzero :
@@ -1142,11 +1159,298 @@ our ending annotation is equal to the overall ending annotation
 our cp_next)
 *)
 
+
+(* new proof using list induction... also fails *)
+(* we need to rethink this. *)
 (*
-it's possible this is not necessary?
+lemma qvalid_cp_next_None' :
+"! x t . (((x, t) :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) \<in> ll_valid_q \<longrightarrow>
+  (! xd d pref . ll_get_node (x, t) (pref@cp) = Some (xd, d) \<longrightarrow>
+    cp_next (x, t) (pref@cp) = None \<longrightarrow>
+    snd x = snd xd))"
+proof(induction cp)
+  case Nil
+  then show ?case 
+    apply(auto)
+    apply(case_tac "rev suf", auto)
+    apply(case_tac "ll_get_node ((a, b), t) (rev list @ [Suc ab])") apply(auto)
+    apply(case_tac list, auto)
+    sorry
+next
+  case (Cons a cp)
+  then show ?case
+    apply(auto)
+    apply(case_tac "rev cp @ a # rev pref", auto)
+(*    apply(case_tac "rev cp @ [a]", auto) *)
+    apply(case_tac " ll_get_node ((aa, b), t) (rev list @ [Suc ab])", auto)
+    apply(case_tac list, auto)
+    apply(case_tac cp, auto)
+    apply(case_tac "ll_get_node ((aa, b), t) (rev lista @ [Suc ac])", auto)
+
+    apply(case_tac lista, auto)
+    
+     apply(drule_tac x = aa in spec) apply(drule_tac x = b in spec)
+     apply(drule_tac x = t in spec) apply(auto)
+     apply(drule_tac x = aaa in spec) apply(drule_tac x = ba in spec)
+     apply(drule_tac x = d in spec) apply(drule_tac x = "pref @ [a]" in spec) apply(auto)
+
+    apply(case_tac " ll_get_node ((aa, b), t) (rev list @ [Suc ad])", auto)
+    apply(case_tac list, auto)
+
+qed
+*)
+(* old unsuccessful proof using validity induction *)
+(* one idea to strengthen - what if we add an additional statement about
+all further descendents of d (that if their cp_next is none then what?)
 *)
 
+(* another option, make cp_next over lists. if this iteration fails we'll try that *)
+(* i think the following lemma is not the right approach *)
+lemma qvalid_cp_next_char' :
+"(((x, t) :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) \<in> ll_valid_q \<longrightarrow>
+  (! cp xd d . ll_get_node (x, t) cp = Some (xd, d) \<longrightarrow>
+    (cp_next (x, t) cp = None \<longrightarrow> (* need an explicit thing about get_node (next) always None? *)
+    snd x = snd xd) \<and>
+  (! cp' . cp_next (x, t) cp = Some cp' \<longrightarrow> 
+    (? xd' d' . ll_get_node (x, t) cp' = Some (xd', d') \<and>
+       snd xd = fst xd')))) 
+\<and>
+(((x1, x2), (l :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) \<in> ll_validl_q \<longrightarrow>
+    (! cp xd d . ll_get_node_list l cp = Some (xd, d) \<longrightarrow>
+    (! e . cp_next ((x1, x2), LSeq e l) cp = None \<longrightarrow>
+    x2 = snd xd) \<and>
+  (! e cp' . cp_next ((x1, x2), LSeq e l) cp = Some cp' \<longrightarrow> 
+    (? xd' d' . ! e .  ll_get_node_list l cp' = Some (xd', d') \<and>
+       x2 = fst xd')))) 
+
+"
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+  case (1 i x e)
+  then show ?case
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (2 x d e)
+  then show ?case
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (3 x d e s)
+  then show ?case
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (4 x d e s)
+  then show ?case
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (5 n l n' e)
+  then show ?case
+    apply(clarify) apply(auto)
+     apply(case_tac cp, auto)
+     apply(drule_tac x = "aa#list" in spec) apply(auto)
+
+    apply(case_tac cp, auto)
+    apply(case_tac "rev list", auto) apply(case_tac " ll_get_node_list l [Suc aa]", auto)
+    (* need a lemma here *)
+     apply(drule_tac x = "[aa]" in spec) apply(auto)
+     apply(drule_tac ll_validl_q.cases, auto)
+    apply(case_tac aa, auto)
+         apply(drule_tac x = "aa#list" in spec) apply(auto)
+    sorry
+next
+  case (6 n)
+  then show ?case
+    apply(auto) apply(case_tac cp, auto) apply(case_tac cp, auto)
+    done
+next
+  (* do we need a lemma about what happens when you take a childpath that has no
+next and put it inside a larger tree with more nodes (i.e. in that case there will be a next) *)
+  case (7 n h n' t n'')
+  then show ?case
+    apply(auto)
+     apply(case_tac cp, auto)
+     apply(case_tac aa, auto)
+(*    apply(drule_tac x = list in spec, auto)*)
+      apply(case_tac "rev list", auto)
+       apply(case_tac "ll_get_node_list t [0]", auto) apply(case_tac t, auto)
+       apply(drule_tac ll_validl_q.cases, auto)
+
+
+      apply(case_tac "ll_get_node ((n, n'), h) (rev lista @ [Suc aa])", auto)
+      apply(frule_tac x = " (rev lista @ [aa])" in spec) apply(auto)
+       apply(case_tac lista, auto)
+       apply(case_tac "ll_get_node ((n, n'), h) (rev list @ [Suc ab])", auto)
+    apply(case_tac list, auto)
+       apply(case_tac "ll_get_node ((n, n'), h) (rev lista @ [Suc aa])", auto)
+       apply(case_tac lista, auto)
+       apply(case_tac "ll_get_node ((n, n'), h) (rev list @ [Suc ab])", auto)
+    apply(case_tac list, auto)
+    apply(case_tac " ll_get_node_list t [aa]", auto)
+qed
 (*
+(((x1, x2), (l :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) \<in> ll_validl_q \<longrightarrow>
+  (! cp xd d . ll_get_node_list l cp = Some (xd, d) \<longrightarrow>
+
+    (! e . cp_next ((x1, x2), LSeq e l) cp = None \<longrightarrow>
+      x2 = snd xd)))
+*)
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+case (1 i x e)
+  then show ?case sorry
+next
+  case (2 x d e)
+  then show ?case sorry
+next
+  case (3 x d e s)
+  then show ?case sorry
+next
+  case (4 x d e s)
+  then show ?case sorry
+next
+  case (5 n l n' e)
+  then show ?case sorry
+next
+  case (6 n)
+  then show ?case sorry
+next
+  case (7 n h n' t n'')
+  then show ?case sorry
+qed
+
+
+(*
+need this lemma, but i don't think i can do it just by list induction.
+*)
+lemma cp_next_ancestor_None' :
+"(! t . cp_next t cp = None \<longrightarrow>
+    (! cp' cpt . cp = cp'@cpt \<longrightarrow>
+       cp_next t cp' = None))"
+
+(* old proof *)
+(*
+proof(induction cp)
+  case Nil
+  then show ?case 
+    apply(auto)
+    done
+next
+  case (Cons a cp)
+  then show ?case
+    apply(auto)
+    apply(case_tac "rev cp", auto)
+     apply(case_tac "rev cp'", auto) apply(case_tac list, auto)
+
+    
+     apply(case_tac "rev cp'", auto) 
+     apply(case_tac " ll_get_node ((aa, b), ba) (rev list @ [Suc aaa])", auto)
+    apply(case_tac list, auto)
+qed
+*)
+(*
+lemma qvalid_cp_next_None_ancestor' :
+"(((x, t) :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) \<in> ll_valid_q \<longrightarrow>
+  (! cp xd d . ll_get_node (x, t) cp = Some (xd, d) \<longrightarrow>
+    cp_next (x, t) cp = None \<longrightarrow>
+    snd x = snd xd)) 
+\<and>
+(((x1, x2), (l :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) \<in> ll_validl_q \<longrightarrow>
+  (! cp xd d . ll_get_node_list l cp = Some (xd, d) \<longrightarrow>
+    (! e . cp_next ((x1, x2), LSeq e l) cp = None \<longrightarrow>
+    x2 = snd xd)))"
+*)
+
+(* can we strengthen further?
+one idea. 
+
+in the second main conjunct (list case)
+mention the "last" item in the list (?)
+define xd in this way.
+*)
+
+lemma qvalid_cp_next_None'' :
+"(((x, t) :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) \<in> ll_valid_q \<longrightarrow>
+  (! cp xd d . ll_get_node (x, t) cp = Some (xd, d) \<longrightarrow>
+    cp_next (x, t) cp = None \<longrightarrow>
+    snd x = snd xd)) 
+\<and>
+(((x1, x2), (l :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) \<in> ll_validl_q \<longrightarrow>
+  (! n  . n < length l \<longrightarrow>
+    (! cp myx myt x d . ll_get_node (myx, myt) cp = Some (xd, d) \<longrightarrow>
+    cp_next (myx, myt) cp = None \<longrightarrow>
+  (! cp xd d . last l = (xd, d) \<longrightarrow>
+    (! e . cp_next ((x1, x2), LSeq e l) cp = None \<longrightarrow>
+    x2 = snd xd)))"
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+
+case (1 i x e)
+  then show ?case 
+    apply(auto)
+    apply(case_tac "rev cp", auto)
+    apply(case_tac "rev list", auto)
+    done
+next
+  case (2 x d e)
+  then show ?case 
+      apply(auto)
+    apply(case_tac "rev cp", auto)
+    apply(case_tac "rev list", auto)
+    done
+next
+  case (3 x d e s)
+  then show ?case 
+    apply(auto)
+    apply(case_tac "rev cp", auto)
+    apply(case_tac "rev list", auto)
+    done
+next
+  case (4 x d e s)
+  then show ?case
+    apply(auto)
+    apply(case_tac "rev cp", auto)
+    apply(case_tac "rev list", auto)
+    done
+next
+  case (5 n l n' e)
+  then show ?case 
+    apply(auto)
+    apply(case_tac "rev cp", auto)
+    apply(case_tac " ll_get_node ((n, n'), llt.LSeq e l) (rev list @ [Suc aa])", auto)
+
+    apply(case_tac "rev list", auto)
+     apply(drule_tac x = "[aa]" in spec) apply(auto)
+
+     apply(case_tac l, auto)
+    apply(case_tac aa, auto) apply(case_tac list, auto) 
+     
+     
+    apply(case_tac list, auto)
+      apply(drule_tac ll_validl_q.cases) apply(auto)
+      apply(case_tac aa, auto)
+    apply(case_tac lista, auto)
+    apply(case_tac "rev lista", auto)
+
+     apply(case_tac "ll_get_node_list l [Suc ab]") apply(auto)
+
+     apply(drule_tac x = "[ab,aa]" in spec) apply(auto)
+    apply(drule_tac x = "(ab # rev list @ [ac, aa])" in spec) apply(auto)
+    done
+next
+  case (6 n)
+  then show ?case
+    apply(auto)
+    apply(case_tac cp, auto)
+    done
+next
+  case (7 n h n' t n'')
+  then show ?case
+
+(* old version *)
 lemma qvalid_cp_next_None' :
 "(((x, t) :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll) \<in> ll_valid_q \<longrightarrow>
   (! cp xd d . ll_get_node (x, t) cp = Some (xd, d) \<longrightarrow>
@@ -1156,7 +1460,7 @@ lemma qvalid_cp_next_None' :
 (((x1, x2), (l :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) ll list)) \<in> ll_validl_q \<longrightarrow>
   (! cp xd d . ll_get_node_list l cp = Some (xd, d) \<longrightarrow>
     (! e . cp_next ((x1, x2), LSeq e l) cp = None \<longrightarrow>
-    snd x = snd xd)))"
+    x2 = snd xd)))"
 proof(induction rule:ll_valid_q_ll_validl_q.induct)
 case (1 i x e)
   then show ?case 
@@ -1190,32 +1494,171 @@ next
   then show ?case 
     apply(auto)
     apply(case_tac "rev cp", auto)
+    apply(case_tac " ll_get_node ((n, n'), llt.LSeq e l) (rev list @ [Suc aa])", auto)
+
     apply(case_tac "rev list", auto)
      apply(drule_tac x = "[aa]" in spec) apply(auto)
-     apply(case_tac "ll_get_node_list l [Suc aa]") apply(auto)
-    (* idea: aa'th tail of l must also be valid *)
-    (* maybe we can use different conditions on the child path to make proving easier *)
-    (* one proof approach: 2 lemmas:
-        1. if our child path has no successor, we must be the last thing in the list (maybe not even needed, could be trivial)
-        2. a "splitting" lemma for validl_q along append (@)
-maaaaybe we can just use descend bound?
-    *)
-(* the lemmas from above didn't quite work.
-the issue is relating get_node to a position in the listn. *)
-     apply(case_tac aa, auto) apply(case_tac l, auto) apply(case_tac list, auto)
-    apply(drule_tac ll_validl_q.cases, auto) apply(drule_tac ll_validl_q.cases, auto)
+
+    apply(case_tac "rev lista", auto)
+
+     apply(case_tac "ll_get_node_list l [Suc ab]") apply(auto)
+
+     apply(drule_tac x = "[ab,aa]" in spec) apply(auto)
+    apply(drule_tac x = "(ab # rev list @ [ac, aa])" in spec) apply(auto)
+    done
 next
   case (6 n)
-  then show ?case sorry
+  then show ?case
+    apply(auto)
+    apply(case_tac cp, auto)
+    done
 next
   case (7 n h n' t n'')
-  then show ?case sorry
-qed
-*)
+  then show ?case
+    apply(auto)
+    apply(case_tac "cp", auto)
+    apply(case_tac aa, auto)
+     apply(case_tac "rev list", auto)
+      apply(case_tac "ll_get_node_list t [0]", auto)
+      apply(case_tac t, auto)
+    apply(drule_tac ll_validl_q.cases, auto)
+    
+     (* need to apply ind rule multiple times - use frule *)
+     apply(frule_tac x =  "rev lista @ [aa]" in spec)
+     apply(auto)
+      apply(case_tac "ll_get_node ((n, n'), h) (rev lista @ [Suc aa])", auto)
+      apply(case_tac lista, auto)
+      apply(frule_tac x =  "(rev list @ [Suc ab])" in spec)
+    apply(auto)
+(* old proof *)
+    apply(case_tac "ll_get_node ((n, n''), llt.LSeq e (((n, n'), h) # t))
+              (rev list @ [Suc aa])", auto)
+
+    apply(case_tac "rev list", auto) apply(case_tac aa, auto) apply(case_tac t, auto)
+      apply(rotate_tac 1) apply(frule_tac ll_validl_q.cases, auto)
+     apply(rotate_tac -3)
+     apply(drule_tac x = "[nat]" in spec) apply(auto)
+
+(* case analysis on whether t is empty? *)
+    apply(case_tac "rev lista @ [ab]", auto)
+
+
+    apply(case_tac ab, auto)  apply(drule_tac x = "lista @ [aa]" in spec) apply(auto)
+      apply(case_tac "rev lista", auto)
+      apply(case_tac " ll_get_node ((n, n'), h) (rev listb @ [Suc ac])", auto)
+    apply(case_tac listb, auto)
+
+    apply(case_tac "ll_get_node ((n, n''), llt.LSeq e (((n, n'), h) # t))
+              (rev list @ [Suc ac])", auto) apply(case_tac list, auto)
+
+(* old proof *)
+     apply(case_tac "ll_get_node_list t [ab]", auto)
+
+     apply(case_tac ab, auto) apply(case_tac t, auto) apply(rotate_tac 1)
+    apply(frule_tac ll_validl_q.cases, auto)
+      apply(drule_tac x = "[aa]" in spec, auto)
+     apply(rotate_tac 3)
+     apply(drule_tac x = "[nat,aa]" in spec, auto)
+
+    apply(case_tac ab, auto) apply(case_tac "rev list @ [Suc ac]", auto)
+    apply(case_tac list, auto)
+     apply(case_tac "ll_get_node ((n, n'), h) (rev list @ [ac, aa])", auto) 
+     apply(case_tac list, auto) apply(case_tac t, auto)
+      apply(rotate_tac 1) apply(frule_tac ll_validl_q.cases, auto)
+      apply(drule_tac x = "[ac, aa]" in spec, auto)
+
+     apply(case_tac "ll_get_node ((n, n'), h) (rev lista @ [Suc ab])", auto)
+     apply(case_tac lista, auto)
+      apply(case_tac t, auto)
+      apply(rotate_tac 1) apply(frule_tac ll_validl_q.cases, auto)
+      apply(drule_tac x = "([ab, ac,  aa])" in spec) apply(auto)
+
+    
+
+
+      apply(case_tac "list", auto)
+      apply(case_tac " ll_get_node ((n, n'), h) (rev lista @ [Suc ab])", auto)
+    apply(case_tac lista, auto)
+      apply(case_tac t, auto)
+    apply(rotate_tac 1) apply(drule_tac ll_validl_q.cases, auto)
+      apply(drule_tac x = "([ac,  aa])" in spec) apply(auto)
+
+     apply(drule_tac x= "ab # lista @ [ac, aa]" in spec, auto)
+      apply(case_tac "rev lista", auto)
+    apply(case_tac "ll_get_node ((n, n'), h) [Suc ab]", auto)
+
+
+    
+
+     apply(case_tac "ll_get_node ((n, n'), h) (rev list @ [Suc ac])", auto) 
+     apply(case_tac list, auto) apply(case_tac t, auto)
+      apply(drule_tac x = "[ac, aa]" in spec, auto) apply(rotate_tac 1)
+      apply(frule_tac ll_validl_q.cases, auto)
+
+     apply(drule_tac x = "rev lista @ [ab, ac, aa]" in spec) apply(auto)
+      apply(case_tac "ll_get_node ((n, n'), h) (rev lista @ [Suc ab])", auto)
+      apply(case_tac lista, auto)
+      apply(case_tac "ll_get_node ((n, n'), h) (rev list @ [Suc ad])", auto)
+    apply(case_tac list, auto)
+    apply(case_tac "ll_get_node ((n, n'), h) (rev lista @ [Suc ae]) ", auto)
+      apply(case_tac lista, auto)
+
+    apply(case_tac ab, auto)
+  qed
 (*
 lemma qvalid_cp_next_Some' :
 
 lemma qvalid_cp_next_Some1 :
+*)
+
+(*
+lemma cp_nexti_valid :
+"cp_nexti t cp cp' \<Longrightarrow>
+  (t \<in> ll_valid_q \<longrightarrow>
+  (? x x' t1 x'' t2 .
+     ll_get_node t cp = Some ((x,x'), t1) \<and>
+     ll_get_node t cp' = Some ((x',x''),t2)))
+"
+proof(induction rule:cp_nexti.induct)
+case (1 t cpp q e ld n)
+  then show ?case 
+    apply(auto) apply(case_tac t) apply(auto)
+    apply(drule_tac ll_valid_q.cases) apply(auto)
+        apply(case_tac cpp, auto) apply(case_tac cpp, auto)
+      apply(case_tac cpp, auto) apply(case_tac cpp, auto)
+    apply(frule_tac kl = n in ll_get_node_last2) apply(auto)
+    apply(rule_tac ll_get_node_child2) apply(auto)
+    apply(case_tac "ld ! n", auto)
+    apply(frule_tac kl = "Suc n" in ll_get_node_last2) apply(auto)
+    apply(rule_tac ll_get_node_child2) apply(auto)
+
+    (* do we want to split list on n or suc n? or both? *)
+    apply(subgoal_tac "n < length ld")
+    apply(rotate_tac -1)
+    apply(drule_tac "id_take_nth_drop") apply(auto)
+    apply(case_tac cpp, auto)
+    apply(subgoal_tac "((na, n'), take n ld @
+       ((a, b), ba) # drop (Suc n) ld) \<in> ll_validl_q")
+      apply(rotate_tac -1)
+    apply(drule_tac ll_valid_app, auto)
+     apply(drule_tac qvalid_get_node2, auto)
+    apply(drule_tac qvalid_get_node2, auto)
+
+    apply(case_tac "ld ! (Suc n)", auto)
+  
+       apply(case_tac cpp, auto) apply(case_tac ld, auto)
+    sorry
+next
+  case (2 t cpp q e ld n cpp')
+  then show ?case 
+    apply(auto)
+    apply(drule_tac kl = "n" and t'' = "ld ! n" in ll_get_node_last2) apply(auto)
+    apply(subgoal_tac "n < length ld") apply(rotate_tac -1)
+      apply(rule_tac ll_get_node_nth2) apply(auto)
+    apply(case_tac "ld ! n", auto)
+    apply(drule_tac cp_nexti.cases) apply(auto)
+    
+qed
 *)
 
 (*
@@ -1258,39 +1701,41 @@ that targstart will be greater than or equal to fst (fst t) *)
                   (* the issue may have to do with distinguishing between errors? *)
                   (* TODO: in some cases we end up having to compare unloaded programs? *)
                   setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
-  using [[simp_trace_new]]
-  using [[linarith_split_limit=4]]
+(*  using [[simp_trace_new]]
+  using [[linarith_split_limit=4]] *)
 proof(induction rule:elle_alt_sem.induct) 
 case (1 t cp x e i cc net st st')
   then show ?case 
     apply(clarify)
     apply(case_tac fuel, clarify) apply(simp)
     apply(case_tac i, clarify)
-    apply(simp)
-    apply(split if_split_asm) apply(clarsimp)
+                apply(simp) apply(auto)
+                apply(simp add:clearpc'_def)
+apply(split if_split_asm) apply(clarsimp)
                  apply(split option.split_asm) apply(clarsimp)
                  apply(split option.split_asm) apply(clarsimp)
     apply(split option.split_asm)
                  apply(clarsimp)
                  apply(clarsimp)
     apply(split option.split_asm)
-                  apply(clarsimp)
+                  apply(clarsimp) 
+                  
+                  apply(auto)
                   apply(split if_split_asm) apply(clarsimp) apply(case_tac x1, clarsimp) apply(case_tac n, clarsimp)
     apply(simp add: check_resources_def)
     apply(clarsimp)
 
-                    apply(simp add:program.defs ellest.defs)
-         apply(frule_tac valid3'_qvalid)
-         apply(frule_tac qvalid_desc_bounded1) apply(simp)
+(* old proof follows but it no longer quite works. *)
+                    apply(frule_tac valid3'_qvalid)
+         apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(clarify)
                     apply(frule_tac qvalid_codegen'_check1) apply(simp) apply(simp)
-                    apply(clarify)
-
+                    apply(clarify) apply(simp) apply(simp add:program.defs) 
     (* idea for a contradiction here: descended guy must be qvalid
        but, we also know targstart = targend \<rightarrow> contradicts the fact
        that this must be an instruction *)
-         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp) apply(simp)
-    apply(rotate_tac -1)
-         apply(drule_tac ll_valid_q.cases, simp) 
+         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
+    apply(rotate_tac -1) apply(auto)
+         apply(drule_tac ll_valid_q.cases, simp) apply(auto)
          apply(subgoal_tac "length (inst_code i) \<noteq> 0")
           apply(rule_tac[2] inst_code_nonzero) apply(auto)
 
@@ -1299,7 +1744,145 @@ next
   then show ?case sorry
 next
   case (3 t cp x e d cc net st st')
-  then show ?case sorry
+  then show ?case 
+
+(* original proof follows, i am now condensing some goals *)
+    apply(clarify)
+    apply(case_tac fuel, clarify) apply(simp)
+
+    apply(frule_tac valid3'_qvalid) apply(simp)
+    apply(simp split:option.split_asm)
+     apply(frule_tac cp = cp and a = "(0, tend)" and t = ttree in program_list_of_lst_validate_head1) apply(auto)
+         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
+    apply(rotate_tac -1)
+      apply(frule_tac ll_valid_q.cases, auto)
+
+         apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(simp)
+    apply(frule_tac qvalid_codegen'_check1, simp) apply(simp) apply(simp)
+     apply(simp add:program.defs) apply(auto)
+         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
+     apply(rotate_tac -1) apply(frule_tac ll_valid_q.cases, auto)
+
+(* heck yes *)
+    apply(simp add:clearpc'_def )
+(*    apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (clearprog' cc) (vctx_stack vi)
+            (Pc JUMPDEST) net") apply(clarsimp) *)
+    apply(simp add:check_resources_def)
+(* we will prove this subgoal later with "head" theorem,
+can delete hypotheses to make computation faster if we need *)
+    apply(subgoal_tac "x2a = Pc JUMPDEST") apply(auto)
+     apply(simp add:program.defs clearprog'_def)
+(* finally, to prove this contradiction, we need a fact about
+being the last item in the buffer if we have no next childpath
+question though - how do empty Seq's factor into childpath calculations? *)
+(*
+idea:
+- targend = targstart + 1 (separate subgoal)
+- targend = length of overall list, if there is no next childpath
+*)
+    apply(split if_split_asm) apply(simp)
+
+
+(* this makes things blow up a little *)
+    apply(simp add:program.defs)
+    
+    
+    apply(auto)
+    apply(split if_split_asm) apply(split if_split_asm)
+      apply(split option.split_asm) apply(simp)
+       apply(split option.split_asm)
+        apply(split option.split_asm) apply(simp)
+        apply(simp)
+       apply(simp)
+    apply(split option.split_asm) apply(simp add: program.defs)
+       apply(simp add:program.defs)
+
+    apply(frule_tac valid3'_qvalid) apply(simp)
+      apply(frule_tac qvalid_get_node1[rotated 1]) apply(simp)
+    apply(rotate_tac -1)
+
+      apply(subgoal_tac "targstart < targend")
+    
+
+(* need to prove that targstart < targend for labels (should be easy, could be separate lemma *)
+        apply(frule_tac 
+a = "(0, tend)" and t = ttree and adl = targstart and adr = targend in
+program_list_of_lst_validate_head1)
+            apply(simp) apply(simp)
+      
+    apply(split if_split_asm) apply(clarsimp)
+(*
+                 apply(split option.split_asm) apply(clarsimp) 
+                 apply(split option.split_asm) apply(clarsimp)
+    apply(split option.split_asm)
+                 apply(clarsimp) 
+    apply(split option.split_asm)
+        apply(clarsimp) apply(clarsimp)
+    apply(split option.split_asm)
+                  apply(clarsimp) apply(clarsimp) 
+                      apply(split option.split_asm)
+                 apply(clarsimp) 
+    apply(split option.split_asm)
+        apply(clarsimp) apply(clarsimp)
+    apply(split option.split_asm)
+      apply(clarsimp)
+          apply(split option.split_asm)
+                 apply(clarsimp) 
+    apply(split option.split_asm)
+        apply(clarsimp) 
+    apply(split option.split_asm)
+                  apply(clarsimp) apply(clarsimp) 
+      apply(clarsimp)
+    apply(split option.split_asm)
+                  apply(clarsimp) apply(clarsimp) 
+      apply(clarsimp)
+    apply(split option.split_asm)
+      apply(clarsimp) apply(clarsimp)
+    apply(split option.split_asm)
+
+    apply(simp add:program.defs)
+
+         apply(frule_tac valid3'_qvalid)
+         apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(simp)
+    apply(frule_tac qvalid_codegen'_check1, simp) apply(simp) apply(simp)
+
+         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
+    apply(rotate_tac -1)
+      apply(frule_tac ll_valid_q.cases, auto)
+
+
+                apply(split if_split_asm) apply(auto)
+    apply(simp add:program.defs) apply(auto)
+(* auto made this messy :/ *)
+    apply(split option.split_asm)
+                  apply(clarsimp)
+                      apply(split option.split_asm)
+                   apply(clarsimp) apply(clarsimp) 
+    apply(clarsimp) 
+      apply(clarsimp)
+    apply(split option.split_asm)
+                  apply(clarsimp) apply(clarsimp) 
+         apply(subgoal_tac "length (inst_code i) \<noteq> 0")
+          apply(rule_tac[2] inst_code_nonzero) apply(auto)
+
+          apply(split option.split_asm)
+       apply(clarsimp)
+       apply(split if_split_asm) apply(clarsimp)
+    apply(auto)
+       apply(clarsimp)
+      apply(clarsimp)
+
+      apply(clarsimp)
+
+      apply(clarsimp)
+
+      apply(clarsimp)
+
+                  apply(auto)
+                  apply(split if_split_asm) apply(clarsimp) apply(case_tac x1, clarsimp) apply(case_tac n, clarsimp)
+    apply(simp add: check_resources_def)
+    apply(clarsimp)
+*)
 next
   case (4 st'' t cp x e d cp' cc net st st')
   then show ?case sorry
@@ -1320,10 +1903,14 @@ next
   then show ?case sorry
 next
   case (10 t cp x e cp' cc net z z')
-  then show ?case sorry
+  then show ?case
+    apply(auto)
+    sorry
 next
   case (11 t cp x e h rest cc net z z')
-  then show ?case sorry
+  then show ?case
+    apply(auto)
+    sorry
 qed
 
 qed
