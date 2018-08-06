@@ -233,16 +233,34 @@ then the semantics are less convincing.
 
 *)
 
+(*
+TODO we need a "finalize" notion that runs STOP (essentially)
+this will get run in every case where there is no next
+child path
+*)
+
+(*
+what is going on with check_resources for stop
+*)
+
+(* change this so that it is just running "stop" instead
+ (otherwise it is going to do check_resources and other things *)
+(* idea: if in a "continue" state, then run stop
+   otherwise leave it alone *)
+fun elle_stop :: "instruction_result \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
+"elle_stop (InstructionContinue v) cc = stop v cc"
+| "elle_stop ir _ = ir"
 
 inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow>
             constant_ctx \<Rightarrow> network \<Rightarrow>
             instruction_result \<Rightarrow> instruction_result \<Rightarrow> bool" where
 (* last node is an instruction *)
-"\<And> t cp x e i cc net st st'.
+"\<And> t cp x e i cc net st st' st''.
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
     elle_instD' i (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
-    elle_alt_sem t cp cc net st st'"
+    elle_stop (clearpc' st') (clearprog' cc) = st'' \<Longrightarrow> 
+    elle_alt_sem t cp cc net st st''"
 (* instruction in the middle *)
 | "\<And> t cp x e i cc net cp' st st' st''.
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
@@ -250,12 +268,13 @@ inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpa
     elle_instD' i (setprog' cc bogus_prog) net (clearpc' st) = st' \<Longrightarrow>
     elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
     elle_alt_sem t cp cc net st st''"
-(* last node is a label label *)
-| "\<And> t cp x e d cc net st st'.
+(* last node is a label *)
+| "\<And> t cp x e d cc net st st' st''.
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
     elle_labD' (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
-    elle_alt_sem t cp cc net st st'"
+    elle_stop (clearpc' st') (clearprog' cc) = st'' \<Longrightarrow> 
+    elle_alt_sem t cp cc net st st''"
 (* label in the middle *)
 | "\<And> t cp x e d cp' cc net st st'.
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
@@ -285,11 +304,12 @@ wrap in a Seq []. (or do we even need that now? ) *)
     elle_alt_sem t cp' cc net st' st'' \<Longrightarrow>
     elle_alt_sem t cp cc net st st''"
 (* jmpI, jump not taken, at end *)
-| "\<And> t cp x e d n cc net st st'.
+| "\<And> t cp x e d n cc net st st' st''.
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
     elle_jumpiD' (setprog' cc bogus_prog) net (clearpc' st) = (False, st') \<Longrightarrow>
-    elle_alt_sem t cp cc net st st'"
+    elle_stop (clearpc' st') (clearprog' cc) = st'' \<Longrightarrow> 
+    elle_alt_sem t cp cc net st st''"
 (* jmpI, jump not taken, in middle *)
 | "\<And> t cp x e d n cp' cc net st st'.
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
@@ -302,7 +322,8 @@ wrap in a Seq []. (or do we even need that now? ) *)
 | "\<And> t cp cc net x e st st'.
     ll_get_node t cp = Some (x, LSeq e []) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow> 
-    elle_instD' (Misc STOP) (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
+
+    elle_stop (clearpc' st) (clearprog' cc) = st' \<Longrightarrow>
     elle_alt_sem t cp cc net st st'"
 (* empty sequence, in the middle *)
 | "\<And> t cp x e cp' cc net z z'. 
@@ -1184,7 +1205,42 @@ ll.L (instructions) *)
 (*
 have a version of this for empty?
 or, characterizing cases where get_node is None?
+what if there are multiple instructions in the codegen?
+instead of just talking about the head, we should say
+"for all i between (fst a) and (snd a)
+between (fst d) and (snd d)?
+il2 ! (i - fst a) = "
+
+need some additional facts implied by ll_valid_q
+about how we will succeed in looking up
+(or will this be captured correctly by semantics of (!)
+also is this going to deal with PUSHes correctly?
+
+i think we have to call program_list_of_lst_validate on codegen'_check
+
 *)
+lemma program_list_of_lst_validate_contents' :
+"((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
+    (! cp adl adr d . ll_get_node (a, t) cp = Some ((adl, adr), d) \<longrightarrow>
+    (! il1 . codegen'_check (a,t) = Some il1 \<longrightarrow>
+    (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
+          (? ild . codegen'_check ((adl, adr), d) = Some (ild) \<and>
+              (? ild2 . program_list_of_lst_validate ild = ild2 \<and>
+              (! idx . idx < length il2 \<longrightarrow> idx \<ge> fst a \<longrightarrow>
+                    il2 ! (adl - fst a) =  
+              adl \<ge> fst a)))))))
+\<and>
+
+(((((a1, a2), (l :: ll4 list)) \<in> ll_validl_q) \<longrightarrow>
+    (! cp adl adr d . ll_get_node_list l cp = Some ((adl, adr), d) \<longrightarrow> adr > adl \<longrightarrow>
+    (* not quite right - need to replace codegen'_check here *)
+    (! il1 e . codegen'_check ((a1, a2), LSeq e l) = Some il1 \<longrightarrow>
+    (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
+          (? ilh ilt . codegen'_check ((adl, adr), d) = Some (ilh#ilt) \<and>
+             il2 ! (adl - a1) = ilh \<and> adl \<ge> a1))))))
+"
+
+
 lemma program_list_of_lst_validate_head' :
 "((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
     (! cp adl adr d . ll_get_node (a, t) cp = Some ((adl, adr), d) \<longrightarrow> adr > adl \<longrightarrow>
@@ -1450,7 +1506,16 @@ all further descendents of d (that if their cp_next is none then what?)
 
 
 
-
+lemma nat_dist_add [rule_format] :
+"(! n1 . nat (n1 + n2) = (nat n1) + (nat n2))"
+proof(induction n2)
+  case (nonneg n)
+  then show ?case
+    apply()
+next
+  case (neg n)
+  then show ?case sorry
+qed
 
 (*
 idea: don't use program_map_of_lst?
@@ -1520,16 +1585,18 @@ apply(split if_split_asm) apply(clarsimp)
                     apply(frule_tac valid3'_qvalid)
          apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(clarify)
                     apply(frule_tac qvalid_codegen'_check1) apply(simp) apply(simp)
-                    apply(clarify) apply(simp) apply(simp add:program.defs) 
+                    apply(clarify) apply(simp) (* apply(simp add:program.defs) *)
     (* idea for a contradiction here: descended guy must be qvalid
        but, we also know targstart = targend \<rightarrow> contradicts the fact
        that this must be an instruction *)
+(*
          apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
     apply(rotate_tac -1) apply(auto)
          apply(drule_tac ll_valid_q.cases, simp) apply(auto)
          apply(subgoal_tac "length (inst_code i) \<noteq> 0")
                         apply(rule_tac[2] inst_code_nonzero) apply(auto)
-    sorry
+*)  
+  sorry
 
 next
   case (2 t cp x e i cc net cp' st st' st'')
@@ -1560,125 +1627,76 @@ next
 (*    apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (clearprog' cc) (vctx_stack vi)
             (Pc JUMPDEST) net") apply(clarsimp) *)
     apply(simp add:check_resources_def)
+(*
+    apply(simp add:elle_stop_def)
+        apply(simp add:program.defs clearprog'_def elle_stop_def check_resources_def)
+*)
+    apply(subgoal_tac "x2a = Pc JUMPDEST")
+    apply(clarsimp)
+     apply(auto)
+(* now we need the fact about the length running out *)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
 (* we will prove this subgoal later with "head" theorem,
 can delete hypotheses to make computation faster if we need *)
-    apply(subgoal_tac "x2a = Pc JUMPDEST") apply(auto)
-     apply(simp add:program.defs clearprog'_def)
-(* finally, to prove this contradiction, we need a fact about
-being the last item in the buffer if we have no next childpath
-question though - how do empty Seq's factor into childpath calculations? *)
-(*
-idea:
-- targend = targstart + 1 (separate subgoal)
-- targend = length of overall list, if there is no next childpath
-*)
-     apply(clarsimp) apply(case_tac nata, auto)
-    apply(case_tac cp, auto)
-    apply(simp)
-     apply(simp add: program_sem.simps)
- apply(simp)
-
-
-(* this makes things blow up a little *)
-    apply(simp add:program.defs)
-    
-    
-    apply(auto)
-    apply(split if_split_asm) apply(split if_split_asm)
-      apply(split option.split_asm) apply(simp)
-       apply(split option.split_asm)
-        apply(split option.split_asm) apply(simp)
-        apply(simp)
-       apply(simp)
-    apply(split option.split_asm) apply(simp add: program.defs)
-       apply(simp add:program.defs)
-
-    apply(frule_tac valid3'_qvalid) apply(simp)
-      apply(frule_tac qvalid_get_node1[rotated 1]) apply(simp)
-    apply(rotate_tac -1)
-
-      apply(subgoal_tac "targstart < targend")
-    
-
-(* need to prove that targstart < targend for labels (should be easy, could be separate lemma *)
-        apply(frule_tac 
-a = "(0, tend)" and t = ttree and adl = targstart and adr = targend in
-program_list_of_lst_validate_head1)
-            apply(simp) apply(simp)
-      
-    apply(split if_split_asm) apply(clarsimp)
-(*
-                 apply(split option.split_asm) apply(clarsimp) 
-                 apply(split option.split_asm) apply(clarsimp)
-    apply(split option.split_asm)
-                 apply(clarsimp) 
-    apply(split option.split_asm)
-        apply(clarsimp) apply(clarsimp)
-    apply(split option.split_asm)
-                  apply(clarsimp) apply(clarsimp) 
-                      apply(split option.split_asm)
-                 apply(clarsimp) 
-    apply(split option.split_asm)
-        apply(clarsimp) apply(clarsimp)
-    apply(split option.split_asm)
-      apply(clarsimp)
-          apply(split option.split_asm)
-                 apply(clarsimp) 
-    apply(split option.split_asm)
-        apply(clarsimp) 
-    apply(split option.split_asm)
-                  apply(clarsimp) apply(clarsimp) 
-      apply(clarsimp)
-    apply(split option.split_asm)
-                  apply(clarsimp) apply(clarsimp) 
-      apply(clarsimp)
-    apply(split option.split_asm)
-      apply(clarsimp) apply(clarsimp)
-    apply(split option.split_asm)
-
-    apply(simp add:program.defs)
-
-         apply(frule_tac valid3'_qvalid)
-         apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(simp)
-    apply(frule_tac qvalid_codegen'_check1, simp) apply(simp) apply(simp)
-
-         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
-    apply(rotate_tac -1)
-      apply(frule_tac ll_valid_q.cases, auto)
-
-
-                apply(split if_split_asm) apply(auto)
-    apply(simp add:program.defs) apply(auto)
-(* auto made this messy :/ *)
-    apply(split option.split_asm)
-                  apply(clarsimp)
-                      apply(split option.split_asm)
-                   apply(clarsimp) apply(clarsimp) 
-    apply(clarsimp) 
-      apply(clarsimp)
-    apply(split option.split_asm)
-                  apply(clarsimp) apply(clarsimp) 
-         apply(subgoal_tac "length (inst_code i) \<noteq> 0")
-          apply(rule_tac[2] inst_code_nonzero) apply(auto)
-
-          apply(split option.split_asm)
        apply(clarsimp)
-       apply(split if_split_asm) apply(clarsimp)
+       apply(frule_tac qvalid_codegen'_check1, auto)
+       apply(case_tac nata, auto)
+    apply(split option.split_asm)
+    apply(split option.split_asm) 
+         apply(auto)
+    apply(split option.split_asm) 
+        apply(auto)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
+       apply(simp add:program.defs clearprog'_def check_resources_def)
+       apply(frule_tac qvalid_cp_next_None1, auto)
+       apply(frule_tac qvalid_get_node1, auto) apply(rotate_tac -1)
+       apply(drule_tac ll_valid_q.cases, auto)
+
+      apply(case_tac nata, auto)
+      apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+        apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+      apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
     apply(auto)
-       apply(clarsimp)
-      apply(clarsimp)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
 
-      apply(clarsimp)
+      apply(auto)
+       apply(frule_tac qvalid_codegen'_check1, auto)
+       apply(frule_tac qvalid_cp_next_None1, auto)
+       apply(frule_tac qvalid_get_node1, auto) apply(rotate_tac -1)
+       apply(drule_tac ll_valid_q.cases, auto)
 
-      apply(clarsimp)
+      apply(case_tac nata, auto)
+      apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+        apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+      apply(split option.split_asm) apply(auto)
+       apply(split option.split_asm) apply(auto)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
+      apply(simp add:program.defs clearprog'_def check_resources_def)
+     apply(simp add:program.defs clearprog'_def check_resources_def)
 
-      apply(clarsimp)
+    apply(auto)
 
-                  apply(auto)
-                  apply(split if_split_asm) apply(clarsimp) apply(case_tac x1, clarsimp) apply(case_tac n, clarsimp)
-    apply(simp add: check_resources_def)
-    apply(clarsimp)
-*)
+       apply(frule_tac qvalid_codegen'_check1, auto)
+       apply(frule_tac qvalid_cp_next_None1, auto)
+     apply(frule_tac qvalid_get_node1, auto)
+     apply(rotate_tac -1)
+     apply(drule_tac ll_valid_q.cases, auto)
+
+    apply(frule_tac program_list_of_lst_validate_head1, auto)
+     apply(frule_tac qvalid_get_node1, auto)
+     apply(rotate_tac -1)
+     apply(drule_tac ll_valid_q.cases, auto)
+    apply(simp add:program.defs)
+    done
 next
   case (4 st'' t cp x e d cp' cc net st st')
   then show ?case sorry
