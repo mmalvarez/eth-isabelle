@@ -247,9 +247,18 @@ what is going on with check_resources for stop
  (otherwise it is going to do check_resources and other things *)
 (* idea: if in a "continue" state, then run stop
    otherwise leave it alone *)
+(*
 fun elle_stop :: "instruction_result \<Rightarrow> constant_ctx \<Rightarrow> instruction_result" where
 "elle_stop (InstructionContinue v) cc = stop v cc"
 | "elle_stop ir _ = ir"
+*)
+
+(* TODO use next_state instead, or we may actually
+just have to reconstruct it. *)
+fun elle_stop :: "instruction_result \<Rightarrow> constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result" where
+"elle_stop (InstructionContinue v) cc net = instruction_sem v cc (Misc STOP) net"
+| "elle_stop ir _ _ = ir"
+
 
 inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow>
             constant_ctx \<Rightarrow> network \<Rightarrow>
@@ -259,7 +268,7 @@ inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpa
     ll_get_node t cp = Some (x, L e i) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
     elle_instD' i (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
-    elle_stop (clearpc' st') (clearprog' cc) = st'' \<Longrightarrow> 
+    elle_stop (clearpc' st') (clearprog' cc) net = st'' \<Longrightarrow> 
     elle_alt_sem t cp cc net st st''"
 (* instruction in the middle *)
 | "\<And> t cp x e i cc net cp' st st' st''.
@@ -273,7 +282,7 @@ inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpa
     ll_get_node t cp = Some (x, LLab e d) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
     elle_labD' (clearprog' cc) net (clearpc' st) = st' \<Longrightarrow>
-    elle_stop (clearpc' st') (clearprog' cc) = st'' \<Longrightarrow> 
+    elle_stop (clearpc' st') (clearprog' cc) net = st'' \<Longrightarrow> 
     elle_alt_sem t cp cc net st st''"
 (* label in the middle *)
 | "\<And> t cp x e d cp' cc net st st'.
@@ -308,7 +317,7 @@ wrap in a Seq []. (or do we even need that now? ) *)
     ll_get_node t cp = Some (x, LJmpI e d n) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow>
     elle_jumpiD' (setprog' cc bogus_prog) net (clearpc' st) = (False, st') \<Longrightarrow>
-    elle_stop (clearpc' st') (clearprog' cc) = st'' \<Longrightarrow> 
+    elle_stop (clearpc' st') (clearprog' cc) net = st'' \<Longrightarrow> 
     elle_alt_sem t cp cc net st st''"
 (* jmpI, jump not taken, in middle *)
 | "\<And> t cp x e d n cp' cc net st st'.
@@ -322,8 +331,7 @@ wrap in a Seq []. (or do we even need that now? ) *)
 | "\<And> t cp cc net x e st st'.
     ll_get_node t cp = Some (x, LSeq e []) \<Longrightarrow>
     cp_next t cp = None \<Longrightarrow> 
-
-    elle_stop (clearpc' st) (clearprog' cc) = st' \<Longrightarrow>
+    elle_stop (clearpc' st) (clearprog' cc) net = st' \<Longrightarrow>
     elle_alt_sem t cp cc net st st'"
 (* empty sequence, in the middle *)
 | "\<And> t cp x e cp' cc net z z'. 
@@ -818,6 +826,15 @@ next
     done
 qed
 
+lemma qvalid_cp_next_Some1 [rule_format] :
+"(((a, (t :: ('a, 'b, 'c, 'd, 'e, 'f, 'g) llt)) \<in> ll_valid_q) \<longrightarrow> 
+    (! cp qd td . ll_get_node (a, t) cp = Some (qd, td) \<longrightarrow>
+        (! cp' . cp_next (a, t) cp = Some cp' \<longrightarrow> 
+                 (? qd' td' . ll_get_node (a, t) cp' = Some (qd', td') \<and>
+                              snd qd = fst qd'))))"
+  apply(insert qvalid_cp_next_Some')
+  apply(blast)
+  done
 
 (* NB behavior of this function is perhaps counterintuitive
 for these purposes we consider a leaf node to be first child of itself *)
@@ -1505,18 +1522,6 @@ all further descendents of d (that if their cp_next is none then what?)
 *)
 
 
-
-lemma nat_dist_add [rule_format] :
-"(! n1 . nat (n1 + n2) = (nat n1) + (nat n2))"
-proof(induction n2)
-  case (nonneg n)
-  then show ?case
-    apply()
-next
-  case (neg n)
-  then show ?case sorry
-qed
-
 (*
 idea: don't use program_map_of_lst?
 maybe just use program_list_of_lst with index?
@@ -1714,16 +1719,65 @@ next
   then show ?case sorry
 next
   case (9 t cp cc net x e st st')
-  then show ?case sorry
+  then show ?case
+    apply(auto)
+    apply(split option.split_asm, auto)
+    apply(split option.split_asm, auto)
+     apply(frule_tac valid3'_qvalid)
+    apply(frule_tac qvalid_cp_next_None1) apply(auto)
+    apply(frule_tac qvalid_codegen'_check1) apply(auto)
+
+    apply(frule_tac qvalid_get_node1, auto)
+    apply(rotate_tac -1) apply(drule_tac ll_valid_q.cases, auto)
+    apply(drule_tac ll_validl_q.cases, auto)
+
+    apply(case_tac fuel, auto)
+
+        apply(split option.split_asm, auto)
+     apply(split option.split_asm, auto)
+    apply(simp add:program.defs clearprog'_def check_resources_def)
+    apply(auto)
+(* OK, i guess the issue is that we need to check for an initial state
+that isn't invalid? i guess somewhere in the label case
+these checks already happened or something *)
+(* or perhaps the issue is that we should get failures
+later on? *)
+(* should stop be using next_state? *)
+    apply(simp add:clearpc'_def) apply(auto)
+      apply(split if_split_asm, auto)
+    apply(simp add:program.defs clearprog'_def check_resources_def)
+
+     apply(auto)
+
+    apply(case_tac nata, auto)
+        apply(split if_split_asm, auto) 
+
+(* we are running into an issue around enforcing resources
+weirdly we didn't hit this in the label case? *)
+    apply(simp add:elle_stop.simps)
+
+sorry
 next
   case (10 t cp x e cp' cc net z z')
   then show ?case
     apply(auto)
-    sorry
+    apply(split option.split_asm, auto)
+    apply(split option.split_asm, auto)
+    apply(drule_tac x = targend in spec, auto)
+     apply(frule_tac valid3'_qvalid)
+     apply(frule_tac qvalid_cp_next_Some1) apply(auto)
+
+     apply(frule_tac valid3'_qvalid)
+    apply(frule_tac qvalid_get_node1, auto)
+    apply(rotate_tac -1) apply(drule_tac ll_valid_q.cases, auto)
+    apply(rotate_tac -1) apply(drule_tac ll_validl_q.cases, auto)
+    done
 next
   case (11 t cp x e h rest cc net z z')
   then show ?case
     apply(auto)
+    apply(split option.split_asm, auto)
+    apply(split option.split_asm, auto)
     sorry
 qed
 
