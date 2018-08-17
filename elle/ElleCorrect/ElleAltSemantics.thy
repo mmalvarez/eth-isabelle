@@ -255,10 +255,42 @@ fun elle_stop :: "instruction_result \<Rightarrow> constant_ctx \<Rightarrow> in
 
 (* TODO use next_state instead, or we may actually
 just have to reconstruct it. *)
+(*
 fun elle_stop :: "instruction_result \<Rightarrow> constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result" where
 "elle_stop (InstructionContinue v) cc net = instruction_sem v cc (Misc STOP) net"
 | "elle_stop ir _ _ = ir"
+*)
 
+(* based on next_state *)
+fun elle_stop :: "instruction_result \<Rightarrow> constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result" where
+"elle_stop (InstructionContinue v) cc net = 
+          (if check_resources v cc(vctx_stack   v) (Misc STOP) net then
+          instruction_sem v cc (Misc STOP) net
+        else
+          InstructionToEnvironment (ContractFail
+              ((case  inst_stack_numbers (Misc STOP) of
+                 (consumed, produced) =>
+                 (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
+                  @ (if meter_gas (Misc STOP) v cc net \<le>(vctx_gas   v) then [] else [OutOfGas])
+               )
+              ))
+              v None)"
+| "elle_stop ir _ _ = ir"
+
+(*
+        if check_resources v c(vctx_stack   v) i net then
+          instruction_sem v c i net
+        else
+          InstructionToEnvironment (ContractFail
+              ((case  inst_stack_numbers i of
+                 (consumed, produced) =>
+                 (if (((int (List.length(vctx_stack   v)) + produced) - consumed) \<le>( 1024 :: int)) then [] else [TooLongStack])
+                  @ (if meter_gas i v c net \<le>(vctx_gas   v) then [] else [OutOfGas])
+               )
+              ))
+              v None
+
+*)
 
 inductive elle_alt_sem :: "('a, 'b, 'c, 'd, 'e, 'f, 'g) ll \<Rightarrow> childpath \<Rightarrow>
             constant_ctx \<Rightarrow> network \<Rightarrow>
@@ -385,6 +417,7 @@ fun  program_list_of_lst_validate  :: "inst list \<Rightarrow> inst list option"
 |" program_list_of_lst_validate (i # rest) = 
     (case program_list_of_lst_validate rest of None \<Rightarrow> None | Some rest' \<Rightarrow> Some (i#rest'))"
 
+(* TODO: will codegen' work correctly on the output of this? *)
 
 (* seeing if the list version is easier to work with *)
 (* this one doesn't seem to quite be what we want *)
@@ -1236,16 +1269,21 @@ also is this going to deal with PUSHes correctly?
 i think we have to call program_list_of_lst_validate on codegen'_check
 
 *)
+(*
 lemma program_list_of_lst_validate_contents' :
 "((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
     (! cp adl adr d . ll_get_node (a, t) cp = Some ((adl, adr), d) \<longrightarrow>
     (! il1 . codegen'_check (a,t) = Some il1 \<longrightarrow>
     (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
+      (* may need to be strengthened with
+fst a \<le> adl \<le> adr \<le> snd a. leaving out for now for simplicity
+  *)
           (? ild . codegen'_check ((adl, adr), d) = Some (ild) \<and>
               (? ild2 . program_list_of_lst_validate ild = ild2 \<and>
-              (! idx . idx < length il2 \<longrightarrow> idx \<ge> fst a \<longrightarrow>
-                    il2 ! (adl - fst a) =  
-              adl \<ge> fst a)))))))
+              (! idx . idx \<ge> adl - fst a \<longrightarrow> 
+                       idx \<le> adr - fst a \<longrightarrow>
+                       (* still not quite right *)
+                       ild2 ! idx = il2 ! (adl - fst a + idx)))))))))
 \<and>
 
 (((((a1, a2), (l :: ll4 list)) \<in> ll_validl_q) \<longrightarrow>
@@ -1256,6 +1294,32 @@ lemma program_list_of_lst_validate_contents' :
           (? ilh ilt . codegen'_check ((adl, adr), d) = Some (ilh#ilt) \<and>
              il2 ! (adl - a1) = ilh \<and> adl \<ge> a1))))))
 "
+*)
+
+(* idea behind this next lemma:
+- item at the jump location will be a push
+- the next item is going to be a jump
+*)
+(*
+lemma program_list_of_lst_validate_jmp' :
+"((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
+    (! cp adl adr d . ll_get_node (a, t) cp = Some ((adl, adr), LJmp ) (*\<longrightarrow> adr > adl*) \<longrightarrow>
+    (! il1 . codegen'_check (a,t) = Some il1 \<longrightarrow>
+    (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
+          (? ilh ilt . codegen'_check ((adl, adr), d) = Some (ilh#ilt) \<and>
+              il2 ! (adl - fst a) = ilh \<and> adl \<ge> fst a))))))
+\<and>
+
+(((((a1, a2), (l :: ll4 list)) \<in> ll_validl_q) \<longrightarrow>
+    (! cp adl adr e n' . ll_get_node_list l cp = Some ((adl, adr), LJmp) (*\<longrightarrow> adr > adl*) \<longrightarrow>
+    (* not quite right - need to replace codegen'_check here *)
+    (! il1 e . codegen'_check ((a1, a2), LSeq e l) = Some il1 \<longrightarrow>
+    (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
+          (? ilh ilt . codegen'_check ((adl, adr), d) = Some (ilh#ilt) \<and>
+             il2 ! (adl - a1) = ilh \<and> adl \<ge> a1))))))
+"
+proof(induction rule:ll_valid_q_ll_validl_q.induct)
+*)
 
 
 lemma program_list_of_lst_validate_head' :
@@ -1706,16 +1770,34 @@ next
   case (4 st'' t cp x e d cp' cc net st st')
   then show ?case sorry
 next
-  case (5 xl el dl cp t cpre cj xj ej dj nj cl cc net st st' st'')
-  then show ?case sorry
+  case (5 t cpre cj xj ej dj nj cl cc net st st' st'')
+  then show ?case
+    apply(auto)
+    apply(simp add:clearpc'_def)
+     apply(split option.split_asm, auto)
+     apply(split option.split_asm, auto)
+     apply(case_tac fuel, auto)
+     apply(split option.split_asm, auto)
+     apply(split option.split_asm, auto)
+    apply(case_tac t, auto)
+    (* need lemma about how at targstart our instruction is a Jmp *)
+    (* need a lemma describing how if our instruction is a Jmp,
+       then at a 0 byte offset we have a push
+       and at an (length addr) offset we have a jmp
+       (in other words, maybe don't need the full generality of the _contents lemma) *)
+     apply(split option.split_asm, auto)
+     apply(simp add:program.defs clearprog'_def check_resources_def)
+
+    
+    sorry
 next
-  case (6 xl el dl cp' cp t cpre cj xj ej dj nj cl cc net elst' st st' st'')
+  case (6 t cpre cj xj ej dj nj cl cc net st st' st'')
   then show ?case sorry
 next
   case (7 t cp x e d n cc net elst' st st')
   then show ?case sorry
 next
-  case (8 st'' t cp x e d n cp' cc net elst' st st')
+  case (8 t cp x e d n cc net st st' st'')
   then show ?case sorry
 next
   case (9 t cp cc net x e st st')
@@ -1744,19 +1826,11 @@ these checks already happened or something *)
 later on? *)
 (* should stop be using next_state? *)
     apply(simp add:clearpc'_def) apply(auto)
-      apply(split if_split_asm, auto)
     apply(simp add:program.defs clearprog'_def check_resources_def)
-
-     apply(auto)
-
-    apply(case_tac nata, auto)
-        apply(split if_split_asm, auto) 
-
-(* we are running into an issue around enforcing resources
-weirdly we didn't hit this in the label case? *)
-    apply(simp add:elle_stop.simps)
-
-sorry
+apply(simp add:program.defs clearprog'_def check_resources_def)
+apply(simp add:program.defs clearprog'_def check_resources_def)
+apply(simp add:program.defs clearprog'_def check_resources_def)
+    done
 next
   case (10 t cp x e cp' cc net z z')
   then show ?case
@@ -1778,7 +1852,13 @@ next
     apply(auto)
     apply(split option.split_asm, auto)
     apply(split option.split_asm, auto)
-    sorry
+    apply(frule_tac kl = 0 in ll_get_node_last2) apply(auto)
+    apply(case_tac h, auto)
+    apply(frule_tac valid3'_qvalid)
+    apply(frule_tac qvalid_get_node1, auto)
+    apply(rotate_tac -1) apply(drule_tac ll_valid_q.cases, auto)
+    apply(rotate_tac -1) apply(drule_tac ll_validl_q.cases, auto)
+    done
 qed
 
 qed
