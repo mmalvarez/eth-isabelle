@@ -384,10 +384,72 @@ if this is
 *)
 
 
-lemma elle_alt_sem_test :
+(* need to take into account the fact that PC may be updated *)
+lemma elle_alt_sem_halted :
 "elle_alt_sem t cp cc net st st' \<Longrightarrow>
-  True"
-  sorry
+  (! x y z . st = InstructionToEnvironment x y z \<longrightarrow>
+  st' = InstructionToEnvironment x (y \<lparr> vctx_pc := 0 \<rparr>) (z)
+)"
+proof(induction rule: elle_alt_sem.induct)
+case (1 t cp x e i cc net st st' st'')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (2 t cp x e i cc net cp' st st' st'')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+case (3 t cp x e d cc net st st' st'')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (4 st'' t cp x e d cp' cc net st st')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (5 xl el dl t cpre cj xj ej dj nj cl cc net st st' st'')
+  then show ?case 
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (6 xl el dl cp' cp t cpre cj xj ej dj nj cl cc net st st' st'')
+  then show ?case 
+    apply(auto simp add:clearpc'_def)
+    done
+next
+case (7 t cp x e d n cc net st st' st'')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (8 st'' t cp x e d n cp' cc net st st')
+  then show ?case 
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (9 t cp cc net x e st st')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (10 t cp x e cp' cc net z z')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+next
+  case (11 t cp x e h rest cc net z z')
+  then show ?case
+    apply(auto simp add:clearpc'_def)
+    done
+qed
+
+(*
+
+*)
 
 fun clearprog_cctx :: "constant_ctx \<Rightarrow> constant_ctx" where
 "clearprog_cctx e =
@@ -1644,7 +1706,12 @@ case (1 t cp x e i cc net st st')
   (* factor this into a lemma about elle_instD vs program_sem *)
     apply(case_tac i, clarify)
                 apply(simp) apply(auto)
-                apply(simp add:clearpc'_def)
+                apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+                apply(auto)
+    apply(auto split:option.split_asm)
+       apply(simp add:program.defs clearprog'_def check_resources_def)
+
+(*
 apply(split if_split_asm) apply(clarsimp)
                  apply(split option.split_asm) apply(clarsimp)
                  apply(split option.split_asm) apply(clarsimp)
@@ -1658,7 +1725,7 @@ apply(split if_split_asm) apply(clarsimp)
                   apply(split if_split_asm) apply(clarsimp) apply(case_tac x1, clarsimp) apply(case_tac n, clarsimp)
     apply(simp add: check_resources_def)
     apply(clarsimp)
-
+*)
 (* old proof follows but it no longer quite works. *)
                     apply(frule_tac valid3'_qvalid)
          apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(clarify)
@@ -1794,8 +1861,16 @@ so that we can minimize the size of these scripts *)
     apply(frule_tac qvalid_codegen'_check1, simp) apply(simp) apply(simp)
      apply(simp add:program.defs) 
 
+    apply(frule_tac qvalid_cp_next_Some1, auto)
+
 
 (* good up to here *)
+(* OK, so in the other one, we can just run for one more iteration
+to reach a halt.
+in this one, we can't (i.e. can't peel through nata) *)
+(* still need qvalid_codegen'_check1 and 
+    frule_tac program_list_of_lst_validate_head1
+ *)
     apply(simp add:clearpc'_def )
 (*    apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (clearprog' cc) (vctx_stack vi)
             (Pc JUMPDEST) net") apply(clarsimp) *)
@@ -1804,34 +1879,65 @@ so that we can minimize the size of these scripts *)
     apply(simp add:elle_stop_def)
         apply(simp add:program.defs clearprog'_def elle_stop_def check_resources_def)
 *)
+     apply(simp add:program.defs clearprog'_def check_resources_def)
+    apply(auto split:option.split_asm)
+
     apply(subgoal_tac "x2a = Pc JUMPDEST")
      apply(clarsimp)
 (* need to use cp_next_Some
 *)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
 (* maybe this specialization is  wrong? *)
 (* i think that is what happened here *)
 apply(subgoal_tac "x2b ! a = Pc JUMPDEST")
      apply(frule_tac "qvalid_cp_next_Some1", auto)
 
-     apply(drule_tac x = a in spec) apply(clarsimp)
-
+(*  *)
 (*
 x2b vs nat i
 *)
+(*
      apply (split if_split_asm, clarsimp) 
 
           apply(auto split: option.split_asm)
                     apply(simp add:program.defs clearprog'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def check_resources_def)
-    apply(simp_all add:program.defs clearprog'_def check_resources_def)
-                  apply(clarsimp) apply(case_tac "x2b ! a", auto)
+                  apply(simp add:program.defs clearprog'_def check_resources_def)
+                  apply(drule_tac x = act in spec) apply(auto)
+                  apply(drule_tac x = vc in spec) apply(drule_tac x = venv in spec) apply(auto)
+    apply(drule_tac x = nata in spec)
+(* seems maybe ok, we do actually have a bunch of *)
+                  apply(simp_all add:program.defs clearprog'_def check_resources_def)
+                    apply(subgoal_tac "vi\<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := int a + 1\<rparr> =
+                                       vi\<lparr>vctx_pc := int a + 1, vctx_gas := vctx_gas vi - 1\<rparr> ")
+                     apply(auto)
+apply(case_tac "x2b ! a", auto)
                    apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
                  apply(case_tac "x2b ! a", auto)
                  apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
-                 apply(case_tac x2a, auto)
+                apply(case_tac x2a, auto)
+                apply(drule_tac x = act in spec)
+                apply(drule_tac x = vc in spec)
+                apply(drule_tac x = venv in spec) apply(auto)
+                apply(drule_tac x = nata in spec)
+    apply(subgoal_tac "(vi\<lparr>vctx_pc := int a + 1, vctx_gas := vctx_gas vi - 1\<rparr> )=
+                       (vi \<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := 1 + int a\<rparr>)")
+                 apply(auto)
+               apply(drule_tac elle_alt_sem_halted, auto)
+              apply(drule_tac elle_alt_sem_halted, auto)
+             apply(drule_tac elle_alt_sem_halted, auto)
+            apply(drule_tac elle_alt_sem_halted, auto)
+
+           apply (split if_split_asm, clarsimp) 
+                   apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
+
+                 apply(case_tac "x2b ! a", auto)
+
+          apply(auto split: option.split_asm)
+*)
+(* need a lemma about elle_alt_sem
+applied to InstructionToEnvironment
+(should leave everything unchanged (?)) *)
 (* this seems bad. we shouldn't need this. *)
-    apply(drule_tac elle_alt_sem.cases, auto)
+(*    apply(drule_tac elle_alt_sem.cases, auto) *)
 (*
                  apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
 
