@@ -1696,21 +1696,102 @@ that targstart will be greater than or equal to fst (fst t) *)
                   (* the issue may have to do with distinguishing between errors? *)
                   (* TODO: in some cases we end up having to compare unloaded programs? *)
                   setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
-(*  using [[simp_trace_new]]
-  using [[linarith_split_limit=4]] *)
+(*  using [[simp_debug]] *)
+  using [[simp_break]]
+(*  using [[simp_trace_depth_limit=20]] *)
+(*  using [[linarith_split_limit=4]] *)
 proof(induction rule:elle_alt_sem.induct) 
 case (1 t cp x e i cc net st st')
   then show ?case 
+
+    (* prelude:
+- valid3'_qvalid
+- qvalid_get_node1
+- fact that instructions are always at least 1 byte
+(ll_L_valid_bytes_length)
+- program_list_of_lst_validate_head1
+*)
     apply(clarify)
     apply(case_tac fuel, clarify) apply(simp)
-  (* factor this into a lemma about elle_instD vs program_sem *)
-    apply(case_tac i, clarify)
-                apply(simp) apply(auto)
-                apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
-                apply(auto)
-    apply(auto split:option.split_asm)
-       apply(simp add:program.defs clearprog'_def check_resources_def)
+    apply(frule_tac valid3'_qvalid, auto)
+    apply(frule_tac qvalid_get_node1[rotated 1]) apply(auto)
+    apply(frule_tac qvalid_cp_next_None1) apply(auto)
+    apply(frule_tac ll_L_valid_bytes_length) 
+    apply(frule_tac qvalid_desc_bounded1) apply(auto)
+    apply(case_tac " codegen'_check ((0, targend), ttree)", auto)
+    apply(case_tac "program_list_of_lst_validate a", auto)
+    apply(frule_tac cp = cp and a = "(0, targend)" and t = ttree in program_list_of_lst_validate_head1)
+        apply(safe)
+        apply(auto)
 
+    apply(case_tac " inst_stack_numbers (aa ! targstart)")
+    apply(case_tac "clearpc' (InstructionContinue vi)", auto)
+
+    apply(unfold clearpc'_def)
+    apply(simp only:irmap.simps)
+(* why is this blowing up *)
+    apply(simp  del:meter_gas_def)
+    apply(simp only:meter_gas_def)
+    apply(clarify)
+    apply(simp)
+    apply(simp only:new_memory_consumption.simps)
+apply(simp  del:meter_gas_def)
+    apply(clarify)
+    apply(auto)
+    apply(simp  del:instruction_sem_def check_resources_def program_sem.simps inst_stack_numbers.simps meter_gas_def)
+     apply(simp only:irmap.simps vctx_pc_update_def)
+    apply(clarify)
+     apply(simp)
+(*
+    apply(clarsimp)
+    
+    apply(auto)
+    apply(simp add:clearpc'_def)
+    apply(simp)
+    apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+
+    apply(simp)
+    apply(simp add:clearpc'_def)
+*)
+(* we still need more before we split on arguments.
+here's a full checklist of all the lemmas we need to apply before splitting
+- valid3'_qvalid
+- qvalid_get_node1
+- qvalid_cp_next_Some1/None1
+- ll_L_valid_bytes_length (for instructions)
+- qvalid_codegen'_check1 ? (can only use later?)
+- qvalid_desc_bounded1 ?
+this is program_list_of_list_head1? (can only use later)
+qvalid_codegen'_check1?
+  *)
+  (* factor this into a lemma about elle_instD vs program_sem *)
+    apply(case_tac i, clarify) apply(clarsimp)
+(* auto here splits more than we probably want now.
+e.g. we can handle UNKNOWNs all at once (?) *)
+                apply(auto)
+                apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+    apply(rotate_tac -6)
+                apply(frule_tac ll_valid_q.cases) apply(auto)
+                        apply(simp)
+                        apply(case_tac "aa ! ab", fastforce)
+apply(case_tac "aa ! ab", fastforce)
+    apply(simp)
+                        apply(auto)
+(*
+    apply(auto split:option.split_asm)
+                        apply(simp add:program.defs clearprog'_def check_resources_def)
+                        apply(auto)
+
+    apply(rotate_tac 1)
+                        apply(drule_tac ll_valid_q.cases, auto)
+                        apply(case_tac "aa ! ab", auto)
+
+                        apply(rotate_tac 3)
+                        apply(drule_tac ll_valid_q.cases, auto)
+                        apply(case_tac "aa ! ab", auto)
+
+    apply(rotate_tac 3)
+*)
 (*
 apply(split if_split_asm) apply(clarsimp)
                  apply(split option.split_asm) apply(clarsimp)
@@ -1727,10 +1808,12 @@ apply(split if_split_asm) apply(clarsimp)
     apply(clarsimp)
 *)
 (* old proof follows but it no longer quite works. *)
-                    apply(frule_tac valid3'_qvalid)
+  (*
+                        apply(frule_tac valid3'_qvalid)
          apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(clarify)
                     apply(frule_tac qvalid_codegen'_check1) apply(simp) apply(simp)
-                    apply(clarify) apply(simp) (* apply(simp add:program.defs) *)
+                    apply(clarify) apply(simp)
+*) (* apply(simp add:program.defs) *)
     (* idea for a contradiction here: descended guy must be qvalid
        but, we also know targstart = targend \<rightarrow> contradicts the fact
        that this must be an instruction *)
@@ -1846,6 +1929,17 @@ next
   case (4 st'' t cp x e d cp' cc net st st')
   then show ?case
 (* copied over from previous case, some of these initial tactics may be wrong *)
+
+(* let's do an outline of this proof:
+- the "targstart"'th child of the output is a Label
+  - This is because root valid3 \<rightarrow> root qvalid \<rightarrow> descendent qvalid
+  - Plus the "bounded" and "output_validate_correct"
+- with this we can prove that the next instruction to evaluate will be a label
+  - at that point, we need to _not_ crunch through another iteration of fuel parameter
+  - instead we need to combine our assumptions
+    - in particular, use the cp_next_Some1 lemma to prove that starting PC corresponds to the next node (?)
+*)
+
         apply(clarify)
     apply(case_tac fuel, clarify) apply(simp)
 
@@ -1855,6 +1949,9 @@ so that we can minimize the size of these scripts *)
          apply(frule_tac qvalid_get_node1[rotated 1]) apply(simp)
     apply(rotate_tac -1)
     apply(frule_tac ll_valid_q.cases, auto)
+    apply(case_tac "codegen'_check ((0, tend), ttree)", auto)
+    apply(case_tac " program_list_of_lst_validate aa", auto)
+    apply(frule_tac a = "(0, tend)" and adl = a in program_list_of_lst_validate_head1, auto) 
 
     apply(simp split:option.split_asm) apply(auto)
          apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(simp)
@@ -1862,210 +1959,36 @@ so that we can minimize the size of these scripts *)
      apply(simp add:program.defs) 
 
     apply(frule_tac qvalid_cp_next_Some1, auto)
+    apply(simp add:program.defs clearprog'_def check_resources_def)
+    apply(auto)
+    apply(case_tac "ab ! a", auto)
 
 
-(* good up to here *)
-(* OK, so in the other one, we can just run for one more iteration
-to reach a halt.
-in this one, we can't (i.e. can't peel through nata) *)
-(* still need qvalid_codegen'_check1 and 
-    frule_tac program_list_of_lst_validate_head1
- *)
-    apply(simp add:clearpc'_def )
-(*    apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (clearprog' cc) (vctx_stack vi)
-            (Pc JUMPDEST) net") apply(clarsimp) *)
-    apply(simp add:check_resources_def)
-(*
-    apply(simp add:elle_stop_def)
-        apply(simp add:program.defs clearprog'_def elle_stop_def check_resources_def)
-*)
-     apply(simp add:program.defs clearprog'_def check_resources_def)
-    apply(auto split:option.split_asm)
+    apply(case_tac " clearpc' (InstructionContinue vi)", auto)
+    apply(simp add:program.defs clearprog'_def check_resources_def)
 
-    apply(subgoal_tac "x2a = Pc JUMPDEST")
-     apply(clarsimp)
-(* need to use cp_next_Some
-*)
-(* maybe this specialization is  wrong? *)
-(* i think that is what happened here *)
-apply(subgoal_tac "x2b ! a = Pc JUMPDEST")
-     apply(frule_tac "qvalid_cp_next_Some1", auto)
-
-(*  *)
-(*
-x2b vs nat i
-*)
-(*
-     apply (split if_split_asm, clarsimp) 
-
-          apply(auto split: option.split_asm)
-                    apply(simp add:program.defs clearprog'_def check_resources_def)
-                  apply(simp add:program.defs clearprog'_def check_resources_def)
-                  apply(drule_tac x = act in spec) apply(auto)
-                  apply(drule_tac x = vc in spec) apply(drule_tac x = venv in spec) apply(auto)
-    apply(drule_tac x = nata in spec)
-(* seems maybe ok, we do actually have a bunch of *)
-                  apply(simp_all add:program.defs clearprog'_def check_resources_def)
-                    apply(subgoal_tac "vi\<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := int a + 1\<rparr> =
-                                       vi\<lparr>vctx_pc := int a + 1, vctx_gas := vctx_gas vi - 1\<rparr> ")
-                     apply(auto)
-apply(case_tac "x2b ! a", auto)
-                   apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
-                 apply(case_tac "x2b ! a", auto)
-                 apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
-                apply(case_tac x2a, auto)
-                apply(drule_tac x = act in spec)
-                apply(drule_tac x = vc in spec)
-                apply(drule_tac x = venv in spec) apply(auto)
-                apply(drule_tac x = nata in spec)
-    apply(subgoal_tac "(vi\<lparr>vctx_pc := int a + 1, vctx_gas := vctx_gas vi - 1\<rparr> )=
-                       (vi \<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := 1 + int a\<rparr>)")
-                 apply(auto)
-               apply(drule_tac elle_alt_sem_halted, auto)
-              apply(drule_tac elle_alt_sem_halted, auto)
-             apply(drule_tac elle_alt_sem_halted, auto)
-            apply(drule_tac elle_alt_sem_halted, auto)
-
-           apply (split if_split_asm, clarsimp) 
-                   apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
-
-                 apply(case_tac "x2b ! a", auto)
-
-          apply(auto split: option.split_asm)
-*)
-(* need a lemma about elle_alt_sem
-applied to InstructionToEnvironment
-(should leave everything unchanged (?)) *)
-(* this seems bad. we shouldn't need this. *)
-(*    apply(drule_tac elle_alt_sem.cases, auto) *)
-(*
-                 apply(simp add:program.defs clearprog'_def check_resources_def bogus_prog_def setprog'_def)
-
-(* are stuck here? we seem to lack hypotheses about st'' *)
-(* maybe we can "build up" a proof about st''? *)
-(* do something with cp'? *)
-   (* apply(drule_tac silly_equal_fact)
-    apply(drule_tac impCE) *)
-(*
-      apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-           apply(auto split: option.split_asm)
-*)
-                    apply(drule_tac x = act in spec) 
-                    apply(drule_tac x = vc in spec)
-apply(drule_tac x = venv in spec)
-                    apply(auto)
-    apply(subgoal_tac "int targend = int targstart + 1", auto)
-                    apply(drule_tac x = nata in spec)
-(* something very weird is happening here. this should be an easy contradiction
-but Isabelle is not picking it up. *)
-(* has to do with the fact that updates to counter and gas are in wrong order.
-this shouldn't matter but for some reason it does *)
-                    apply(case_tac "x2b ! targstart", auto)
-                    apply(subgoal_tac "vi\<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := int targstart + 1\<rparr> =
-                                       vi\<lparr>vctx_pc := int targstart + 1, vctx_gas := vctx_gas vi - 1\<rparr> ")
-                     apply(auto)
-
-    apply(subgoal_tac "int targend = int targstart + 1", auto)
-                   apply(drule_tac x = nata in spec)
-                    apply(case_tac "x2b ! targstart", auto)
-                    apply(subgoal_tac "vi\<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := int targstart + 1\<rparr> =
-                                       vi\<lparr>vctx_pc := int targstart + 1, vctx_gas := vctx_gas vi - 1\<rparr> ")
-                    apply(auto)
-       apply(frule_tac qvalid_get_node1, auto) apply(rotate_tac -1)
-       apply(drule_tac ll_valid_q.cases, auto)
-
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-        apply(simp add:program.defs clearprog'_def check_resources_def)
-        apply(simp add:program.defs clearprog'_def check_resources_def)
-
-
-
-    apply(simp)
-       apply(auto)
-
-
-     apply(clarsimp)
-     apply(case_tac "int (length (vctx_stack vi)) \<le> 1024", clarsimp)
-      apply(case_tac "1 \<le> vctx_gas vi", clarsimp)
-    *)
-  (*  apply(auto) *)
-     apply (split if_split_asm, clarsimp) 
-    apply(simp)
-    
-    (* need a fact about how 
-
-*)
-    apply(simp)
-(*
-    apply(hypsubst)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-(* we will prove this subgoal later with "head" theorem,
-can delete hypotheses to make computation faster if we need *)
-       apply(clarsimp)
-       apply(frule_tac qvalid_codegen'_check1, auto)
-       apply(case_tac nata, auto)
-    apply(split option.split_asm)
-    apply(split option.split_asm) 
-         apply(auto)
-    apply(split option.split_asm) 
+     apply(case_tac "int (length (vctx_stack x1)) \<le> 1024 \<and> 1 \<le> vctx_gas x1", auto)
+       apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+    apply(case_tac "ab ! a", auto)
+       apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+       apply(drule_tac x = act in spec) apply(drule_tac x = vc in spec) apply(drule_tac x = venv in spec, auto)
+    apply(subgoal_tac 
+"vi\<lparr>vctx_pc := int a + 1, vctx_gas := vctx_gas vi - 1\<rparr> =
+(vi\<lparr>vctx_gas := vctx_gas vi - 1, vctx_pc := 1 + int a\<rparr>)")
         apply(auto)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-       apply(simp add:program.defs clearprog'_def check_resources_def)
-       apply(frule_tac qvalid_cp_next_None1, auto)
-       apply(frule_tac qvalid_get_node1, auto) apply(rotate_tac -1)
-       apply(drule_tac ll_valid_q.cases, auto)
 
-      apply(case_tac nata, auto)
-      apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-        apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-      apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-    apply(auto)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
+       apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+      apply(case_tac "int (length (vctx_stack vi)) \<le> 1024", auto)
+       apply(frule_tac elle_alt_sem_halted) apply(auto)
+       apply(frule_tac elle_alt_sem_halted) apply(auto)
 
-      apply(auto)
-       apply(frule_tac qvalid_codegen'_check1, auto)
-       apply(frule_tac qvalid_cp_next_None1, auto)
-       apply(frule_tac qvalid_get_node1, auto) apply(rotate_tac -1)
-       apply(drule_tac ll_valid_q.cases, auto)
+       apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+    apply(case_tac " int (length (vctx_stack vi)) \<le> 1024", auto)
+       apply(frule_tac elle_alt_sem_halted) apply(auto)
+       apply(frule_tac elle_alt_sem_halted) apply(auto)
 
-      apply(case_tac nata, auto)
-      apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-        apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-      apply(split option.split_asm) apply(auto)
-       apply(split option.split_asm) apply(auto)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-      apply(simp add:program.defs clearprog'_def check_resources_def)
-     apply(simp add:program.defs clearprog'_def check_resources_def)
-
-    apply(auto)
-
-       apply(frule_tac qvalid_codegen'_check1, auto)
-       apply(frule_tac qvalid_cp_next_None1, auto)
-     apply(frule_tac qvalid_get_node1, auto)
-     apply(rotate_tac -1)
-     apply(drule_tac ll_valid_q.cases, auto)
-
-    apply(frule_tac program_list_of_lst_validate_head1, auto)
-     apply(frule_tac qvalid_get_node1, auto)
-     apply(rotate_tac -1)
-     apply(drule_tac ll_valid_q.cases, auto)
-    apply(simp add:program.defs)
+             apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
     done
-    *)
-    sorry
 next
   case (5 t cpre cj xj ej dj nj cl cc net st st' st'')
   then show ?case
