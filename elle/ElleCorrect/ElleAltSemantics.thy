@@ -688,6 +688,16 @@ lemma qvalid_codegen'_check1 [rule_format]:
   apply(fastforce)
   done
 
+lemma qvalid_codegen'_check2 [rule_format]:
+  "
+ (((a1, a2), (l::  ll4 list)) \<in> ll_validl_q \<longrightarrow> 
+      (! ils . List.those (map codegen'_check l) = Some ils \<longrightarrow>
+      (! il . program_list_of_lst_validate (List.concat ils) = Some il  \<longrightarrow>
+        a2 \<ge> a1 \<and> length il = a2 - a1)))"
+  apply(insert qvalid_codegen'_check')
+  apply(fastforce)
+  done
+
 (* TODO: use descend here? *)
 
 lemma qvalid_desc_bounded' :
@@ -1362,26 +1372,351 @@ fst a \<le> adl \<le> adr \<le> snd a. leaving out for now for simplicity
 - item at the jump location will be a push
 - the next item (item located at endloc-1) is going to be a jump
 *)
+(* to prove this we are going to need
+
+*)
 (*
+Should we use x instead of q-annotation?
+probably doesn't really matter.
+*)
+
+lemma output_address_nonnil [rule_format]:
+"output_address e \<noteq> []"
+proof(induction e)
+case 0
+  then show ?case 
+    apply(auto simp add:output_address_def)
+    apply(split prod.split_asm) apply(case_tac x1, auto)
+    done
+next
+  case (Suc e)
+  then show ?case
+    apply(auto simp add:output_address_def)
+    apply(split prod.split_asm)
+    apply(split prod.split_asm)
+    
+    apply(case_tac x1, auto)
+     apply(case_tac x1a, auto)
+    apply(case_tac x1a, auto)
+    done
+qed
+
+
+(*
+there is some kind of issue in the case wrhere s = 0
+statement about length(ild2)
+*)
 lemma program_list_of_lst_validate_jmp' :
 "((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
-    (! cp adl adr d . ll_get_node (a, t) cp = Some ((adl, adr), LJmp ) (*\<longrightarrow> adr > adl*) \<longrightarrow>
+    (! cp adl adr e d x . ll_get_node (a, t) cp = Some ((adl, adr), LJmp e d x) (*\<longrightarrow> adr > adl*) \<longrightarrow>
     (! il1 . codegen'_check (a,t) = Some il1 \<longrightarrow>
     (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
-          (? ild . codegen'_check ((adl, adr), d) = Some ild \<and>
-              il2 ! (adl - fst a) = ilh \<and> adl \<ge> fst a))))))
+          (? ild . codegen'_check ((adl, adr), LJmp e d x) = Some ild \<and>
+                   (? ild2 . program_list_of_lst_validate ild = Some ild2 \<and>
+                      length il2 > 0 \<and>
+                      length il2 = snd a - fst a \<and>
+                      length ild2 > 0 \<and>
+                      length ild2 = adr - adl (* was fst a *) \<and>
+(* facts about length il2 needed? *)
+                      ild2 ! 0 = il2 ! (adl - fst a) \<and>
+                      ild2 ! (adr - adl - 1) = Pc JUMP \<and> (* is this line right? *)
+                      ild2 ! (adr - adl - 1) = il2 ! (adr - fst a - 1)  \<and>
+                      adr > 1 \<and> adr > adl \<and>
+                      adl \<ge> fst a \<and>
+                      adr > fst a)))))))
 \<and>
 
 (((((a1, a2), (l :: ll4 list)) \<in> ll_validl_q) \<longrightarrow>
-    (! cp adl adr e n' . ll_get_node_list l cp = Some ((adl, adr), LJmp) (*\<longrightarrow> adr > adl*) \<longrightarrow>
-    (* not quite right - need to replace codegen'_check here *)
-    (! il1 e . codegen'_check ((a1, a2), LSeq e l) = Some il1 \<longrightarrow>
+    (! cp adl adr e d x . ll_get_node_list l cp = Some ((adl, adr), LJmp e d x) (*\<longrightarrow> adr > adl*) \<longrightarrow>
+    (! il1 eseq . codegen'_check ((a1, a2), LSeq eseq l) = Some il1 \<longrightarrow>
     (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
-          (? ilh ilt . codegen'_check ((adl, adr), d) = Some (ilh#ilt) \<and>
-             il2 ! (adl - a1) = ilh \<and> adl \<ge> a1))))))
+          (? ild . codegen'_check ((adl, adr), LJmp e d x) = Some ild \<and>
+             (? ild2 . program_list_of_lst_validate ild = Some ild2 \<and>
+                      length il2 > 0 \<and>
+                      length il2 = a2 - a1 \<and> (* wrong i think *)
+                      length ild2 > 0 \<and>
+                      length ild2 = adr - adl \<and>
+                      ild2 ! 0 = il2 ! (adl - a1) \<and>
+                      ild2 ! (adr - adl - 1) = Pc JUMP \<and>
+                      ild2 ! (adr - adl - 1) =  il2 ! (adr - a1 - 1)  \<and>
+                      adr > 1 \<and> adr > adl \<and>
+                      adl \<ge> a1 \<and>
+                      adr > a1)))))))
 "
 proof(induction rule:ll_valid_q_ll_validl_q.induct)
+case (1 i x e)
+  then show ?case 
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (2 x d e)
+  then show ?case
+apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (3 x d e s)
+  then show ?case
+apply(clarify)
+    apply(case_tac cp, auto)
+    apply(split if_split_asm) apply(auto)
+    apply(case_tac "output_address e", auto)
+    apply(auto split: if_split_asm)
+    apply (metis length_map nth_append_length)
+    done
+next
+  case (4 x d e s)
+  then show ?case 
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+  case (5 n l n' e)
+  then show ?case
+    apply(clarify)
+    apply(case_tac cp, auto)
+(*
+             apply(auto split:option.split_asm)
+             apply(drule_tac x = "a#list" in spec, auto)
+             apply(auto split: if_split_asm)
+          apply(drule_tac x = "a#list" in spec, auto)
+          apply(drule_tac x = "adl" in spec)
+          apply(drule_tac x = "adr" in spec)
+          apply(drule_tac x = e in spec) apply(auto)
+
+          apply(drule_tac x = "a#list" in spec, auto)
+          apply(drule_tac x = "adl" in spec)
+          apply(drule_tac x = "adr" in spec)
+      apply(drule_tac x = e in spec) apply(auto)
+           apply(frule_tac qvalid_get_node2) apply(auto)
+(* need qvalid_codegen'_check2 *)
+           apply(frule_tac qvalid_codegen'_check2, auto)
+
+          apply(drule_tac x = "(a # list)" in spec, auto)
+
+          apply(drule_tac x = "(a # list)" in spec, auto)
+
+        apply(drule_tac x = "(a # list)" in spec, auto)
+
+          apply(drule_tac x = "(a # list)" in spec, auto)
+          apply(drule_tac x = "adl" in spec)
+          apply(drule_tac x = "adr" in spec)
+          apply(drule_tac x = e in spec) apply(auto)
+
+          apply(drule_tac x = "(a # list)" in spec, auto)
+
+          apply(drule_tac x = "(a # list)" in spec, auto)
+          apply(drule_tac x = "adl" in spec)
+          apply(drule_tac x = "adr" in spec)
+          apply(drule_tac x = e in spec) apply(auto)
+
+          apply(drule_tac x = "(a # list)" in spec, auto)
+          apply(drule_tac x = "adl" in spec)
+          apply(drule_tac x = "adr" in spec)
+          apply(drule_tac x = e in spec) apply(auto)
+
+     apply(auto simp add:output_address_nonnil)
 *)
+    done
+next
+  case (6 n)
+  then show ?case
+    apply(clarify)
+    apply(case_tac cp, auto)
+    done
+next
+(*
+validate_split
+codegen'_check
+bounded1 *)
+  case (7 n h n' t n'')
+  then show ?case 
+    apply(clarify)
+    apply(case_tac cp, clarsimp)
+    apply(case_tac a, clarsimp)
+     apply(drule_tac x = list in spec)
+
+(* we also probably want to do a similar thing in second case *)
+(*    apply(rotate_tac [2] 3) *)
+    apply(auto)
+                       apply(auto split:option.split_asm)
+
+(*
+          apply(drule_tac x = "adl" in spec, rotate_tac -1)
+          apply(drule_tac x = "adr" in spec, rotate_tac -1)
+     apply(drule_tac x = e in spec, rotate_tac -1)
+    apply(drule_tac x = d in spec, rotate_tac -1)
+     apply(drule_tac x = x in spec, rotate_tac -1) apply(clarsimp)
+*)
+    apply(frule_tac program_list_of_lst_validate_split)
+     apply(clarsimp)
+                       apply(case_tac "length (output_address e) = x", clarsimp)
+                        apply(case_tac e, auto) apply(simp add:output_address_def)
+                        apply(simp split:prod.split_asm)
+    apply(case_tac x1, auto)
+                        apply(simp split:prod.split_asm)
+                        apply(simp add:output_address_def)
+                       apply(auto simp add:output_address_nonnil)
+
+                      apply(simp add:output_address_def)
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(auto)
+                        apply(simp split:prod.split_asm)
+                      apply(case_tac x1, auto) apply(case_tac x, auto)
+    apply(case_tac x, auto)
+
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                     apply(clarsimp)
+
+(* right hand side (n'' - n) seems wrong *)
+    apply(frule_tac program_list_of_lst_validate_split)
+                        apply(clarsimp)
+                        apply(frule_tac qvalid_codegen'_check2) apply(auto)
+                        apply(frule_tac qvalid_less1, auto)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                        apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                        apply(clarsimp)
+
+                    apply(subgoal_tac "adl - n < length a'")
+                     apply(rotate_tac -1) apply(frule_tac a = a' and b = b' in ProgramList.index_append_small)
+
+                        apply(case_tac "index a' (adl - n)", auto)
+    apply(frule_tac qvalid_desc_bounded1, auto)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                       apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+
+                    apply(subgoal_tac "adr - Suc n < length a'")
+                     apply(rotate_tac -1) apply(frule_tac a = a' and b = b' in ProgramList.index_append_small)
+
+                        apply(case_tac "index a' (adr - Suc n)", auto)
+                      apply(frule_tac qvalid_desc_bounded1, auto)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                       apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+
+                 apply(case_tac " length (output_address e) = x", auto)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+                      apply(clarsimp)
+    apply(rotate_tac -5)
+
+                apply(drule_tac x = "nat#list" in spec, auto)
+                 apply(case_tac " length (output_address e) = x", auto)
+                apply(case_tac "output_address e = []", auto)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+    apply(rotate_tac -5)
+                apply(drule_tac x = "nat#list" in spec, auto)
+               apply(case_tac " length (output_address e) = x", auto)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+    apply(rotate_tac -5)
+                apply(drule_tac x = "nat#list" in spec, auto)
+                apply(case_tac "output_address e = []", auto)
+
+             apply(frule_tac qvalid_codegen'_check1) apply(auto)
+             apply(frule_tac qvalid_less2, auto)
+
+    apply(rotate_tac -3)
+    apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+            apply(case_tac "output_address e", auto)
+(* good up to here *)
+           apply(rotate_tac -3)
+           apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+           apply(case_tac "output_address e", auto)
+
+(* probably good here *)
+(* need to get length a' *)
+           apply(frule_tac qvalid_codegen'_check1, clarsimp)
+             apply(force) apply(force) apply(simp) apply(clarify)
+(* use List.nth_append_length_plus *)
+           apply(subgoal_tac "(a' @ b') ! (length a' + (adl - n')) = b' ! (adl - n')")
+            apply(rule_tac[2] List.nth_append_length_plus)
+           apply(auto)
+
+          apply(rotate_tac -3)
+           apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+          apply(case_tac "output_address e", auto)
+
+          apply(rotate_tac -3)
+           apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+               apply(clarsimp)
+         apply(case_tac "output_address e", auto)
+           apply(frule_tac qvalid_codegen'_check1, clarsimp)
+           apply(force) apply(force) apply(simp) apply(clarify)
+
+           apply(subgoal_tac "(a' @ b') ! (length a' + (adr - n' - 1)) = b' ! (adr - n' -1)")
+            apply(rule_tac[2] List.nth_append_length_plus)
+         apply(auto)
+
+          apply(rotate_tac -3)
+        apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+        apply(clarsimp)
+
+          apply(rotate_tac -3)
+        apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+        apply(clarsimp)
+
+          apply(rotate_tac -3)
+        apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+        apply(clarsimp)
+          apply(case_tac "output_address e", auto)
+      apply(frule_tac qvalid_less1, auto)
+
+          apply(rotate_tac -3)
+        apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+        apply(clarsimp)
+          apply(case_tac "output_address e", auto)
+     apply(frule_tac qvalid_less1, auto)
+
+          apply(rotate_tac -3)
+        apply(drule_tac x = "nat#list" in spec, auto)
+    apply(frule_tac program_list_of_lst_validate_split)
+        apply(clarsimp)
+          apply(case_tac "length (output_address e) = x", auto)
+    done
+qed
+
 
 
 lemma program_list_of_lst_validate_head' :
@@ -1672,6 +2007,96 @@ lemma silly_eq_fact :
   apply(blast)
   done
 
+(* idea: if instruction i is the nth item in the program
+and the PC is equal to i
+then one iteration of the EVM (running with fuel=1)
+is the same as the instruction result (other than PC)
+(problem - need to relate semantics of running EVM
+with 1 fuel vs running EVM with higher fuel amounts
+(Hoare.execution_continue looks useful))
+*)
+(* idea: use clearprog' *)
+(* generalize based on whether continuing or ending *)
+lemma elle_instD'_correct :
+
+"
+inst_valid i \<longrightarrow>
+(! cc n vcstart irfinal st2 . elle_instD' i cc n (InstructionContinue vcstart) = irfinal \<longrightarrow>
+(! vcstart' . (vcstart \<lparr> vctx_pc := 0 \<rparr>)  = (vcstart' \<lparr> vctx_pc := 0 \<rparr>) \<longrightarrow>
+(! cc' . clearprog' cc = clearprog' cc' \<longrightarrow>
+    program_content (cctx_program cc') (vctx_pc vcstart') =  Some i \<longrightarrow>
+(? irfinal' . ( program_sem (\<lambda> _ . ()) cc' 1 n (InstructionContinue vcstart') = irfinal' \<and>
+              clearpc' irfinal = clearpc' irfinal')))))"
+proof(cases i)
+case (Unknown x1)
+  then show ?thesis
+    apply(clarify)
+    apply(fastforce)
+    done
+next
+  case (Bits x2)
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac x2, clarsimp)
+        apply(case_tac "vctx_stack vcstart", clarsimp)
+         apply(simp add:check_resources_def clearpc'_def)
+         apply(case_tac "vctx_stack vcstart'")
+
+          apply(simp only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def)
+(*    apply(clarsimp) *)
+(*   using [[simp_trace_new]]    *)
+   apply(simp)
+    apply(simp only:program.defs)
+    (*apply(simp del: vctx_advance_pc_def meter_gas_def)
+    apply(simp)
+   using [[simp_trace_new]]    
+          apply(simp) (* blows up *)
+    apply(auto)
+          apply(simp del:meter_gas_def) apply(clarify)
+    apply(simp)
+
+    apply(blast)
+    apply(simp split:list.split_asm)
+    apply(auto)
+*)
+next
+  case (Sarith x3)
+  then show ?thesis sorry
+next
+  case (Arith x4)
+  then show ?thesis sorry
+next
+  case (Info x5)
+  then show ?thesis sorry
+next
+  case (Dup x6)
+  then show ?thesis sorry
+next
+  case (Memory x7)
+  then show ?thesis sorry
+next
+  case (Storage x8)
+  then show ?thesis sorry
+next
+  case (Pc x9)
+  then show ?thesis sorry
+next
+  case (Stack x10)
+  then show ?thesis sorry
+next
+  case (Swap x11)
+  then show ?thesis sorry
+next
+  case (Log x12)
+  then show ?thesis sorry
+next
+  case (Misc x13)
+  then show ?thesis sorry
+qed
+
+
+(* For instruction cases, would it be easier to just prove a lemma that for
+any valid instruction, one step of program execution is the same as 1 step of Elle execution? *)
 
 (* TODO: need some kind of eliminators for elle_alt_sem (?) *)
 (* Do we need to somehow generalize the bottom part by a premise about elle_alt_sem of the tail? *)
@@ -1697,9 +2122,9 @@ that targstart will be greater than or equal to fst (fst t) *)
                   (* TODO: in some cases we end up having to compare unloaded programs? *)
                   setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
 (*  using [[simp_debug]] *)
-  using [[simp_break]]
+(*  using [[simp_trace_new mode=full]] *)
 (*  using [[simp_trace_depth_limit=20]] *)
-(*  using [[linarith_split_limit=4]] *)
+(*  using [[linarith_split_limit=12]] *)
 proof(induction rule:elle_alt_sem.induct) 
 case (1 t cp x e i cc net st st')
   then show ?case 
@@ -1711,6 +2136,9 @@ case (1 t cp x e i cc net st st')
 (ll_L_valid_bytes_length)
 - program_list_of_lst_validate_head1
 *)
+
+(* lemma: build relationship
+between program_sem and elle_instD *)
     apply(clarify)
     apply(case_tac fuel, clarify) apply(simp)
     apply(frule_tac valid3'_qvalid, auto)
@@ -1721,9 +2149,391 @@ case (1 t cp x e i cc net st st')
     apply(case_tac " codegen'_check ((0, targend), ttree)", auto)
     apply(case_tac "program_list_of_lst_validate a", auto)
     apply(frule_tac cp = cp and a = "(0, targend)" and t = ttree in program_list_of_lst_validate_head1)
+    
         apply(safe)
+    
+
         apply(auto)
 
+(* maybe another option is to do all these cases first *)
+
+(*
+    apply(case_tac "clearpc' (InstructionContinue vi)")
+     apply(simp add:clearpc'_def check_resources_def del:meter_gas_def)
+    apply(auto simp del:meter_gas_def)
+*)
+
+    apply(frule_tac qvalid_codegen'_check1)
+      apply(force)
+     apply(force)
+
+
+
+    apply(rotate_tac -6)
+    apply(frule_tac ll_valid_q.cases, auto)
+
+    apply(case_tac "aa ! ab") apply(auto)
+
+(* this looks _very_ nice *)
+                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+             apply(auto)
+             apply(case_tac x2, auto)
+(* Bits ops *)
+                 apply(simp split: list.split_asm, force)
+    apply(force)
+    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                 apply(auto)
+(* better to case split on nata earlier? *)
+                   apply(case_tac nata, auto)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(case_tac nata, auto)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                  apply(auto)
+                   apply(case_tac nata, auto)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                 apply(simp split: list.split_asm, force)
+
+    apply(force)
+
+
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                apply(auto)
+                  apply(case_tac nata, auto)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                  apply(case_tac nata, auto)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                 apply(force)
+
+                  apply(case_tac nata, auto)
+                apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                 apply(simp split: list.split_asm, force)
+                apply(auto)
+
+                  apply(case_tac nata, auto)
+                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                  apply(case_tac nata, auto)
+                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(force)
+
+                  apply(case_tac nata, auto)
+                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                 apply(simp split: list.split_asm, force)
+                apply(auto)
+
+                  apply(case_tac nata, auto)
+                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                  apply(case_tac nata, auto)
+                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(force)
+
+                  apply(case_tac nata, auto)
+                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                 apply(simp split: list.split_asm, force)
+                apply(auto)
+
+
+                  apply(case_tac nata, auto)
+                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                  apply(case_tac nata, auto)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(force)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+    apply(case_tac nata, auto )
+                apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+(* SARITH *)
+            apply(case_tac x3, clarsimp)
+                apply(case_tac nata, clarsimp)
+                apply(auto simp del:meter_gas_def)
+    apply(simp)
+                        apply(simp split: list.split_asm, force)
+                        apply(clarify) apply(force)
+                        apply(force)
+                        apply(force)
+                        apply(force)
+                        apply(simp split: list.split_asm, force)
+                        apply(fastforce)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(fastforce)
+                        apply(fastforce)
+                        apply(fastforce)
+                        apply(fastforce)
+
+
+                        apply(simp split: list.split_asm, force)
+                        apply(clarify) apply(force)
+                        apply(clarify)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, clarify)
+                        apply(fastforce)
+                        apply(auto)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(force)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(force)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(force)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                        apply(force)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(force)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(force)
+
+apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                   apply(force)
+
+apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                apply(force)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+(* Sarith SGT *)
+
+                        apply(simp split: list.split_asm, force)
+    apply(auto)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, clarify)
+                        apply(fastforce)
+                        apply(auto)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, clarify)
+                        apply(force)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(force)
+                       apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, clarify)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+    apply(case_tac nata, clarify)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+apply(case_tac nata, clarify)
+
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(auto)   
+                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+apply(case_tac nata, clarify)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+(* SLT *)
+      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+           apply(simp split: list.split_asm, force)
+    apply(auto)
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, auto)
+                        apply(fastforce simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                       apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, auto)
+                       apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                       apply(fastforce)
+
+    apply(case_tac nata, auto)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+    apply(case_tac nata, auto)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+    apply(case_tac nata, auto)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(fastforce)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+apply(case_tac nata, auto)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+(* signextend *)
+           apply(simp split: list.split_asm, force)
+               apply(fastforce)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    
+apply(case_tac nata, auto)
+                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+             apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(fastforce)
+            apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+(* Arith *)
+(* unclear to me why this is harder than sarith *)
+           apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac nata, clarsimp)
+            apply(case_tac x4, clarsimp)
+
+(*    using [[linarith_split_limit=10]]
+    apply(auto)
+*)
+    apply(simp)
+    apply(safe)
+                        apply(simp_all add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+    apply(simp only:)
+    apply(fastforce)
+                apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                       apply(fastforce)
+
+
+                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(force)
+                        apply(simp split: list.split_asm, force)
+                        apply(fastforce)
+               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                        apply(fastforce)
+                        apply(fastforce)
+                        apply(fastforce)
+                        apply(fastforce)
+
+apply(fastforce)
+
+
+
+                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+                        apply(case_tac x21a, clarsimp) apply(case_tac "of_nat n :: int", clarsimp)
+
+    apply(auto simp del:meter_gas_def)
+    apply(blast)
+                        apply(force)
+
+            apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+                 
+                apply(auto)
+
+                 apply(force)
+
+
+                 apply(force)
+
+  
+
+                     apply(split if_split_asm) apply(clarsimp)
+    apply(case_tac "vctx_stack vi") apply(force) apply(hypsubst)
+    apply(split list.split_asm, clarsimp)
+    apply(force)
+             apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+
+(* old proof *)
+             apply(case_tac "index aa ab", clarsimp)
+             apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+             apply(case_tac x2, simp)
+                  apply(split if_split_asm) 
+                   apply(simp) apply(clarify)
+                   apply(split if_split_asm)
+                    apply(simp)
+(* issue with out of gas errors followed by a stop? *)
+                    apply(clarsimp)
+
+                    apply(case_tac "vctx_stack vi") 
+                     apply(simp del: instruction_failure_result_def)
+    apply(simp only: instruction_failure_result_def)
+
+
+(* need qvalid_codegen'_check1 somewhere around here *)
+
+                     apply(simp)
+                     apply(frule_tac qvalid_codegen'_check1, simp) apply(force)
+                     apply(force) 
+
+    apply(simp)
+    apply(case_tac aa, simp)
+(*
+ Another attempt to understand what is happening here:
+we need to use another fact ("validate_head ?")
+in order to derive a contradiction in this case. length of aa
+must 
+*)
+
+              (*      apply(case_tac "vctx_stack vi", clarsimp) *)
+(* need a "pc vs gas" swapping lemma, which seems annoying but
+maybe not the worst thing if we can just throw it in our simpset *)
+    apply(safe)
+                    
+                    apply(auto)
+    apply(safe)
+                        apply(case_tac "vctx_stack vi", auto)
+    apply(case_tac vi, auto) apply(force)
+
+                   
+    apply(safe)
+                   apply(auto simp del:meter_gas_def)
+    apply(case_tac "vctx_stack vi", auto)
+                apply(simp add:clearpc'_def check_resources_def) apply(auto)
+    apply(case_tac "index aa targstart", auto)
+                apply(simp add:clearpc'_def check_resources_def) apply(auto)
+
+    apply(subgoal_tac "True")
+    apply(simp del:meter_gas_def check_resources_def)
+
+(*  using [[linarith_split_limit=100]] (* good idea? *)*)
+    apply(simp)
+    apply(case_tac "aa ! targstart") apply(auto)
     apply(case_tac " inst_stack_numbers (aa ! targstart)")
     apply(case_tac "clearpc' (InstructionContinue vi)", auto)
 
