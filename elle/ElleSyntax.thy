@@ -43,6 +43,10 @@ fun inst_valid :: "inst => bool" where
   "inst_valid (Unknown _) = False"
 | "inst_valid (Pc _) = False"
 | "inst_valid (Misc _) = False"
+(* codecopy also? *)
+| "inst_valid (Info CODESIZE) = False"
+| "inst_valid (Memory CODECOPY) = False"
+(* extcodecopy? *)
 | "inst_valid _ = True"
 
 fun ll1_valid :: "ll1 \<Rightarrow> bool" where

@@ -2017,7 +2017,7 @@ with 1 fuel vs running EVM with higher fuel amounts
 *)
 (* idea: use clearprog' *)
 (* generalize based on whether continuing or ending *)
-lemma elle_instD'_correct :
+lemma elle_instD'_correct [ rule_format] :
 
 "
 inst_valid i \<longrightarrow>
@@ -2037,61 +2037,651 @@ next
   case (Bits x2)
   then show ?thesis
     apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', clarsimp) (* experimental line *)
     apply(case_tac x2, clarsimp)
-        apply(case_tac "vctx_stack vcstart", clarsimp)
-         apply(simp add:check_resources_def clearpc'_def)
-         apply(case_tac "vctx_stack vcstart'")
+          apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+ split:list.splits prod.splits )
+        apply(simp_all)
+          apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+ split:list.splits prod.splits )
+       apply(simp_all)
+    done
 
-          apply(simp only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def)
-(*    apply(clarsimp) *)
-(*   using [[simp_trace_new]]    *)
-   apply(simp)
-    apply(simp only:program.defs)
-    (*apply(simp del: vctx_advance_pc_def meter_gas_def)
-    apply(simp)
-   using [[simp_trace_new]]    
-          apply(simp) (* blows up *)
-    apply(auto)
-          apply(simp del:meter_gas_def) apply(clarify)
-    apply(simp)
-
-    apply(blast)
-    apply(simp split:list.split_asm)
-    apply(auto)
-*)
 next
   case (Sarith x3)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', clarsimp) (* experimental line *)
+    apply(case_tac x3, clarsimp)
+          apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+ split:list.splits prod.splits )
+        apply(simp_all)
+          apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+ split:list.splits prod.splits )
+       apply(simp_all)
+    done
+
 next
   case (Arith x4)
-  then show ?thesis sorry
+  then show ?thesis
+
+
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x4, clarify)
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    print_state
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+         defer (* Exp case is annoying *)
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+(* sha3 requires sha3_def *)
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+
+(* last case: EXP *)
+    apply(clarify)
+(*    apply(case_tac vctx_stacka) apply(simp)
+(*
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def
+split:list.splits prod.splits instruction_result.splits option.splits )*)
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def thirdComponentOfC_def
+Gverylow_def Gcopy_def Cmem_def C_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+*)
+apply(simp only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(safe)
+    print_state
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    print_state
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    print_state
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+           apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    print_state
+    defer
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    print_state
+    defer
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+Word.unat_def word_exp.simps
+word_of_int_def unat_def
+Gverylow_def Gcopy_def Cmem_def C_def
+Gexp_def Gexpbyte_def Gmemory_def
+vctx_stack_default_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    print_state
+    apply(rule_tac x = 
+"program_sem (\<lambda>_. ())
+           \<lparr>cctx_program = cctx_programaa, cctx_this = cctx_thisa, cctx_hash_filter = cctx_hash_filtera\<rparr> 1 n
+           (InstructionContinue
+             \<lparr>vctx_stack = vctx_stackaa, vctx_memory = vctx_memorya, vctx_memory_usage = vctx_memory_usageaa,
+                vctx_storage = vctx_storageaa, vctx_pc = vctx_pca, vctx_balance = vctx_balancea,
+                vctx_caller = vctx_callera, vctx_value_sent = vctx_value_senta, vctx_data_sent = vctx_data_senta,
+                vctx_storage_at_call = vctx_storage_at_calla, vctx_balance_at_call = vctx_balance_at_calla,
+                vctx_origin = vctx_origina, vctx_ext_program = vctx_ext_programa, vctx_block = vctx_blocka,
+                vctx_gas = vctx_gasaa, vctx_account_existence = vctx_account_existenceaa,
+                vctx_touched_storage_index = vctx_touched_storage_indexa, vctx_logs = vctx_logsa,
+                vctx_refund = vctx_refunda, vctx_gasprice = vctx_gaspricea\<rparr>)"
+in exI)
+    print_state 
+      apply(safe)
+    print_state
+      apply(simp only:meter_gas_def subtract_gas.simps variable_ctx.simps) (* NB this affects other goals *)
+(* thirdComponentOfC? *)
+    print_state
+    apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) (* this may fail *)
+    print_state
+    apply(clarify)
+    print_state
+(* 3 goals - seems OK here *)
+
+    apply(safe)
+    print_state
+                 apply(simp) apply(simp) apply(simp) apply(simp)
+             apply(simp ) apply(simp)
+    print_state
+            apply(simp add:check_resources_def)
+           apply(simp add:check_resources_def)
+          apply(simp add:check_resources_def)
+         apply(simp add:check_resources_def)
+        apply(simp add:check_resources_def)
+apply(simp add:check_resources_def)
+    print_state
+apply(simp add:check_resources_def)
+    print_state
+(* 2 goals *)
+     apply(simp only:variable_ctx.simps program.simps)
+    print_state
+    apply(rule_tac x = 
+"program_sem (\<lambda>_. ()) \<lparr>cctx_program = cctx_programaa, cctx_this = cctx_thisa, cctx_hash_filter = cctx_hash_filtera\<rparr> 1 n
+           (InstructionContinue
+             \<lparr>vctx_stack = vctx_stacka, vctx_memory = vctx_memorya, vctx_memory_usage = vctx_memory_usagea, vctx_storage = vctx_storagea,
+                vctx_pc = vctx_pca, vctx_balance = vctx_balancea, vctx_caller = vctx_callera, vctx_value_sent = vctx_value_senta,
+                vctx_data_sent = vctx_data_senta, vctx_storage_at_call = vctx_storage_at_calla,
+                vctx_balance_at_call = vctx_balance_at_calla, vctx_origin = vctx_origina, vctx_ext_program = vctx_ext_programa,
+                vctx_block = vctx_blocka, vctx_gas = vctx_gasa, vctx_account_existence = vctx_account_existencea,
+                vctx_touched_storage_index = vctx_touched_storage_indexa, vctx_logs = vctx_logsa, vctx_refund = vctx_refunda,
+                vctx_gasprice = vctx_gaspricea\<rparr>)" in exI)
+
+(*    apply(simp del:meter_gas_def split:list.splits) *)
+    print_state
+    apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) (* this may fail *)
+    apply(simp only:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) (* this may fail *)
+    apply(clarify)
+    print_state
+     apply(safe)
+    print_state
+    apply(simp)
+apply(simp) apply(simp) apply(simp) apply(simp) apply(simp) apply(simp) apply(simp) apply(simp) apply(simp) apply(simp)
+         apply(simp) apply(simp) apply(simp) apply(simp) apply(simp) 
+    print_state
+
+(* 1 goal *)
+    apply(simp only:variable_ctx.simps program.simps)
+    print_state
+    apply(simp only: ordered_ab_group_add_abs_class.abs_of_nonneg)
+    print_state
+    apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits option.splits) (* this may fail *)
+    print_state
+    apply(simp only:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits option.splits) (* this may fail *)
+    apply(clarify)
+    print_state
+    apply(simp only:vctx_stack_default_def variable_ctx.simps program.simps)
+    print_state
+    apply(simp only: ordered_ab_group_add_abs_class.abs_of_nonneg)
+                    apply(subgoal_tac "nat 0 = 0 \<and> nat 1 = Suc 0 \<and> 
+                                       nat 2 = Suc (Suc 0) \<and> nat 3 = Suc (Suc (Suc 0))")
+
+    print_state
+     apply(safe)
+
+    print_state
+                       apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) (* this may fail *)
+    print_state
+    apply(simp only:new_memory_consumption.simps C_def thirdComponentOfC_def split:list.splits) (* this may fail *)
+    apply(fastforce)
+                        apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) 
+apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) 
+apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) 
+apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) 
+apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) 
+
+
+                    apply(simp only:index.simps nth.simps split:nat.splits)
+
+    print_state
+                    apply(fastforce)
+                   apply(fastforce)
+    print_state            
+                  apply(simp only:index.simps nth.simps )
+    print_state
+apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def split:list.splits) 
+    print_state
+                  apply(simp)
+    print_state 
+    apply(split nat.split_asm) apply(simp) apply(simp)
+    print_state
+    apply(split nat.split_asm) 
+    print_state
+    apply(simp) apply(simp)
+
+                 apply(simp)
+    print_state
+                  apply(simp only:index.simps nth.simps )
+    print_state
+                apply(simp)
+               apply(simp)
+              apply(simp)
+             apply(simp)
+    print_state
+       apply(simp)
+           apply(simp)
+    print_state
+                  apply(simp only:index.simps nth.simps )
+    print_state
+    apply(simp only:new_memory_consumption.simps C_def thirdComponentOfC_def split:list.splits) (* this may fail *)
+    print_state
+          apply(split option.split_asm)
+    print_state
+apply(simp del:meter_gas_def check_resources_def thirdComponentOfC_def ) 
+          apply(split option.split_asm)
+           apply(simp)
+          apply(split option.split_asm)
+           apply(simp)
+    print_state
+          apply(split nat.split)
+    print_state apply(clarify)
+    apply(rule_tac conjI) apply(clarify)  apply(clarify)
+    print_state
+          apply(split nat.split) apply(simp) apply(simp)
+    print_state
+        apply(simp)
+                  apply(simp only:index.simps nth.simps )
+    print_state
+        apply(case_tac "x21a = 0", simp) apply(clarify) apply(simp)
+       apply(arith)
+    apply(arith) apply(arith) apply(arith)
+
+    done
 next
   case (Info x5)
-  then show ?thesis sorry
+  then show ?thesis 
+(* proof prefix, copied from Arith *)
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x5, clarsimp)
+
+  apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+split:list.splits prod.splits instruction_result.splits ) 
+                   apply(simp_all) 
+ apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+split:list.splits prod.splits instruction_result.splits ) 
+                   apply(simp_all) 
+    apply(simp add:gas_def)
+
+    done
 next
   case (Dup x6)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x6, clarsimp)
+
+  apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits ) 
+                   apply(simp_all) 
+apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits option.splits ) 
+                   apply(simp_all) 
+    done
 next
   case (Memory x7)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify) 
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+
+    apply(case_tac x7, clarify)
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def cut_memory_def
+read_word_from_bytes_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def cut_memory_def
+read_word_from_bytes_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+split:list.splits prod.splits instruction_result.splits option.splits )
+        apply(clarify)
+        apply(safe) apply(simp)
+        apply(force)
+    print_state
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+split:list.splits prod.splits instruction_result.splits option.splits )
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+split:list.splits prod.splits instruction_result.splits option.splits )
+(* INTERACTION REQUIRED HERE to continue tracing. let's try to fix this.... or is there? ? ?*)
+apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+split:list.splits prod.splits instruction_result.splits option.splits )
+    done
 next
   case (Storage x8)
-  then show ?thesis sorry
+  then show ?thesis 
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x8, simp)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+
+    apply(auto)
+    done
 next
   case (Pc x9)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x9, simp)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    done
 next
   case (Stack x10)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x10, simp)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    done
 next
   case (Swap x11)
-  then show ?thesis sorry
+  then show ?thesis 
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x11, simp)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    done
 next
   case (Log x12)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    apply(case_tac x12, simp)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def vctx_returned_bytes_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+
+    done
 next
   case (Misc x13)
-  then show ?thesis sorry
+  then show ?thesis
+    apply(clarify)
+    apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
+    apply(case_tac x13, simp)
+    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def
+split:list.splits prod.splits instruction_result.splits option.splits )
+    done
 qed
 
 
@@ -2149,7 +2739,7 @@ between program_sem and elle_instD *)
     apply(case_tac " codegen'_check ((0, targend), ttree)", auto)
     apply(case_tac "program_list_of_lst_validate a", auto)
     apply(frule_tac cp = cp and a = "(0, targend)" and t = ttree in program_list_of_lst_validate_head1)
-    
+    (* OK, here we should use Hoare.execution_continue and the fact we just proved about inst_valid *)
         apply(safe)
     
 
@@ -2177,463 +2767,6 @@ between program_sem and elle_instD *)
 (* this looks _very_ nice *)
                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
              apply(auto)
-             apply(case_tac x2, auto)
-(* Bits ops *)
-                 apply(simp split: list.split_asm, force)
-    apply(force)
-    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                 apply(auto)
-(* better to case split on nata earlier? *)
-                   apply(case_tac nata, auto)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(case_tac nata, auto)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                  apply(auto)
-                   apply(case_tac nata, auto)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                 apply(simp split: list.split_asm, force)
-
-    apply(force)
-
-
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                apply(auto)
-                  apply(case_tac nata, auto)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                  apply(case_tac nata, auto)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                 apply(force)
-
-                  apply(case_tac nata, auto)
-                apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                 apply(simp split: list.split_asm, force)
-                apply(auto)
-
-                  apply(case_tac nata, auto)
-                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                  apply(case_tac nata, auto)
-                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(force)
-
-                  apply(case_tac nata, auto)
-                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                 apply(simp split: list.split_asm, force)
-                apply(auto)
-
-                  apply(case_tac nata, auto)
-                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                  apply(case_tac nata, auto)
-                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(force)
-
-                  apply(case_tac nata, auto)
-                    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                 apply(simp split: list.split_asm, force)
-                apply(auto)
-
-
-                  apply(case_tac nata, auto)
-                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                  apply(case_tac nata, auto)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(force)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-    apply(case_tac nata, auto )
-                apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-(* SARITH *)
-            apply(case_tac x3, clarsimp)
-                apply(case_tac nata, clarsimp)
-                apply(auto simp del:meter_gas_def)
-    apply(simp)
-                        apply(simp split: list.split_asm, force)
-                        apply(clarify) apply(force)
-                        apply(force)
-                        apply(force)
-                        apply(force)
-                        apply(simp split: list.split_asm, force)
-                        apply(fastforce)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(fastforce)
-                        apply(fastforce)
-                        apply(fastforce)
-                        apply(fastforce)
-
-
-                        apply(simp split: list.split_asm, force)
-                        apply(clarify) apply(force)
-                        apply(clarify)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, clarify)
-                        apply(fastforce)
-                        apply(auto)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(force)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(force)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(force)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                        apply(force)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(force)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(force)
-
-apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                   apply(force)
-
-apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                apply(force)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-(* Sarith SGT *)
-
-                        apply(simp split: list.split_asm, force)
-    apply(auto)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, clarify)
-                        apply(fastforce)
-                        apply(auto)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, clarify)
-                        apply(force)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(force)
-                       apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, clarify)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-    apply(case_tac nata, clarify)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-apply(case_tac nata, clarify)
-
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(auto)   
-                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-apply(case_tac nata, clarify)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                  apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-(* SLT *)
-      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-           apply(simp split: list.split_asm, force)
-    apply(auto)
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, auto)
-                        apply(fastforce simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                       apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, auto)
-                       apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                       apply(fastforce)
-
-    apply(case_tac nata, auto)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-    apply(case_tac nata, auto)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-    apply(case_tac nata, auto)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(fastforce)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-apply(case_tac nata, auto)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-(* signextend *)
-           apply(simp split: list.split_asm, force)
-               apply(fastforce)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    
-apply(case_tac nata, auto)
-                 apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-             apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(fastforce)
-            apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-(* Arith *)
-(* unclear to me why this is harder than sarith *)
-           apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(case_tac nata, clarsimp)
-            apply(case_tac x4, clarsimp)
-
-(*    using [[linarith_split_limit=10]]
-    apply(auto)
-*)
-    apply(simp)
-    apply(safe)
-                        apply(simp_all add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-    apply(simp only:)
-    apply(fastforce)
-                apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                      apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                       apply(fastforce)
-
-
-                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-    apply(force)
-                        apply(simp split: list.split_asm, force)
-                        apply(fastforce)
-               apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                        apply(fastforce)
-                        apply(fastforce)
-                        apply(fastforce)
-                        apply(fastforce)
-
-apply(fastforce)
-
-
-
-                        apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-                        apply(case_tac x21a, clarsimp) apply(case_tac "of_nat n :: int", clarsimp)
-
-    apply(auto simp del:meter_gas_def)
-    apply(blast)
-                        apply(force)
-
-            apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-                 
-                apply(auto)
-
-                 apply(force)
-
-
-                 apply(force)
-
-  
-
-                     apply(split if_split_asm) apply(clarsimp)
-    apply(case_tac "vctx_stack vi") apply(force) apply(hypsubst)
-    apply(split list.split_asm, clarsimp)
-    apply(force)
-             apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-
-(* old proof *)
-             apply(case_tac "index aa ab", clarsimp)
-             apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
-             apply(case_tac x2, simp)
-                  apply(split if_split_asm) 
-                   apply(simp) apply(clarify)
-                   apply(split if_split_asm)
-                    apply(simp)
-(* issue with out of gas errors followed by a stop? *)
-                    apply(clarsimp)
-
-                    apply(case_tac "vctx_stack vi") 
-                     apply(simp del: instruction_failure_result_def)
-    apply(simp only: instruction_failure_result_def)
-
-
-(* need qvalid_codegen'_check1 somewhere around here *)
-
-                     apply(simp)
-                     apply(frule_tac qvalid_codegen'_check1, simp) apply(force)
-                     apply(force) 
-
-    apply(simp)
-    apply(case_tac aa, simp)
-(*
- Another attempt to understand what is happening here:
-we need to use another fact ("validate_head ?")
-in order to derive a contradiction in this case. length of aa
-must 
-*)
-
-              (*      apply(case_tac "vctx_stack vi", clarsimp) *)
-(* need a "pc vs gas" swapping lemma, which seems annoying but
-maybe not the worst thing if we can just throw it in our simpset *)
-    apply(safe)
-                    
-                    apply(auto)
-    apply(safe)
-                        apply(case_tac "vctx_stack vi", auto)
-    apply(case_tac vi, auto) apply(force)
-
-                   
-    apply(safe)
-                   apply(auto simp del:meter_gas_def)
-    apply(case_tac "vctx_stack vi", auto)
-                apply(simp add:clearpc'_def check_resources_def) apply(auto)
-    apply(case_tac "index aa targstart", auto)
-                apply(simp add:clearpc'_def check_resources_def) apply(auto)
-
-    apply(subgoal_tac "True")
-    apply(simp del:meter_gas_def check_resources_def)
-
-(*  using [[linarith_split_limit=100]] (* good idea? *)*)
-    apply(simp)
-    apply(case_tac "aa ! targstart") apply(auto)
-    apply(case_tac " inst_stack_numbers (aa ! targstart)")
-    apply(case_tac "clearpc' (InstructionContinue vi)", auto)
-
-    apply(unfold clearpc'_def)
-    apply(simp only:irmap.simps)
-(* why is this blowing up *)
-    apply(simp  del:meter_gas_def)
-    apply(simp only:meter_gas_def)
-    apply(clarify)
-    apply(simp)
-    apply(simp only:new_memory_consumption.simps)
-apply(simp  del:meter_gas_def)
-    apply(clarify)
-    apply(auto)
-    apply(simp  del:instruction_sem_def check_resources_def program_sem.simps inst_stack_numbers.simps meter_gas_def)
-     apply(simp only:irmap.simps vctx_pc_update_def)
-    apply(clarify)
-     apply(simp)
-(*
-    apply(clarsimp)
-    
-    apply(auto)
-    apply(simp add:clearpc'_def)
-    apply(simp)
-    apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
-
-    apply(simp)
-    apply(simp add:clearpc'_def)
-*)
-(* we still need more before we split on arguments.
-here's a full checklist of all the lemmas we need to apply before splitting
-- valid3'_qvalid
-- qvalid_get_node1
-- qvalid_cp_next_Some1/None1
-- ll_L_valid_bytes_length (for instructions)
-- qvalid_codegen'_check1 ? (can only use later?)
-- qvalid_desc_bounded1 ?
-this is program_list_of_list_head1? (can only use later)
-qvalid_codegen'_check1?
-  *)
-  (* factor this into a lemma about elle_instD vs program_sem *)
-    apply(case_tac i, clarify) apply(clarsimp)
-(* auto here splits more than we probably want now.
-e.g. we can handle UNKNOWNs all at once (?) *)
-                apply(auto)
-                apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
-    apply(rotate_tac -6)
-                apply(frule_tac ll_valid_q.cases) apply(auto)
-                        apply(simp)
-                        apply(case_tac "aa ! ab", fastforce)
-apply(case_tac "aa ! ab", fastforce)
-    apply(simp)
-                        apply(auto)
-(*
-    apply(auto split:option.split_asm)
-                        apply(simp add:program.defs clearprog'_def check_resources_def)
-                        apply(auto)
-
-    apply(rotate_tac 1)
-                        apply(drule_tac ll_valid_q.cases, auto)
-                        apply(case_tac "aa ! ab", auto)
-
-                        apply(rotate_tac 3)
-                        apply(drule_tac ll_valid_q.cases, auto)
-                        apply(case_tac "aa ! ab", auto)
-
-    apply(rotate_tac 3)
-*)
-(*
-apply(split if_split_asm) apply(clarsimp)
-                 apply(split option.split_asm) apply(clarsimp)
-                 apply(split option.split_asm) apply(clarsimp)
-    apply(split option.split_asm)
-                 apply(clarsimp)
-                 apply(clarsimp)
-    apply(split option.split_asm)
-                  apply(clarsimp) 
-                  
-                  apply(auto)
-                  apply(split if_split_asm) apply(clarsimp) apply(case_tac x1, clarsimp) apply(case_tac n, clarsimp)
-    apply(simp add: check_resources_def)
-    apply(clarsimp)
-*)
-(* old proof follows but it no longer quite works. *)
-  (*
-                        apply(frule_tac valid3'_qvalid)
-         apply(frule_tac qvalid_desc_bounded1) apply(simp) apply(clarify)
-                    apply(frule_tac qvalid_codegen'_check1) apply(simp) apply(simp)
-                    apply(clarify) apply(simp)
-*) (* apply(simp add:program.defs) *)
-    (* idea for a contradiction here: descended guy must be qvalid
-       but, we also know targstart = targend \<rightarrow> contradicts the fact
-       that this must be an instruction *)
-(*
-         apply(drule_tac qvalid_get_node1[rotated 1]) apply(simp)
-    apply(rotate_tac -1) apply(auto)
-         apply(drule_tac ll_valid_q.cases, simp) apply(auto)
-         apply(subgoal_tac "length (inst_code i) \<noteq> 0")
-                        apply(rule_tac[2] inst_code_nonzero) apply(auto)
-*)  
   sorry
 
 next
