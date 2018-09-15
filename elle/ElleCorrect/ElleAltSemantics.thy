@@ -2017,6 +2017,8 @@ with 1 fuel vs running EVM with higher fuel amounts
 *)
 (* idea: use clearprog' *)
 (* generalize based on whether continuing or ending *)
+(* need to add that pc' is equal to targend for valid
+trees? *)
 lemma elle_instD'_correct [ rule_format] :
 
 "
@@ -2688,6 +2690,13 @@ qed
 (* For instruction cases, would it be easier to just prove a lemma that for
 any valid instruction, one step of program execution is the same as 1 step of Elle execution? *)
 
+lemma my_exec_continue :
+"program_sem stopper cc (Suc f) net st = st'' \<Longrightarrow>
+ ( ? st' . program_sem stopper cc 1 net st = st' \<and> program_sem stopper cc f net st' = st'')"
+  apply(insert Hoare.execution_continue)
+  apply(auto)
+  done
+
 (* TODO: need some kind of eliminators for elle_alt_sem (?) *)
 (* Do we need to somehow generalize the bottom part by a premise about elle_alt_sem of the tail? *)
 theorem elle_alt_correct :
@@ -2730,35 +2739,474 @@ case (1 t cp x e i cc net st st')
 (* lemma: build relationship
 between program_sem and elle_instD *)
     apply(clarify)
-    apply(case_tac fuel, clarify) apply(simp)
-    apply(frule_tac valid3'_qvalid, auto)
-    apply(frule_tac qvalid_get_node1[rotated 1]) apply(auto)
-    apply(frule_tac qvalid_cp_next_None1) apply(auto)
+    apply(simp only:Hoare.execution_continue)
+    apply(case_tac fuel)
+     apply(simp)
+    apply(clarify)
+    apply(frule_tac my_exec_continue)
+    apply(simp del:elle_instD'.simps program_sem.simps)
+    apply(case_tac "codegen'_check ((0, tend), ttree)", simp)
+    apply(simp del:elle_instD'.simps program_sem.simps)
+    apply(frule_tac valid3'_qvalid)
+    apply(frule_tac qvalid_get_node1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
+    apply(frule_tac qvalid_cp_next_None1) apply(auto simp del:elle_instD'.simps program_sem.simps)
     apply(frule_tac ll_L_valid_bytes_length) 
-    apply(frule_tac qvalid_desc_bounded1) apply(auto)
-    apply(case_tac " codegen'_check ((0, targend), ttree)", auto)
-    apply(case_tac "program_list_of_lst_validate a", auto)
+    apply(frule_tac qvalid_desc_bounded1) apply(auto simp del:elle_instD'.simps program_sem.simps)
+    apply(case_tac " codegen'_check ((0, targend), ttree)", auto simp del:elle_instD'.simps program_sem.simps)
+    apply(case_tac "program_list_of_lst_validate a", auto simp del:elle_instD'.simps program_sem.simps)
     apply(frule_tac cp = cp and a = "(0, targend)" and t = ttree in program_list_of_lst_validate_head1)
     (* OK, here we should use Hoare.execution_continue and the fact we just proved about inst_valid *)
         apply(safe)
+
+        apply(auto simp del:elle_instD'.simps program_sem.simps)
     
+    apply(subgoal_tac "inst_valid (aa ! targstart)") 
 
-        apply(auto)
 
+    print_state
+     apply(frule_tac qvalid_codegen'_check1)
+        apply(auto simp del:elle_instD'.simps program_sem.simps)
+
+(* need lemma for permuting elle_stop and pc_update *)
+(* i think this one isn't quite right though *)
+
+    apply(frule_tac cc = "(clearprog' cc)"
+and cc' = "(cc\<lparr>cctx_program := program.make (\<lambda>i. index aa (nat i)) (int (length aa))\<rparr>)"
+and vcstart = "(vi\<lparr>vctx_pc := int 0\<rparr>)"
+and vcstart' = "(vi\<lparr>vctx_pc := int targstart\<rparr>)" (*targstart? *)
+and irfinal = "st'"
+and n = net
+in elle_instD'_correct)         apply(auto simp del:elle_instD'.simps program_sem.simps)
+    print_state
+(* first, need a lemma saying that instD never looks at program counter *)
+
+        apply(simp add:clearpc'_def del:elle_instD'.simps program_sem.simps)
+       apply(simp add:clearprog'_def del:elle_instD'.simps program_sem.simps)
+
+    
+      apply(simp add:program.simps program.defs del:elle_instD'.simps program_sem.simps)
+      apply(simp add:program.simps program.defs clearpc'_def elle_stop.simps del:elle_instD'.simps program_sem.simps)
+(* case split to see if we are already at I2E or we need
+to actually run elle_stop*)
+(* looks decent up until here *)
+    print_state
+(*      apply(simp only: program_sem.simps irmap.simps  program.simps)
+    apply(unfold program_sem.simps) *)
+(* old stuff follows *)
+    apply(case_tac vi, clarify)
+    apply(case_tac "program_sem (\<lambda>_. ()) (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>) (Suc 0) net
+              (InstructionContinue (vi\<lparr>vctx_pc := int targstart\<rparr>))")
+
+      apply(simp add:program.simps program.defs clearpc'_def elle_stop.simps del:elle_instD'.simps program_sem.simps)
+      apply(case_tac vi, clarify)
+      apply(case_tac x1, clarify)
+      apply(simp add:program.simps program.defs clearpc'_def elle_stop.simps del:elle_instD'.simps program_sem.simps)
+
+(*idea: use a subgoal to capture the fact that we know the result of program_sem (...) *)
+
+      apply(simp only: program_sem.simps irmap.simps  program.simps)
+(* this seems to have made progress *)
+(* however, we now need to deal with the fact that we have clearpc' applied to some things and not others
+as well as dealing with elle_stop
+- lemma about how x = y \<longrightarrow> clearpc x = clearpc y
+- lemma about how elle_stop is equivalent to running past end of program
+*)
+    print_state
+    apply(case_tac nata)
+       apply(simp only: program_sem.simps irmap.simps  program.simps)
+       apply(simp add:elle_stop.simps)
+(* need lemma about how InstructionToEnvironment propagates through
+program_sem
+*)
+(*
+maybe we need a lemma about value of pc?
+yes, i  think that's it. we need a lemma about how
+after executing an instruction in a valid tree, our PC
+is equal to the second component of the instruction's qvalue
+*)
+(* need to use Hoare.execution_continue again? *)
+       apply(simp only: program_sem.simps irmap.simps  program.simps)
+
+    print_state
+    apply(simp)
+
+    print_state
+
+      apply(simp add:check_resources_def)
+    print_state
+      apply(auto)
+    print_state
+
+   (* apply(fastforce)*)
+    apply(subgoal_tac
+"
+ irmap (vctx_pc_update (\<lambda>_. 0))
+        (elle_stop
+          (irmap (vctx_pc_update (\<lambda>_. 0))
+(             InstructionContinue
+        \<lparr>vctx_stack = vctx_stackb, vctx_memory = vctx_memoryb, vctx_memory_usage = vctx_memory_usageb, vctx_storage = vctx_storageb, vctx_pc = vctx_pcb, vctx_balance = vctx_balanceb,
+           vctx_caller = vctx_callerb, vctx_value_sent = vctx_value_sentb, vctx_data_sent = vctx_data_sentb, vctx_storage_at_call = vctx_storage_at_callb,
+           vctx_balance_at_call = vctx_balance_at_callb, vctx_origin = vctx_originb, vctx_ext_program = vctx_ext_programb, vctx_block = vctx_blockb, vctx_gas = vctx_gasb,
+           vctx_account_existence = vctx_account_existenceb, vctx_touched_storage_index = vctx_touched_storage_indexb, vctx_logs = vctx_logsb, vctx_refund = vctx_refundb,
+           vctx_gasprice = vctx_gaspriceb\<rparr>)) (clearprog' cc) net) =
+       InstructionToEnvironment act (vc\<lparr>vctx_pc := 0\<rparr>) venv
+"
+)
+(*
+       apply(simp del:elle_instD'.simps program_sem.simps elle_stop.simps)
+    print_state
+       apply(simp)
+    print_state
+       apply(safe)
+    print_state
+(* need a "boundedness" lemma for this one? *)
+    apply(fastforce)
+      defer
+    apply(simp)
+    print_state
+*)
+(* idea:
+vcstart' and cc' are for the EVM
+so they have the program loaded and the PC set
+*)
+    apply(frule_tac cc = "(clearprog' cc)"
+and cc' = "(cc\<lparr>cctx_program := program.make (\<lambda>i. index aa (nat i)) (int (length aa))\<rparr>)"
+and vcstart = "(vi\<lparr>vctx_pc := int 0\<rparr>)"
+and vcstart' = "(vi\<lparr>vctx_pc := int ab\<rparr>)" (*targstart? *)
+and irfinal = "st'"
+and n = net
+in elle_instD'_correct)
+(*
+
+    apply(simp only:clearpc'_def irmap.simps)
+
+
+    apply(rotate_tac -5)
+    apply(drule_tac ll_valid_q.cases)
+
+
+        apply(simp) apply(simp) apply(simp) apply(simp)
+        apply(simp) apply(simp) apply(simp) apply(simp)
+
+    apply(simp del: elle_instD'.simps program_sem.simps)
+    print_state
+    apply(safe)
+    print_state
+    apply(simp) apply(simp)
+    apply(frule_tac cc = "(clearprog' cc)"
+and cc' = "(cc\<lparr>cctx_program := program.make (\<lambda>i. index aa (nat i)) (int (length aa))\<rparr>)"
+and vcstart = "(vi\<lparr>vctx_pc := int 0\<rparr>)"
+and vcstart' = "(vi\<lparr>vctx_pc := int ab\<rparr>)"
+and irfinal = "st'"
+and n = net
+in elle_instD'_correct)
+
+    apply(simp)
+    apply(blast)
+    apply(subgoal_tac "(elle_instD' (aa ! targstart) (clearprog' cc) net (clearpc' (InstructionContinue vi))))
+ (clearprog' cc) net) = InstructionToEnvironment act (vc\<lparr>vctx_pc := 0\<rparr>) venv")
+
+    apply(unfold irmap.simps)
+
+    apply(metis)
+    apply(auto simp add:clearprog'_def clearpc'_def del:elle_instD'.simps program_sem.simps)
+
+(* i think we are running into an issue here with
+
+*)
+
+    apply(auto)
+
+    apply(rotate_tac -5)
+    apply(frule_tac ll_valid_q.cases, auto simp del:elle_instD'.simps)
+
+    apply(frule_tac cc = "(clearprog' cc)"
+and cc' = "(cc\<lparr>cctx_program := program.make (\<lambda>i. index aa (nat i)) (int (length aa))\<rparr>)"
+and vcstart = "(vi\<lparr>vctx_pc := int 0\<rparr>)"
+and vcstart' = "(vi\<lparr>vctx_pc := int ab\<rparr>)"
+and irfinal = "st'"
+and n = net
+in elle_instD'_correct)
+    apply(simp add:clearpc'_def)
+       apply(auto simp del:elle_instD'.simps)
+    apply(simp add:clearprog'_def)
+     apply(simp add:program.defs variable_ctx.defs)
+    apply(case_tac cc, simp del:elle_instD.simps) apply(rotate_tac 1)
+    apply(frule_tac qvalid_desc_bounded1, auto simp del:elle_instD.simps)
+    print_state
 (* maybe another option is to do all these cases first *)
+     apply(rotate_tac 1)
+    apply(frule_tac qvalid_codegen'_check1)
+       apply(auto simp del:elle_instD.simps)
+(* one goal here *)
 
+
+    apply(rotate_tac 1)
+    apply(frule_tac qvalid_cp_next_None1) apply(simp) apply(simp)
+
+    apply(simp)
+(* begin new experiment *)
+    apply(case_tac "clearpc' (InstructionContinue vi)", simp)
+    apply(case_tac " check_resources x1 (clearprog' cc) (vctx_stack x1) (aa ! ab) net", simp)
+(* end new experiment *)
+    apply(auto)
+    apply(case_tac nata, simp)
+
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(case_tac "index aa ab") apply(simp)
+     apply(safe)
+    print_state
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+    apply(fastforce)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+    apply(fastforce)
+
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+                     apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(fastforce)
+    print_state
+                    apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+                   apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+                  apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+    apply(fastforce)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+               apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(fastforce)
+              apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(fastforce)
+    print_state
+apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+         apply(fastforce)
+apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+      apply(fastforce)
+     apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+         apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+    apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (clearprog' cc) (vctx_stack vi) (aa ! ab) net", simp)
+    print_state
+    apply(case_tac nata, simp)
+    print_state
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+    sledgehammer
+    apply(best)
+     apply(blast)
+    apply(metis)
+*)
+(*
+    apply(case_tac " clearpc' (InstructionContinue vi)", simp)
+     apply(case_tac "program_content (program.make (\<lambda>i. index aa (nat i)) (int (length aa))) (int ab)", simp)
+      apply(case_tac "check_resources x1 (clearprog' cc) (vctx_stack x1) (aa ! ab) net", simp)
+       apply(case_tac "check_resources (vi\<lparr>vctx_pc := int ab\<rparr>) (cc\<lparr>cctx_program := program.make (\<lambda>i. index aa (nat i)) (int (length aa))\<rparr>) (vctx_stack vi) (Misc STOP) net", simp)
+     apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+       apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(safe)
+    print_state
+                  apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+             apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+            apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+       apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+      apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+      apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+     apply(safe)
+    print_state
+      apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+    apply(fastforce)
+    print_state
+          apply(case_tac "check_resources x1 (clearprog' cc) (vctx_stack x1) (aa ! ab) net", simp)
+
+       apply(simp add:program.defs variable_ctx.defs clearpc'_def program.simps)
+    print_state
+(* here is where we probably need to use cp_next_None *)
+    apply(rotate_tac 1)
+    apply(frule_tac qvalid_cp_next_None1) apply(simp) apply(simp)
+    apply(auto)
+    apply(simp only:  clearpc'_def program.simps split:option.splits)
+    print_state
+                   apply(fastforce) apply(fastforce) apply(fastforce)
+      apply(fastforce)      apply(fastforce)      apply(fastforce)      apply(fastforce)
+    apply(fastforce)      apply(fastforce)      apply(fastforce)      apply(fastforce)      apply(fastforce)
+       apply(fastforce)       apply(fastforce)    
+     apply(simp only:  split:instruction_result.splits)
+        apply(safe)
+      apply(split if_split_asm) apply(simp)
+       
+       apply(safe)
+    apply(simp add:check_resources_def clearpc'_def)
+              apply(fastforce)
+             apply(simp add:check_resources_def clearpc'_def)
+            apply(simp add:check_resources_def clearpc'_def)
+      apply(simp add:check_resources_def clearpc'_def)
+    apply(safe)
+                 apply(fastforce)
+    print_state
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+                 apply(fastforce)
+      apply(fastforce)
+     apply(fastforce)
+    print_state
+    apply(case_tac "aa ! ab", simp)
+    apply(case_tac x2, simp)
+    print_state
+                apply(simp add:check_resources_def clearpc'_def)
+    apply(case_tac nata) apply(simp)
+    apply(safe)
+    print_state
+                        apply(simp)
+    print_state
+    apply(fastforce)
+    print_state
+                apply(simp add:check_resources_def clearpc'_def)
+    print_state
+    apply(simp add:check_resources_def clearpc'_def)
+    apply(simp add:check_resources_def clearpc'_def)
+    apply(simp add:check_resources_def clearpc'_def)
+      apply(simp add:check_resources_def clearpc'_def)
+    apply(safe)
+    apply(simp add:check_resources_def clearpc'_def)
+                apply(simp add:check_resources_def clearpc'_def)
+                apply(safe)
+                apply(simp add:check_resources_def clearpc'_def)
+
+    print_state 
+                apply(simp add:check_resources_def clearpc'_def)
+    print_state
+
+                apply(simp add:check_resources_def clearpc'_def)
+    print_state
+             apply(simp add:check_resources_def clearpc'_def)
+    print_state
+    apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+    apply(fastforce)
+       apply(fastforce)
+      apply(fastforce)
+
+     apply(simp add:check_resources_def clearpc'_def elle_stop.simps)
+    
+    apply(split if_split_asm) apply(simp)
+     apply(simp add:check_resources_def clearpc'_def elle_stop.simps)
+    apply(safe)
+    print_state
+     apply(simp add:check_resources_def clearpc'_def elle_stop.simps)
+    
+        apply(case_tac nata, simp)
+    print_state
+    apply(safe)
+      apply(fastforce)
+
+*)
+(* split if_split_asm ?*)
+
+(*
+    apply(split if_split_asm)
+                apply(simp add:check_resources_def clearpc'_def)
+
+
+
+    print_state
+    apply(auto)
+    print_state
+    apply(unfold clearpc'_def)
+      apply(simp_all)
+    print_state
+      apply(safe)
+    print_state apply(simp) apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce)
+    apply(fastforce) apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce) apply(fastforce)
+    apply(fastforce) apply(fastforce) apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce) apply(fastforce)
+    print_state
+apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce)
+    apply(fastforce) apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce)
+                        apply(fastforce) apply(fastforce) apply(fastforce) apply(fastforce)
+    apply(fastforce) apply(fastforce) apply(fastforce) apply(fastforce)
+apply(fastforce) apply(fastforce) apply(fastforce) apply(fastforce)
+(* maybe now we need the facts about cp_next being None *)
 (*
     apply(case_tac "clearpc' (InstructionContinue vi)")
      apply(simp add:clearpc'_def check_resources_def del:meter_gas_def)
     apply(auto simp del:meter_gas_def)
 *)
 
-    apply(frule_tac qvalid_codegen'_check1)
-      apply(force)
-     apply(force)
+    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(case_tac "index aa ab") apply(simp)
+    apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
+    apply(safe)
+    print_state
+                apply(fastforce)
+    apply(fastforce)
+              apply(fastforce)      apply(fastforce)      apply(fastforce)      apply(fastforce)
+    apply(fastforce)      apply(fastforce)      apply(fastforce)      apply(fastforce)      apply(fastforce)
+     apply(fastforce)
 
+    print_state
+    apply(case_tac "index aa ab") apply(simp)
+    apply(simp) (* interaction required? *)
+    print_state
 
+    apply(safe)
+    print_state
+                        apply(simp_all)
+    apply(safe)
+    print_state
+                        apply(simp_all)
+    apply(safe)
 
+    print_state
+    apply(fastforce)
+                        apply(simp_all)
+    print_state
+*)
+(*
     apply(rotate_tac -6)
     apply(frule_tac ll_valid_q.cases, auto)
 
@@ -2767,6 +3215,7 @@ between program_sem and elle_instD *)
 (* this looks _very_ nice *)
                   apply(simp add:program.defs clearprog'_def clearpc'_def check_resources_def)
              apply(auto)
+*)
   sorry
 
 next
