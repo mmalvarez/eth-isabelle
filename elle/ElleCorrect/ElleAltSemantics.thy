@@ -1717,7 +1717,27 @@ bounded1 *)
     done
 qed
 
-
+lemma program_list_of_lst_validate_jmp1 [rule_format]:
+"((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
+    (! cp adl adr e d x . ll_get_node (a, t) cp = Some ((adl, adr), LJmp e d x) (*\<longrightarrow> adr > adl*) \<longrightarrow>
+    (! il1 . codegen'_check (a,t) = Some il1 \<longrightarrow>
+    (! il2 . program_list_of_lst_validate il1 = Some il2 \<longrightarrow>
+          (? ild . codegen'_check ((adl, adr), LJmp e d x) = Some ild \<and>
+                   (? ild2 . program_list_of_lst_validate ild = Some ild2 \<and>
+                      length il2 > 0 \<and>
+                      length il2 = snd a - fst a \<and>
+                      length ild2 > 0 \<and>
+                      length ild2 = adr - adl (* was fst a *) \<and>
+(* facts about length il2 needed? *)
+                      ild2 ! 0 = il2 ! (adl - fst a) \<and>
+                      ild2 ! (adr - adl - 1) = Pc JUMP \<and> (* is this line right? *)
+                      ild2 ! (adr - adl - 1) = il2 ! (adr - fst a - 1)  \<and>
+                      adr > 1 \<and> adr > adl \<and>
+                      adl \<ge> fst a \<and>
+                      adr > fst a)))))))"
+  apply(insert program_list_of_lst_validate_jmp')
+  apply(force)
+  done
 
 lemma program_list_of_lst_validate_head' :
 "((((a, (t :: ll4t)) \<in> ll_valid_q) \<longrightarrow>
@@ -2695,7 +2715,6 @@ to actually run elle_stop*)
     print_state
 
 
-
 (*      apply(simp only: program_sem.simps irmap.simps  program.simps)
     apply(unfold program_sem.simps) *)
 (* old stuff follows *)
@@ -2759,19 +2778,23 @@ to actually run elle_stop*)
     apply(simp del:elle_instD'.simps program_sem.simps)
     apply(frule_tac valid3'_qvalid)
     apply(frule_tac qvalid_get_node1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
-    apply(frule_tac qvalid_cp_next_None1) apply(auto simp del:elle_instD'.simps program_sem.simps)
+    apply(frule_tac qvalid_cp_next_Some1) apply(auto simp del:elle_instD'.simps program_sem.simps)
     print_state
     apply(frule_tac ll_L_valid_bytes_length) 
     apply(frule_tac qvalid_desc_bounded1) apply(auto simp del:elle_instD'.simps program_sem.simps)
-    apply(case_tac " codegen'_check ((0, targend), ttree)", auto simp del:elle_instD'.simps program_sem.simps)
+    apply(case_tac "program_list_of_lst_validate a")
+    apply(simp del:elle_instD'.simps program_sem.simps)
+    apply(simp del:elle_instD'.simps program_sem.simps)
+
+    apply(case_tac " codegen'_check ((0, tend), ttree)", auto simp del:elle_instD'.simps program_sem.simps)
     apply(case_tac "program_list_of_lst_validate a", auto simp del:elle_instD'.simps program_sem.simps)
-    apply(frule_tac cp = cp and a = "(0, targend)" and t = ttree in program_list_of_lst_validate_head1)
+    apply(frule_tac cp = cp and a = "(0, tend)" and t = ttree in program_list_of_lst_validate_head1)
     (* OK, here we should use Hoare.execution_continue and the fact we just proved about inst_valid *)
         apply(safe)
 
         apply(auto simp del:elle_instD'.simps program_sem.simps)
 
-    apply(rotate_tac -5) apply(drule_tac ll_valid_q.cases)
+    apply(rotate_tac -7) apply(drule_tac ll_valid_q.cases)
         apply(auto simp del:elle_instD'.simps program_sem.simps)
 
     print_state
@@ -2781,15 +2804,106 @@ to actually run elle_stop*)
 (* need lemma for permuting elle_stop and pc_update *)
 (* i think this one isn't quite right though *)
 
-    apply(frule_tac cc = "(clearprog' cc)"
+    apply(frule_tac cc = "(setprog' cc bogus_prog)"
 and cc' = "(cc\<lparr>cctx_program := program.make (\<lambda>i. index aa (nat i)) (int (length aa))\<rparr>)"
 and vcstart = "(vi\<lparr>vctx_pc := int 0\<rparr>)"
 and vcstart' = "(vi\<lparr>vctx_pc := int ab\<rparr>)" (*targstart? *)
 and irfinal = "st'"
 and n = net
-in elle_instD'_correct)         apply(auto simp del:elle_instD'.simps program_sem.simps)
+in elle_instD'_correct) 
+        apply(auto simp del:elle_instD'.simps program_sem.simps)
     print_state
-    sorry
+        apply(simp_all add:clearpc'_def clearprog'_def setprog'_def del:elle_instD'.simps program_sem.simps)
+     apply(simp add:program.simps program.defs del:elle_instD'.simps program_sem.simps)
+     apply(case_tac " inst_code (aa ! ab)")
+      apply(simp) apply(simp)
+
+    (*1 goal. things seem ok up until here *)
+    apply(simp add:program.simps program.defs del:elle_instD'.simps program_sem.simps)
+    apply(case_tac "elle_instD' (aa ! ab) (cc\<lparr>cctx_program := bogus_prog\<rparr>) net
+              (InstructionContinue (vi\<lparr>vctx_pc := 0\<rparr>))")
+      apply(drule_tac x = x1 in spec)
+     apply(simp del:instruction_sem_def next_state_def)
+     apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (cc\<lparr>cctx_program := bogus_prog\<rparr>) (vctx_stack vi) (aa ! ab) net")
+     apply(simp del:instruction_sem_def next_state_def)
+    apply(case_tac "next_state (\<lambda>_. ()) (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>) net
+           (InstructionContinue (vi\<lparr>vctx_pc := int ab\<rparr>))")
+       apply(case_tac "index aa ab")
+        apply(auto simp del:instruction_sem_def next_state_def) (* was auto *)
+    print_state
+    apply(case_tac " check_resources (vi\<lparr>vctx_pc := int ab\<rparr>) (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>)
+            (vctx_stack vi) (Misc STOP) net")
+       apply(simp)
+    apply(simp)
+
+
+    apply(case_tac "check_resources (vi\<lparr>vctx_pc := int ab\<rparr>)
+            (cc\<lparr>cctx_program :=
+                  \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>)
+            (vctx_stack vi) (aa ! ab) net")
+      apply(drule_tac x = act in spec)
+    apply(drule_tac x = vc in spec)
+      apply(drule_tac x = venv in spec)
+    apply(clarify)
+      apply(simp)
+      apply(drule_tac x = nata in spec)
+      apply(case_tac x1) apply(case_tac x1a)
+    apply(clarify)
+      apply(simp)
+    print_state
+
+      apply(drule_tac x = act in spec)
+    apply(drule_tac x = vc in spec)
+      apply(drule_tac x = venv in spec)
+    apply(clarify)
+     apply(simp)
+
+(* final goal *)
+
+    apply(case_tac " check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (cc\<lparr>cctx_program := bogus_prog\<rparr>)
+            (vctx_stack vi) (aa ! ab) net")
+     apply(simp del:instruction_sem_def next_state_def)
+
+    print_state
+    apply(case_tac " next_state (\<lambda>_. ())
+           (cc\<lparr>cctx_program :=
+                 \<lparr>program_content = \<lambda>i. index aa (nat i),
+                    program_length = int (length aa)\<rparr>\<rparr>)
+           net (InstructionContinue (vi\<lparr>vctx_pc := int ab\<rparr>))")
+      apply(simp del:instruction_sem_def next_state_def)
+apply(simp del:instruction_sem_def next_state_def)
+     apply(clarify)
+     apply(case_tac x22) apply(case_tac vc) apply(clarify)
+     apply(simp del:instruction_sem_def next_state_def)
+     apply(frule_tac elle_alt_sem_halted)
+     apply(simp del:instruction_sem_def next_state_def)
+
+    print_state
+    apply(subgoal_tac "index aa ab = Some (aa ! ab)")
+     apply(rule_tac [2] LemExtraDefs.index_simps)
+     defer
+    print_state
+     apply(case_tac "inst_code(aa ! ab)") 
+      apply(simp del:instruction_sem_def next_state_def)
+     apply(simp del:instruction_sem_def next_state_def)
+
+    apply(frule_tac elle_alt_sem_halted)
+    apply(rotate_tac -1) apply(drule_tac x = x21 in spec)
+    apply(rotate_tac -1) apply(drule_tac x = x22 in spec)
+apply(rotate_tac -1) apply(drule_tac x = x23 in spec)
+    apply(auto simp only:)
+     apply(simp del:instruction_sem_def next_state_def)
+    apply(clarify)
+    apply(auto simp only:)
+    print_state
+     apply(simp del:instruction_sem_def next_state_def)
+    print_state
+    apply(case_tac "(next_state (\<lambda>_. ()) (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>) net
+          (InstructionContinue (vi\<lparr>vctx_pc := int ab\<rparr>)))")
+     apply(simp del:instruction_sem_def next_state_def)
+    apply(simp del:instruction_sem_def next_state_def)
+
+    done
 next
   case (3 t cp x e d cc net st st')
   then show ?case 
@@ -2968,8 +3082,9 @@ next
        (in other words, maybe don't need the full generality of the _contents lemma) *)
      apply(split option.split_asm, auto)
      apply(simp add:program.defs clearprog'_def check_resources_def)
-
-    
+    print_state
+    apply(frule_tac program_list_of_lst_validate_jmp1)
+    apply(simp)
     sorry
 next
   case (6 t cpre cj xj ej dj nj cl cc net st st' st'')
