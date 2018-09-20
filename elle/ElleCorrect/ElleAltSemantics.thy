@@ -2622,6 +2622,9 @@ lemma my_exec_continue :
 
 (* TODO: need some kind of eliminators for elle_alt_sem (?) *)
 (* Do we need to somehow generalize the bottom part by a premise about elle_alt_sem of the tail? *)
+(* Idea: restrict to only successful returned results
+(not arbitrary InstructionToEnvironment)
+*)
 theorem elle_alt_correct :
 "elle_alt_sem ((t :: ll4)) cp cc net st st' \<Longrightarrow>
  (t \<in> ll_valid3' \<longrightarrow>
@@ -3075,6 +3078,146 @@ next
      apply(split option.split_asm, auto)
      apply(split option.split_asm, auto)
     apply(case_tac t, auto)
+
+
+(* ensure these are applying to the correct descends fact
+i.e., the JUMP
+*)
+(* we need to apply some additional lemma here (but what exactly?) *)
+    apply(case_tac "codegen'_check ((0, tend), ttree)", simp)
+    apply(simp del:elle_instD'.simps program_sem.simps)
+    apply(frule_tac valid3'_qvalid)
+    apply(frule_tac cp = "ej @ dj" in qvalid_get_node1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
+    print_state
+    apply(rotate_tac 2)
+     apply(frule_tac cp = "ej @ dj" in qvalid_desc_bounded1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
+
+      apply(frule_tac program_list_of_lst_validate_jmp1)
+         apply(auto simp del:elle_instD'.simps program_sem.simps)
+
+       apply(case_tac ild2, auto)
+       apply(case_tac "length (output_address cl) = net", auto)
+       apply(case_tac "output_address cl = []", auto)
+    apply(case_tac "32 < length (output_address cl) ", auto)
+
+    apply(case_tac " program_content (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a))) (int targstart)")
+     apply(auto simp add:program.defs)
+    
+    
+    apply(case_tac "check_resources (vi\<lparr>vctx_pc := int targstart\<rparr>)
+             (st'\<lparr>cctx_program :=
+                    program.make (\<lambda>i. index x2a (nat i))
+                     (int (length x2a))\<rparr>)
+             (vctx_stack vi) (x2a ! targstart) st''")
+    apply(simp add:check_resources_def)
+     apply(auto)
+    print_state
+(* interaction required *)
+    apply(case_tac "x2a ! targstart", auto)
+
+
+(* here we start splitting *)
+      apply(case_tac "vctx_gas vi < 8")
+       apply(auto simp del:elle_instD'.simps program_sem.simps)
+          apply(frule_tac elle_alt_sem_halted) apply(auto)
+
+    apply(case_tac "program_content
+              (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a)))
+              (int targstart)")
+       apply(auto simp del:elle_instD'.simps program_sem.simps)
+      apply(simp add:program.defs)
+
+              apply(simp add:program.defs)
+        apply(auto)
+    print_state
+        apply(case_tac nata, auto)
+    apply(case_tac " index x2a
+                    (nat (int targstart + int (length (inst_code (x2a ! targstart)))))")
+         apply(auto)
+    apply(case_tac " check_resources
+             (vi\<lparr>vctx_stack :=
+                   word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) #
+                   vctx_stack vi,
+                   vctx_pc := int targstart + int (length (inst_code (x2a ! targstart))),
+                   vctx_gas := vctx_gas vi - 3\<rparr>)
+             (st'\<lparr>cctx_program :=
+                    \<lparr>program_content = \<lambda>i. index x2a (nat i),
+                       program_length = int (length x2a)\<rparr>\<rparr>)
+             (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) #
+              vctx_stack vi)
+             (Misc STOP) st''")
+          apply(auto)
+
+          apply(simp add:check_resources_def)
+        apply(case_tac "x2a ! targstart", auto)
+
+          apply(simp add:check_resources_def)
+        apply(case_tac "x2a ! targstart", auto)
+
+        apply(simp add:check_resources_def)
+
+    apply(subgoal_tac 
+"(x2a ! nat (int targstart +
+                        (1 + int (length (output_address cl)))) =
+Pc JUMP)")
+
+         apply(auto)
+        apply(simp add:Int.nat_add_distrib)
+        apply(rotate_tac 14)
+    print_state
+    apply(drule_tac ll_valid_q.cases, auto)
+    print_state
+
+       apply(case_tac nata, auto)
+    apply(case_tac "program_content
+                                     (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a)))
+                                     (int targstart)")
+        apply(simp add:program.defs)
+apply(simp add:program.defs)
+        apply(auto)
+       apply(simp add:check_resources_def)
+    apply(rotate_tac 14)
+    apply(drule_tac ll_valid_q.cases, auto)
+       apply(simp add:Int.nat_add_distrib)
+    apply(auto)
+
+    print_state
+        apply(case_tac " (x2a !
+                   nat (int targstart + (1 + int (length (output_address cl)))))", auto)
+    print_state
+
+       apply(case_tac "length (output_address cl) = net", auto)
+       apply(case_tac "output_address cl = []", auto)
+    apply(case_tac "32 < length (output_address cl) ", auto)
+    apply(case_tac "check_resources (vi\<lparr>vctx_pc := int targstart\<rparr>)
+             (st'\<lparr>cctx_program :=
+                    \<lparr>program_content = \<lambda>i. index x2a (nat i), program_length = int (length x2a)\<rparr>\<rparr>)
+             (vctx_stack vi) (x2a ! targstart) st''")
+    apply(simp)
+    print_state
+    apply(auto)
+       apply(auto simp del:elle_instD'.simps program_sem.simps)
+    print_state
+             apply(simp add:program.defs)
+    print_state
+          apply(case_tac "length (output_address cl) = net", auto)
+          apply(simp split:if_splits)
+          apply(auto)
+          apply(frule_tac elle_alt_sem_halted) apply(auto)
+          apply(simp add:check_resources_def)
+    apply(auto)
+       apply(auto simp del:elle_instD'.simps program_sem.simps)
+
+(* need some other lemma here? *)
+(* validate_jump_targets_spec *)
+      apply(auto)
+        apply(simp del:elle_instD'.simps program_sem.simps)
+       apply(simp del:elle_instD'.simps program_sem.simps)
+
+    apply(case_tac " codegen'_check ((0, tend), ttree)", auto simp del:elle_instD'.simps program_sem.simps)
+    apply(case_tac "program_list_of_lst_validate a", auto simp del:elle_instD'.simps program_sem.simps)
+    apply(frule_tac cp = cp and a = "(0, tend)" and t = ttree in program_list_of_lst_validate_head1)
+
     (* need lemma about how at targstart our instruction is a Jmp *)
     (* need a lemma describing how if our instruction is a Jmp,
        then at a 0 byte offset we have a push
