@@ -2625,6 +2625,12 @@ lemma my_exec_continue :
 (* Idea: restrict to only successful returned results
 (not arbitrary InstructionToEnvironment)
 *)
+
+
+(*
+TODO: we also need to prove a case that if the Elle semantics fails,
+so must the compiled version, even if the resulting states are not the same
+*)
 theorem elle_alt_correct :
 "elle_alt_sem ((t :: ll4)) cp cc net st st' \<Longrightarrow>
  (t \<in> ll_valid3' \<longrightarrow>
@@ -2643,9 +2649,10 @@ that targstart will be greater than or equal to fst (fst t) *)
                (setpc_ir st (targstart  (*- fst (fst t) *))) = 
                    (* fuel can be arbitrary, but we require to compute to a final result *)
                    InstructionToEnvironment act vc venv \<longrightarrow>
+( ! l . act \<noteq> InstructionFail l \<longrightarrow> 
                   (* the issue may have to do with distinguishing between errors? *)
                   (* TODO: in some cases we end up having to compare unloaded programs? *)
-                  setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
+                  setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0)))))))"
 (*  using [[simp_debug]] *)
 (*  using [[simp_trace_new mode=full]] *)
 (*  using [[simp_trace_depth_limit=20]] *)

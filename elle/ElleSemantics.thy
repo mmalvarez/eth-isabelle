@@ -300,6 +300,11 @@ for resource (gas) subtraction, we can then just subtract
 3. Subtract off Gmid gas
 *)
 
+(* NB: the truth is more complicated.
+we need to subtract off Gverylow gas for
+the PUSH_N
+*)
+
 
 (* off by one in checking for stack overflow?
 actually i think this is ok. we need to check for "greater than or equal to 1024" *)
@@ -308,24 +313,24 @@ fun elle_jumpD :: "ellest \<Rightarrow> ellest" where
     (case ellest_ir e of
       InstructionToEnvironment _ _ _ \<Rightarrow> e
     | InstructionContinue v \<Rightarrow>
-        if      (vctx_gas v) < Gmid then
+        if      (vctx_gas v) < Gmid + Gverylow then
           (e \<lparr> ellest_ir := InstructionToEnvironment (ContractFail [OutOfGas]) v None \<rparr>)
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
           (e \<lparr> ellest_ir := InstructionToEnvironment (ContractFail [TooLongStack]) v None \<rparr> )
         else
-          (e \<lparr> ellest_ir := InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>) \<rparr>))"
+          (e \<lparr> ellest_ir := InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - (Gmid + Gverylow)) \<rparr>) \<rparr>))"
 
 fun elle_jumpD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result \<Rightarrow> instruction_result" where
 "elle_jumpD' c n ir =
     (case ir of
       InstructionToEnvironment _ _ _ \<Rightarrow> ir
     | InstructionContinue v \<Rightarrow>
-        if      (vctx_gas v) < Gmid then
+        if      (vctx_gas v) < Gmid + Gverylow then
           (InstructionToEnvironment (ContractFail [OutOfGas]) v None )
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
           (InstructionToEnvironment (ContractFail [TooLongStack]) v None )
         else
-          (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - Gmid) \<rparr>)))"
+          (InstructionContinue (v \<lparr> vctx_gas := (vctx_gas v - (Gmid + Gverylow)) \<rparr>)))"
 
 
 (* FOR JUMPI steps are as follows
@@ -339,7 +344,7 @@ return a Boolean based on whether the item is 0
 
 
 *)
-
+(* again, we also need to push address, so need Gverylow *)
 
 (*
 
@@ -356,14 +361,14 @@ fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest)" where
     (case ellest_ir e of
       InstructionToEnvironment _ _ _ \<Rightarrow> (False, e)
     | InstructionContinue v \<Rightarrow>
-        if      (vctx_gas v) < Ghigh then
+        if      (vctx_gas v) < Ghigh + Gverylow then
           (False, (e \<lparr> ellest_ir := (InstructionToEnvironment (ContractFail [OutOfGas]) v None) \<rparr>))
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
           (False, (e \<lparr> ellest_ir := (InstructionToEnvironment (ContractFail [TooLongStack]) v None) \<rparr>))
         else (case vctx_stack v of
           [] \<Rightarrow> (False, (e \<lparr> ellest_ir := (InstructionToEnvironment (ContractFail [TooShortStack]) v None) \<rparr> ))
           | cond#rest \<Rightarrow>
-           let new_env = (e \<lparr> ellest_ir := (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>)) \<rparr>) in
+           let new_env = (e \<lparr> ellest_ir := (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - (Ghigh + Gverylow)) \<rparr>)) \<rparr>) in
             strict_if (cond =(((word_of_int 0) ::  256 word)))
              (\<lambda> _ . (True, (new_env) ))
              (\<lambda> _  . (False, (new_env)))))"
@@ -373,14 +378,14 @@ fun elle_jumpiD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instructio
     (case ir of
       InstructionToEnvironment _ _ _ \<Rightarrow> (False, ir)
     | InstructionContinue v \<Rightarrow>
-        if      (vctx_gas v) < Ghigh then
+        if      (vctx_gas v) < Ghigh + Gverylow then
           (False, ((InstructionToEnvironment (ContractFail [OutOfGas]) v None) ))
         else if int (List.length(vctx_stack   v)) \<ge> (1024 :: int) then 
           (False, ((InstructionToEnvironment (ContractFail [TooLongStack]) v None) ))
         else (case vctx_stack v of
           [] \<Rightarrow> (False, ((InstructionToEnvironment (ContractFail [TooShortStack]) v None) ))
           | cond#rest \<Rightarrow>
-           let new_env = ((InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - Ghigh) \<rparr>))) in
+           let new_env = ((InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - (Ghigh + Gverylow)) \<rparr>))) in
             strict_if (cond =(((word_of_int 0) ::  256 word)))
              (\<lambda> _ . (True, (new_env) ))
              (\<lambda> _  . (False, (new_env)))))"
