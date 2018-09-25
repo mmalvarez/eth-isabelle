@@ -2126,6 +2126,21 @@ a tight enough bound on value of recursive call
 something about length (output_address cl)? 
 *)
 
+lemma mod_really_obvious :
+"x = y \<Longrightarrow> z mod x = z mod y"
+proof(auto)
+qed
+
+lemma my_pow_add :
+"(a :: nat) > (b :: nat) \<Longrightarrow>
+ (base :: nat) ^ (b) * base ^ (a - b) = base ^ a"  
+  apply(subgoal_tac "base ^ (b + (a - b)) = base ^ a")
+  apply(insert Power.monoid_mult_class.power_add[of base b "(a - b)"])
+  
+   apply(auto)
+  done
+  
+
 (* generalize argument to bin_cat beyond 8? *)
 lemma reconstruct_address_assn_n [rule_format] :
 "(! m . (cl :: nat) mod (2 ^ m) = (nat (bintrunc m (foldl (\<lambda> u . bin_cat u 8) 0 (map uint (output_address cl))))))"
@@ -2187,73 +2202,86 @@ case (2 n)
       apply(simp)
 
 (* final goal *)
+(*
      apply(case_tac "Divides.divmod_nat (Suc nataa) 256")
      apply(simp)
+(* need this case? *)
      apply(case_tac a) apply(simp_all)
 
       defer
+*)
       apply(simp add: Bits_Int.bintr_cat)
       apply(drule_tac x = "Suc nataa" in spec) apply(auto)
-       defer (* easy, mod_less *)
+      defer (* easy, mod_less *)
+
+    apply(case_tac "(m :: nat) \<le> 8", simp)
+       apply(simp add: Orderings.min_absorb1 Orderings.min_absorb2)
+       apply(simp add: Bit_Representation.bintrunc_mod2p)
+       apply(simp add: byteFromNat_def word8FromNat_def)
+       apply(simp add: Word.uint_word_of_int)
+
+       defer (* easy, m < 8 < 256 *)
+
        apply(drule_tac x = "m - 8" in spec)       
-             apply(simp add: Bits_Int.bintr_cat)
-    apply(simp add:bin_cat_assoc)
-       
-       apply(simp)
+       apply(simp add: bintrunc_mod2p)
+       apply(subgoal_tac "min m 8 = 8") apply(simp)
 
-     apply(split prod.splits)
-     apply(split prod.splits)
-    apply(simp)
-     apply(case_tac " Divides.divmod_nat j 256") 
-    apply(simp)
-
-
-
-    apply(subgoal_tac "int nata + 1 = 1 + int nata") apply(simp)
-    apply(fastforce)
-
-
-      apply(cut_tac i = "Suc nata" and k = 256 in zdiv_eq_0_iff)
-      apply(simp)
-      apply(subgoal_tac "nata < 255") (* residual goal should be easy *)
-       apply(subgoal_tac "1 + nata < 256")
-    apply(rotate_tac -1)
-        apply(frule_tac   "Divides.mod_less")
-    apply(subgoal_tac "(1 + int nata) mod 256 = 1 + nata")
+    apply(subgoal_tac
+"
+(foldl (\<lambda>u. bin_cat u 8) 0
+                      (map uint
+                        (rev (case Divides.divmod_nat (Suc nataa) 256 of (0, mo) \<Rightarrow> [byteFromNat mo]
+                              | (Suc n, mo) \<Rightarrow> byteFromNat mo # nat_to_bytes' (Suc n)))) mod
+                     2 ^ (m - 8)) =
+int (Suc nataa mod 2 ^ (m - 8))
+"
+)
          apply(simp)
-       apply(subgoal_tac "(1 +  nata) < 115792089237316195423570985008687907853269984665640564039457584007913129639936")
-          apply(rotate_tac -1) apply(frule_tac Divides.mod_less)
-(*       apply(subgoal_tac "(1 +  int nata) = int (1 + nata)")
-    
+    apply(simp add:bin_cat_num)
+         apply(simp add: Bit_Representation.bintrunc_mod2p)
+         apply(simp add:Divides.divmod_nat_div_mod) apply(auto)
+       apply(simp add: byteFromNat_def word8FromNat_def)
+       apply(simp add: Word.uint_word_of_int)
+       apply(simp add:Divides.zmod_int)
 
-    apply(simp_all)
-*)
-          apply(subgoal_tac "(1 + int nata) mod 
-115792089237316195423570985008687907853269984665640564039457584007913129639936
- = (1 + nata)") apply(simp)
-          apply(unfold Divides.modulo_int_def)
-          apply(simp)
-          apply(auto)
-        apply(drule_tac Int.zdvd_imp_le) apply(simp) apply(simp)
+    apply(subgoal_tac "
+Suc nata mod ((256 * 2 ^ ((m :: nat) - 8))) = (256 * (Suc nata div 256 mod 2 ^ (m - 8))) + (Suc nata) mod 256
+")
+        apply(rule_tac [2] mod_mult2_eq)
+       apply(subgoal_tac "Suc nata mod (256 * 2 ^ (m - 8)) = Suc nata mod 2 ^ m")
+        apply(simp)
+        apply(simp add: Int.nat_add_distrib Int.nat_mult_distrib Divides.nat_mod_distrib
+                        Int.nat_power_eq)
+(* mult2_eq ? should solve it, very nice! *)
+       apply(subgoal_tac "m > 8") apply(rotate_tac -1)
+        apply(drule_tac base = 2 in my_pow_add) apply(simp)
+       apply(simp)
+      apply(simp add: div_eq_0_iff)
+      apply(subgoal_tac "(2 :: nat) ^ m > 256")
+       apply(auto)
 
-    apply(simp add:Int.nat_add_distrib)
-
-    apply(drule_tac "Rings.semidom_divide_class.dvd_div_eq_0_iff")
+      apply(subgoal_tac "m > 8")
+    apply(rotate_tac -1)
+       apply(drule_tac a = 2 in Power.linordered_semidom_class.power_strict_increasing)
+        apply(simp) apply(simp)
       apply(simp)
 
-      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+(* deferred *)
+     apply(simp add: divmod_nat_div_mod) apply(clarsimp)
+
+(* deferred *)
+
+     apply(simp add: divmod_nat_div_mod) apply(clarsimp)
+        apply(simp add: Int.nat_add_distrib Int.nat_mult_distrib Divides.nat_mod_distrib
+                        Int.nat_power_eq)
+    apply(subgoal_tac "(2 ^ m) dvd 256")
+     apply(drule_tac a = "Suc nata" in  Divides.semiring_div_class.mod_mod_cancel)
      apply(simp)
 
-    apply(drule_tac x = "Suc nataa" in spec) apply(auto)
-    apply(subgoal_tac "fst (Divides.divmod_nat (Suc nata) 256) = Suc nataa")
-      apply(frule_tac ElleCompiler.divmod_decrease)
-      apply(simp)
-     apply(simp)
-    apply(simp add: word_ubin.eq_norm)
-
-(* the second iteration is doing bin_cat with length 248 *)
-    apply(simp add:bintr_cat)
-
+    apply(drule_tac a = 2 in Power.comm_semiring_1_class.le_imp_power_dvd)
+    apply(simp)
+    done
+qed
 lemma reconstruct_address_assn :
 "(cl :: nat) mod (2^256) = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)))"
 proof(induction rule:my_nat_strong_induct[of _ cl])
