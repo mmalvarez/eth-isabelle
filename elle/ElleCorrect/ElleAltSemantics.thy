@@ -2036,6 +2036,546 @@ with 1 fuel vs running EVM with higher fuel amounts
 (Hoare.execution_continue looks useful))
 *)
 
+lemma bytetrunc :
+"x < 256 \<Longrightarrow>
+ bintrunc 8 x = x
+"
+  apply(simp add:word_ubin.
+  apply(simp add:bintrunc_def)
+  apply(simp add:bin_last_def bin_rest_def)
+  apply(case_tac "x mod 2 = 1", simp)
+  print_state
+  apply(case_tac "x div 2 mod 2 = 1") apply(simp)
+  apply(case_tac "(x div 2 div 2 mod 2 = 1)") apply(simp)
+     apply(case_tac "(x div 2 div 2 div 2 mod 2 = 1)") apply(simp)
+      apply(case_tac "(x div 2 div 2 div 2 div 2 mod 2 = 1)", simp)
+       apply(case_tac "(x div 2 div 2 div 2 div 2 div 2 mod 2 = 1)", simp)
+        apply(case_tac "(x div 2 div 2 div 2 div 2 div 2 div 2 mod 2 = 1)", simp)
+         apply(case_tac "(x div 2 div 2 div 2 div 2 div 2 div 2 div 2 mod 2 = 1)", simp)
+  print_state
+  print_state
+  sorry
+
+(* need to satisfy the premise of this lemma
+
+however, it may be that this is easy, because we
+know the integer derives from a 256word
+
+Another thing:
+make sure the discrepancy surrounding the
+number of bytes in the address is resolved
+(may not be important to do at this time)
+
+*)
+
+(*
+
+we may still want the version of the induction principle
+from 
+http://siek.blogspot.com/2009/11/strong-induction.html
+
+Nat.measure_induct seems to be stated differently in
+a way that may be annoying.
+
+
+*)
+
+lemma my_nat_strong_induct:
+  assumes H0 : "P 0"
+  and Hless : "(\<And> n . (! j . j < n \<longrightarrow> P j) \<Longrightarrow> P n)"
+shows "P (x :: nat)"
+proof-
+  { fix x
+    have "P x"
+    proof(induction x)
+      case 0
+then show ?case using H0 by auto
+next
+  case (Suc x)
+  then show ?case using Hless nat_less_induct
+    apply(auto)
+    done 
+   
+  qed
+}
+  thus ?thesis by auto
+qed
+
+definition maxEvmValueN :: nat where
+"maxEvmValueN = 115792089237316195423570985008687907853269984665640564039457584007913129639936"
+
+definition maxEvmValueI :: int where
+"maxEvmValueI = 115792089237316195423570985008687907853269984665640564039457584007913129639936"
+
+(*
+lemma reconstruct_address_assn :
+  assumes Acl : "(cl :: nat) < 2 ^ 256"
+  shows " cl = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)))"
+*)
+
+(* TODO: do I instead need to
+
+*)
+
+(* How much of the problem here lies in the fact that
+the version of divmod we are using isn't executable? *)
+(* idea: can we generalize to say that cl mod 2^256 is equal to running RHS? *)
+(* remove rev from the picture here? prove something about nat_to_bytes'? *)
+(* problem: in the recursive case, we don't have
+a tight enough bound on value of recursive call
+something about length (output_address cl)? 
+*)
+
+(* generalize argument to bin_cat beyond 8? *)
+lemma reconstruct_address_assn_n [rule_format] :
+"(! m . (cl :: nat) mod (2 ^ m) = (nat (bintrunc m (foldl (\<lambda> u . bin_cat u 8) 0 (map uint (output_address cl))))))"
+proof(induction rule:my_nat_strong_induct[of _ cl])
+  case 1 then show ?case
+      apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:Divides.divmod_nat_if)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+    apply(simp add: Divides.divmod_nat_zero_left)
+    done
+
+case (2 n)
+  then show ?case
+    apply(auto)
+    apply(case_tac n, auto)
+    apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:Divides.divmod_nat_if)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+     apply(simp add: Divides.divmod_nat_zero_left)
+
+    apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+(* i think the idea is that we need to deal with wrap around *)
+
+      apply(simp add:uint_word_of_int)
+(* need a lemma about results of div *)
+(* div_less *)
+      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+     apply(simp)
+     apply(case_tac "m \<le> 8")
+      apply(frule_tac Orderings.min_absorb1) apply(simp)
+      apply(simp add: bintrunc_mod2p)
+
+      apply(subgoal_tac "2^m dvd 256")
+       apply(frule_tac a = "1+ int nata" in mod_mod_cancel) apply(simp)
+       apply(simp add: "Divides.nat_mod_distrib")
+       apply(simp add: SMT.Suc_as_int)
+       apply(subgoal_tac "0 \<le> 2") apply(rotate_tac -1)
+    apply(frule_tac n = m in "Int.nat_power_eq")
+        apply(simp)
+        apply(presburger)
+       apply(simp)
+      apply(subgoal_tac "2^m dvd 2^8")
+       apply(rule_tac[2] Power.comm_semiring_1_class.le_imp_power_dvd)
+       apply(simp) apply(simp)
+
+     apply(subgoal_tac "min m 8 = 8")
+    apply(simp)
+      apply(simp add: bintrunc_mod2p)
+       apply(simp add: "Divides.nat_mod_distrib")
+      apply(simp add: SMT.Suc_as_int)
+
+(* here, we need to use the fact that int nata + 1 < 256*)
+
+    defer
+      apply(simp)
+
+(* final goal *)
+     apply(case_tac "Divides.divmod_nat (Suc nataa) 256")
+     apply(simp)
+     apply(case_tac a) apply(simp_all)
+
+      defer
+      apply(simp add: Bits_Int.bintr_cat)
+      apply(drule_tac x = "Suc nataa" in spec) apply(auto)
+       defer (* easy, mod_less *)
+       apply(drule_tac x = "m - 8" in spec)       
+             apply(simp add: Bits_Int.bintr_cat)
+    apply(simp add:bin_cat_assoc)
+       
+       apply(simp)
+
+     apply(split prod.splits)
+     apply(split prod.splits)
+    apply(simp)
+     apply(case_tac " Divides.divmod_nat j 256") 
+    apply(simp)
+
+
+
+    apply(subgoal_tac "int nata + 1 = 1 + int nata") apply(simp)
+    apply(fastforce)
+
+
+      apply(cut_tac i = "Suc nata" and k = 256 in zdiv_eq_0_iff)
+      apply(simp)
+      apply(subgoal_tac "nata < 255") (* residual goal should be easy *)
+       apply(subgoal_tac "1 + nata < 256")
+    apply(rotate_tac -1)
+        apply(frule_tac   "Divides.mod_less")
+    apply(subgoal_tac "(1 + int nata) mod 256 = 1 + nata")
+         apply(simp)
+       apply(subgoal_tac "(1 +  nata) < 115792089237316195423570985008687907853269984665640564039457584007913129639936")
+          apply(rotate_tac -1) apply(frule_tac Divides.mod_less)
+(*       apply(subgoal_tac "(1 +  int nata) = int (1 + nata)")
+    
+
+    apply(simp_all)
+*)
+          apply(subgoal_tac "(1 + int nata) mod 
+115792089237316195423570985008687907853269984665640564039457584007913129639936
+ = (1 + nata)") apply(simp)
+          apply(unfold Divides.modulo_int_def)
+          apply(simp)
+          apply(auto)
+        apply(drule_tac Int.zdvd_imp_le) apply(simp) apply(simp)
+
+    apply(simp add:Int.nat_add_distrib)
+
+    apply(drule_tac "Rings.semidom_divide_class.dvd_div_eq_0_iff")
+      apply(simp)
+
+      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+     apply(simp)
+
+    apply(drule_tac x = "Suc nataa" in spec) apply(auto)
+    apply(subgoal_tac "fst (Divides.divmod_nat (Suc nata) 256) = Suc nataa")
+      apply(frule_tac ElleCompiler.divmod_decrease)
+      apply(simp)
+     apply(simp)
+    apply(simp add: word_ubin.eq_norm)
+
+(* the second iteration is doing bin_cat with length 248 *)
+    apply(simp add:bintr_cat)
+
+lemma reconstruct_address_assn :
+"(cl :: nat) mod (2^256) = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)))"
+proof(induction rule:my_nat_strong_induct[of _ cl])
+case 1
+  then show ?case
+    apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:Divides.divmod_nat_if)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+    apply(simp add: Divides.divmod_nat_zero_left)
+    done
+next
+case (2 n)
+  then show ?case
+    apply(auto)
+    apply(case_tac n, auto)
+    apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:Divides.divmod_nat_if)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+     apply(simp add: Divides.divmod_nat_zero_left)
+
+    apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+(* i think the idea is that we need to deal with wrap around *)
+     apply(case_tac "Suc nata < 2 ^ 256") 
+       apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+      apply(simp)
+
+     apply(simp add: bintr_uint)
+      apply(simp add:uint_word_of_int)
+(* need a lemma about results of div *)
+(* div_less *)
+      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+    apply(simp)
+      apply(cut_tac i = "Suc nata" and k = 256 in zdiv_eq_0_iff)
+      apply(simp)
+      apply(subgoal_tac "nata < 255") (* residual goal should be easy *)
+       apply(subgoal_tac "1 + nata < 256")
+    apply(rotate_tac -1)
+        apply(frule_tac   "Divides.mod_less")
+    apply(subgoal_tac "(1 + int nata) mod 256 = 1 + nata")
+         apply(simp)
+       apply(subgoal_tac "(1 +  nata) < 115792089237316195423570985008687907853269984665640564039457584007913129639936")
+          apply(rotate_tac -1) apply(frule_tac Divides.mod_less)
+(*       apply(subgoal_tac "(1 +  int nata) = int (1 + nata)")
+    
+
+    apply(simp_all)
+*)
+          apply(subgoal_tac "(1 + int nata) mod 
+115792089237316195423570985008687907853269984665640564039457584007913129639936
+ = (1 + nata)") apply(simp)
+          apply(unfold Divides.modulo_int_def)
+          apply(simp)
+          apply(auto)
+        apply(drule_tac Int.zdvd_imp_le) apply(simp) apply(simp)
+
+    apply(simp add:Int.nat_add_distrib)
+
+    apply(drule_tac "Rings.semidom_divide_class.dvd_div_eq_0_iff")
+      apply(simp)
+
+      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+     apply(simp)
+
+    apply(drule_tac x = "Suc nataa" in spec) apply(auto)
+    apply(subgoal_tac "fst (Divides.divmod_nat (Suc nata) 256) = Suc nataa")
+      apply(frule_tac ElleCompiler.divmod_decrease)
+      apply(simp)
+     apply(simp)
+    apply(simp add: word_ubin.eq_norm)
+
+(* the second iteration is doing bin_cat with length 248 *)
+    apply(simp add:bintr_cat)
+
+(* need a tighter bound on Suc nata? *)
+
+    apply(case_tac "Divides.divmod_nat (Suc nataa) 256", simp)
+    
+
+
+    apply(cut_tac "Divides.divmod_nat_if"[of "1+nata" "256"])
+
+    apply(safe) apply(simp)
+
+          apply(simp add: transfer_int_nat_functions(2))
+          apply(subgoal_tac "(1 + int nata) mod 
+115792089237316195423570985008687907853269984665640564039457584007913129639936
+ = 1 + nata") apply(simp)
+    apply(simp)
+    apply(subgoal_tac "1 + nata < 
+115792089237316195423570985008687907853269984665640564039457584007913129639936
+")
+            apply(rotate_tac -1) apply(frule_tac Divides.mod_less)
+
+    apply(simp)
+
+    print_state
+qed
+
+
+   apply(simp add:output_address_def)
+   apply(case_tac "Divides.divmod_nat 0 256", auto)
+  apply(case_tac a, auto)
+   apply(simp add:byteFromNat_def word8FromNat_def)
+     apply(simp add: bintr_uint)
+    apply(simp add:uint_word_of_int)
+     apply(cut_tac word_uint.Rep_inverse) apply(simp)
+  apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+  case (1 x)
+  then show ?case
+qed
+  case 0
+  then show ?case
+   apply(simp)
+     apply(simp add:output_address_def)
+    apply(simp add: Divides.divmod_nat_if) apply(simp add:byteFromNat_def word8FromNat_def)
+    done
+next
+  case (Suc cl)
+  then show ?case 
+    apply(simp)
+     apply(simp add:output_address_def)
+  qed
+
+(* nat_measure_induct *)
+
+(* Word.rcat? *)
+lemma reconstruct_address :
+" cl < 2^256 \<Longrightarrow>
+ (cl = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word))))"
+
+
+(* how to prove this?
+induction on the address list? *)
+lemma reconstruct_address :
+"(! cl . cl < 2 ^ 256  \<longrightarrow>
+ cl = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word))) \<longrightarrow>
+ ((Suc cl) mod (2 ^ 256) = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address (Suc cl mod (2^256))))):: 256 word))))) \<Longrightarrow>
+ cl < 2^256 \<Longrightarrow>
+ (cl = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word))))"
+  apply(drule_tac i = 0 and j = cl in Divides.mod_induct)
+     apply(simp)
+     apply(simp add:output_address_def)
+     apply(simp add: Divides.divmod_nat_if) apply(simp add:byteFromNat_def word8FromNat_def)
+    apply(auto)
+  done
+
+
+
+(* induction on x, didn't really work *)
+case Nil
+  then show ?case
+    apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+    done
+next
+  case (Cons a x)
+  then show ?case 
+    apply(auto simp add:output_address_def)
+    apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+     apply(simp add: bintr_uint)
+    apply(simp add:uint_word_of_int)
+     apply(cut_tac word_uint.Rep_inverse) apply(simp)
+  apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+   apply(simp add:Divides.divmod_nat_if)
+     apply(case_tac "cl < 256", auto) apply(rotate_tac 1)
+apply(frule_tac Word_Miscellaneous.nat_mod_eq') 
+   apply (subgoal_tac "int cl mod int 256 = int (cl mod 256)")
+       apply(rule_tac[2] transfer_int_nat_functions(2))
+      apply(auto)
+      apply(subgoal_tac "int cl mod int 115792089237316195423570985008687907853269984665640564039457584007913129639936 = int (cl mod 115792089237316195423570985008687907853269984665640564039457584007913129639936)")
+       apply(rule_tac[2] transfer_int_nat_functions(2))
+      apply(simp)
+
+     apply(case_tac " Divides.divmod_nat (cl - 256) 256", auto)
+
+    apply(case_tac "Divides.divmod_nat (Suc nata) 256", auto)
+    apply(case_tac aa, auto)
+
+      apply(simp add:Divides.transfer_int_nat_functions(2))
+      apply(subgoal_tac "int cl < 115792089237316195423570985008687907853269984665640564039457584007913129639936")
+    apply(rule_tac Divides.transfer_int_nat_functions(2))
+    apply(simp)
+
+
+
+qed
+
+  apply(auto simp add:word_of_int_def output_address_def)
+  apply(case_tac "Divides.divmod_nat cl 256", auto)
+  apply(case_tac a, auto)
+   apply(simp add:byteFromNat_def word8FromNat_def)
+   apply(simp add: bintr_uint)
+   apply(simp add:Divides.divmod_nat_if)
+  apply(case_tac "cl < 256", auto)
+    apply(case_tac [2] "Divides.divmod_nat (cl - 256) 256", auto)
+
+   apply(simp add:Abs_word_inverse)
+   apply(simp add:uint_word_of_int)
+
+  apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+
+   apply (subgoal_tac "int cl mod int 256 = int (cl mod 256)")
+    apply(rule_tac[2] transfer_int_nat_functions(2))
+
+  apply(simp)
+
+   apply (subgoal_tac "int cl mod int 115792089237316195423570985008687907853269984665640564039457584007913129639936 = int (cl mod 115792089237316195423570985008687907853269984665640564039457584007913129639936)")
+  apply(rule_tac[2] transfer_int_nat_functions(2))
+  apply(simp)
+
+(* final goal *)
+   apply(simp add:byteFromNat_def word8FromNat_def)
+
+  apply(case_tac "Divides.divmod_nat (Suc nata) 256", auto)
+  apply(case_tac a, auto)
+
+   apply(simp add:Abs_word_inverse)
+   apply(simp add:uint_word_of_int)
+  apply(simp add:cat_bintr)
+
+  apply(auto simp add:word_of_int_def output_address_def)
+   apply(simp add:byteFromNat_def word8FromNat_def)
+   apply(simp add: bintr_uint)
+  apply(rotate_tac 2)
+   apply(simp add:Divides.divmod_nat_if)
+  apply(case_tac "cl < 256", auto)
+    apply(case_tac [2] "Divides.divmod_nat (cl - 256) 256", auto)
+
+
+  apply(simp add:Word.word.Abs_word_def)
+  apply(subgoal_tac "cl < 
+115792089237316195423570985008687907853269984665640564039457584007913129639936")
+  apply(rotate_tac 2)
+    apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+  apply(simp)
+     apply(auto)
+
+  apply(subgoal_tac "int cl mod
+115792089237316195423570985008687907853269984665640564039457584007913129639936
+= int  cl")
+
+     apply(auto)
+
+  apply(subgoal_tac "cl < 
+115792089237316195423570985008687907853269984665640564039457584007913129639936")
+  apply(rotate_tac 2)
+     apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+     apply(auto)
+
+  apply(subgoal_tac "cl < 
+115792089237316195423570985008687907853269984665640564039457584007913129639936")
+  apply(rotate_tac 2)
+     apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+
+  apply(subgoal_tac "cl < 
+115792089237316195423570985008687907853269984665640564039457584007913129639936")
+  apply(rotate_tac 2)
+     apply(frule_tac Word_Miscellaneous.nat_mod_eq')
+  apply(simp) 
+     apply(auto)
+
+
+   apply(cut_tac a = cl and b = 256 and c = 115792089237316195423570985008687907853269984665640564039457584007913129639936 in Divides.semiring_div_class.mod_mod_cancel)
+  apply(auto)
+  apply(auto)
+  apply(cut_tac a = zmod_int)
+  apply(simp add:SMT.nat_int')
+   apply(cut_tac Word.word.uint_inverse[of "word_of_int (int cl) :: 256 word"])
+  
+  apply(auto)
+
+  apply(simp add: word_ubin.eq_norm)
+  apply(auto simp add:word_of_int_def output_address_def)
+
+  apply(insert Divides.divmod_nat_if[of cl 256])
+  apply(auto simp add:word_of_int_def output_address_def)
+
+    apply(simp add:byteFromNat_def word8FromNat_def)
+   apply(simp add:Word.word.Abs_word_inverse)
+  apply(cut_tac word_ubin.norm_Rep) apply(auto)
+  apply(simp add: Word.word_ubin.norm_norm(2))
+  apply(simp add:Word.unat_bintrunc)
+
+  apply(case_tac "Divides.divmod_nat cl 256")
+  apply(simp add:Divides.divmod_nat_step)
+  apply(case_tac a, auto)
+    apply(simp add:byteFromNat_def word8FromNat_def)
+   apply(simp add:Word.word.Abs_word_inverse)
+    apply(simp add:bintruc_def)
+    apply(simp add:Word.word.Abs_word_invers)
+    apply(case_tac "Suc cl \<le> 256")
+    apply(drule_tac Divides.divmod_nat_step)
+    apply(cut_tac n = 256 and m = "Suc  cl" in Divides.divmod_nat_step)
+    apply(auto)
+  sorry  
+
+lemma reconstruct_address2 :
+"cl = (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))))))"
+proof(induction cl)
+case 0
+  then show ?case 
+    apply(auto simp add:word_of_int_def output_address_def)
+    apply(simp add:Divides.divmod_nat_zero_left)
+    apply(simp add:byteFromNat_def word8FromNat_def)
+    apply(simp add:Word.word.Abs_word_inverse)
+    done
+next
+  case (Suc cl)
+  then show ?case
+    apply(auto simp add:word_of_int_def output_address_def)
+    apply(case_tac "Suc cl \<le> 256")
+    apply(drule_tac Divides.divmod_nat_step)
+    apply(cut_tac n = 256 and m = "Suc  cl" in Divides.divmod_nat_step)
+    apply(auto)
+  qed
+
 
 
 (* idea: use clearprog' *)
@@ -2630,7 +3170,14 @@ lemma my_exec_continue :
 (*
 TODO: we also need to prove a case that if the Elle semantics fails,
 so must the compiled version, even if the resulting states are not the same
+
+this should not be too hard to add in, but i'm going to focus on
+the success cases for now.
 *)
+(*
+idea: prove a separate theorem that says
+*)
+
 theorem elle_alt_correct :
 "elle_alt_sem ((t :: ll4)) cp cc net st st' \<Longrightarrow>
  (t \<in> ll_valid3' \<longrightarrow>
@@ -2649,10 +3196,10 @@ that targstart will be greater than or equal to fst (fst t) *)
                (setpc_ir st (targstart  (*- fst (fst t) *))) = 
                    (* fuel can be arbitrary, but we require to compute to a final result *)
                    InstructionToEnvironment act vc venv \<longrightarrow>
-( ! l . act \<noteq> InstructionFail l \<longrightarrow> 
+( ! l . act \<noteq> ContractFail l ) \<longrightarrow> 
                   (* the issue may have to do with distinguishing between errors? *)
                   (* TODO: in some cases we end up having to compare unloaded programs? *)
-                  setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0)))))))"
+                  setpc_ir st' 0 = setpc_ir (InstructionToEnvironment act vc venv) 0))))))"
 (*  using [[simp_debug]] *)
 (*  using [[simp_trace_new mode=full]] *)
 (*  using [[simp_trace_depth_limit=20]] *)
@@ -2854,22 +3401,18 @@ in elle_instD'_correct)
       apply(drule_tac x = act in spec)
     apply(drule_tac x = vc in spec)
       apply(drule_tac x = venv in spec)
-    apply(clarify)
-      apply(simp)
+      apply(auto)
+    print_state
       apply(drule_tac x = nata in spec)
       apply(case_tac x1) apply(case_tac x1a)
     apply(clarify)
       apply(simp)
     print_state
 
-      apply(drule_tac x = act in spec)
-    apply(drule_tac x = vc in spec)
-      apply(drule_tac x = venv in spec)
-    apply(clarify)
-     apply(simp)
 
 (* final goal *)
-
+(* under construction  *)
+(*
     apply(case_tac " check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (cc\<lparr>cctx_program := bogus_prog\<rparr>)
             (vctx_stack vi) (aa ! ab) net")
      apply(simp del:instruction_sem_def next_state_def)
@@ -2896,7 +3439,7 @@ apply(simp del:instruction_sem_def next_state_def)
      apply(case_tac "inst_code(aa ! ab)") 
       apply(simp del:instruction_sem_def next_state_def)
      apply(simp del:instruction_sem_def next_state_def)
-
+    print_state
     apply(frule_tac elle_alt_sem_halted)
     apply(rotate_tac -1) apply(drule_tac x = x21 in spec)
     apply(rotate_tac -1) apply(drule_tac x = x22 in spec)
@@ -2914,6 +3457,8 @@ apply(rotate_tac -1) apply(drule_tac x = x23 in spec)
     apply(simp del:instruction_sem_def next_state_def)
 
     done
+*)
+    sorry
 next
   case (3 t cp x e d cc net st st')
   then show ?case 
@@ -3063,9 +3608,14 @@ so that we can minimize the size of these scripts *)
         apply(auto)
 
        apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
-      apply(case_tac "int (length (vctx_stack vi)) \<le> 1024", auto)
-       apply(frule_tac elle_alt_sem_halted) apply(auto)
-       apply(frule_tac elle_alt_sem_halted) apply(auto)
+      apply(case_tac "int (length (vctx_stack vi)) \<le> 1024 \<and> 1 \<le> vctx_gas vi", auto)
+      apply(case_tac "int (length (vctx_stack vi)) \<le> 1024 \<and> 1 \<le> vctx_gas vi", auto)
+
+     apply(frule_tac elle_alt_sem_halted) 
+    apply(case_tac vi) apply(case_tac x1)
+     apply(auto simp add:clearpc'_def)
+(*
+          apply(auto)
 
        apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
     apply(case_tac " int (length (vctx_stack vi)) \<le> 1024", auto)
@@ -3073,6 +3623,7 @@ so that we can minimize the size of these scripts *)
        apply(frule_tac elle_alt_sem_halted) apply(auto)
 
              apply(simp add:program.defs clearprog'_def check_resources_def clearpc'_def)
+*)
     done
 next
   case (5 t cpre cj xj ej dj nj cl cc net st st' st'')
@@ -3083,8 +3634,10 @@ next
      apply(split option.split_asm, auto)
      apply(case_tac fuel, auto)
      apply(split option.split_asm, auto)
-     apply(split option.split_asm, auto)
-    apply(case_tac t, auto)
+     (*apply(split option.split_asm, auto)*) (* this is probably splitting the wrong thing *)
+
+     
+     apply(case_tac t, auto)
 
 
 (* ensure these are applying to the correct descends fact
@@ -3096,7 +3649,7 @@ i.e., the JUMP
     apply(frule_tac valid3'_qvalid)
     apply(frule_tac cp = "ej @ dj" in qvalid_get_node1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
     print_state
-    apply(rotate_tac 2)
+(*   apply(rotate_tac 2) *)
      apply(frule_tac cp = "ej @ dj" in qvalid_desc_bounded1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
 
       apply(frule_tac program_list_of_lst_validate_jmp1)
@@ -3109,22 +3662,54 @@ i.e., the JUMP
 
     apply(case_tac " program_content (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a))) (int targstart)")
      apply(auto simp add:program.defs)
-    
-    
-    apply(case_tac "check_resources (vi\<lparr>vctx_pc := int targstart\<rparr>)
+
+    apply(rotate_tac 18)
+    apply(frule_tac ll_valid_q.cases, auto)
+
+    print_state
+
+    apply(simp add:check_resources_def)
+    apply(case_tac "x2a ! aa", auto)
+
+       apply(case_tac "int (length (vctx_stack vi)) \<le> 1023 \<and> 3 \<le> vctx_gas vi", auto)
+
+    apply(case_tac "program_content (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a))) (int aa)")
+     apply(auto simp add:program.defs)
+
+    apply(case_tac nata, auto)
+    apply(simp add:check_resources_def)
+
+      apply(case_tac "vctx_gas vi < 11")
+       apply(auto simp del:elle_instD'.simps program_sem.simps)
+     apply(frule_tac elle_alt_sem_halted) apply(auto)
+       apply(case_tac "int (length (vctx_stack vi)) \<le> 1023 \<and> 3 \<le> vctx_gas vi", auto)
+
+       apply(case_tac nata, auto)
+        apply(auto simp add:Int.nat_add_distrib)
+
+    apply(case_tac " index x2a (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))))))")
+     apply(auto)
+
+(* need a  lemma relating the address to the result on the stack *)
+
+
+(* old stuff *)
+
+    apply(case_tac "check_resources (vi\<lparr>vctx_pc := int aa\<rparr>)
              (st'\<lparr>cctx_program :=
                     program.make (\<lambda>i. index x2a (nat i))
                      (int (length x2a))\<rparr>)
-             (vctx_stack vi) (x2a ! targstart) st''")
+             (vctx_stack vi) (x2a ! aa) st''")
     apply(simp add:check_resources_def)
-     apply(auto)
+     apply(auto simp add:check_resources_def)
     print_state
 (* interaction required *)
-    apply(case_tac "x2a ! targstart", auto)
+(* doesn't seem to work actually *)
+    apply(case_tac "x2a ! aa", auto)
 
-
+    print_state
 (* here we start splitting *)
-      apply(case_tac "vctx_gas vi < 8")
+      apply(case_tac "vctx_gas vi < 11")
        apply(auto simp del:elle_instD'.simps program_sem.simps)
           apply(frule_tac elle_alt_sem_halted) apply(auto)
 
@@ -3170,7 +3755,7 @@ Pc JUMP)")
 
          apply(auto)
         apply(simp add:Int.nat_add_distrib)
-        apply(rotate_tac 14)
+        apply(rotate_tac 15)
     print_state
     apply(drule_tac ll_valid_q.cases, auto)
     print_state
@@ -3182,12 +3767,13 @@ Pc JUMP)")
         apply(simp add:program.defs)
 apply(simp add:program.defs)
         apply(auto)
-       apply(simp add:check_resources_def)
-    apply(rotate_tac 14)
+          apply(simp add:check_resources_def)
+    print_state
+    apply(rotate_tac 15)
     apply(drule_tac ll_valid_q.cases, auto)
        apply(simp add:Int.nat_add_distrib)
     apply(auto)
-
+    apply(case_tac vi, auto)
     print_state
         apply(case_tac " (x2a !
                    nat (int targstart + (1 + int (length (output_address cl)))))", auto)
