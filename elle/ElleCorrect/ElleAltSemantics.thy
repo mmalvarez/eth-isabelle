@@ -2139,7 +2139,67 @@ lemma my_pow_add :
   
    apply(auto)
   done
-  
+
+
+(* we are using the argument m wrong i think *)
+(* get rid of bintrunc m? *)
+lemma output_address_length_bound [rule_format] :
+"(  (nat ((*bintrunc m*) (foldl (\<lambda> u . bin_cat u 8) 0 (map uint (output_address cl))))) < 8 ^ length (output_address cl))"
+proof(induction rule:my_nat_strong_induct[of _ cl])
+  case 1
+  then show ?case
+    apply(auto simp add:output_address_def)
+apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:Divides.divmod_nat_if)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+    apply(simp add: Divides.divmod_nat_zero_left)
+    done
+next
+  case (2 n)
+  then show ?case    apply(case_tac n, auto)
+      (* proof from case1*)
+    apply(auto simp add:output_address_def)
+apply(split prod.splits) apply(auto)
+    apply(case_tac x1, auto)
+     apply(simp add:Divides.divmod_nat_if)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+    apply(simp add: Divides.divmod_nat_zero_left)
+
+    apply(split prod.splits) apply(auto)
+      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+    apply(simp)
+
+
+    apply(case_tac "Suc nata div 256", auto)
+     apply(simp add:byteFromNat_def word8FromNat_def)
+
+     apply(case_tac "m \<le> 8")
+      apply(frule_tac Orderings.min_absorb1) apply(simp)
+      apply(simp add: bintrunc_mod2p)
+
+      apply(subgoal_tac "2^m dvd 256")
+       apply(frule_tac a = "1+ int nata" in mod_mod_cancel) apply(simp)
+       apply(simp add: "Divides.nat_mod_distrib")
+       apply(simp add: SMT.Suc_as_int)
+       apply(subgoal_tac "0 \<le> 2") apply(rotate_tac -1)
+    apply(frule_tac n = m in "Int.nat_power_eq")
+        apply(simp)
+        apply(presburger)
+       apply(simp)
+      apply(subgoal_tac "2^m dvd 2^8")
+       apply(rule_tac[2] Power.comm_semiring_1_class.le_imp_power_dvd)
+       apply(simp) apply(simp)
+
+     apply(subgoal_tac "min m 8 = 8")
+    apply(simp)
+      apply(simp add: bintrunc_mod2p)
+       apply(simp add: "Divides.nat_mod_distrib")
+      apply(simp add: SMT.Suc_as_int)
+
+    sorry
+qed
+
 
 (* generalize argument to bin_cat beyond 8? *)
 lemma reconstruct_address_gen [rule_format] :
@@ -2283,6 +2343,135 @@ Suc nata mod ((256 * 2 ^ ((m :: nat) - 8))) = (256 * (Suc nata div 256 mod 2 ^ (
     done
 qed
 
+lemma reconstruct_address_gen2 :
+"(cl :: nat) mod (2 ^ 256) = (nat ( (foldl (\<lambda> u . bin_cat u 8) 0 (map uint (output_address cl))) mod (2 ^ 256)))"
+  apply(insert reconstruct_address_gen[of cl 256])
+  apply(simp add:bintrunc_mod2p)
+  done
+
+(* lemma output_address_bounded :
+"length (output_address z) \leq  n \<longrightarrow>
+ z \lt 8 ^ n"*)
+
+(* need this one for next one *)
+(*
+lemma program_list_of_lst_validate_app :
+"program_list_of_list (pre@post) = Some result \<Longrightarrow>
+ (\exists ppre ppost . result = ppre @ ppost \<and>
+    )
+*)
+
+lemma program_list_of_lst_validate_unknown :
+"
+program_list_of_lst_validate (map Unknown ls) = Some (map Unknown ls)"
+proof(induction ls)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons a ls)
+  then show ?case 
+    apply(auto)
+    done
+qed
+
+lemma program_list_of_lst_validate_split2[rule_format] :
+"(! b . program_list_of_lst_validate (a @ b) = None \<longrightarrow>
+    program_list_of_lst_validate a = None \<or>
+    program_list_of_lst_validate b = None)"
+proof(induction a)
+case Nil
+  then show ?case
+    apply(auto)
+    done
+next
+  case (Cons a1 a2)
+  then show ?case
+    apply(auto)
+    apply(drule_tac x = b in spec)
+    apply(case_tac a1, auto)
+     apply(case_tac x10, auto)
+    apply(case_tac x10, auto)
+    done
+
+qed
+
+
+(*lemma program_list_of_lst_validate_pushn :
+"program_list_of_lst l = Some l' \<Longrightarrow>
+ l' ! x = PUSH_N dl \<Longrightarrow>
+ length dl < 32 *)
+(* make this statement about input instead? *)
+(* i think maybe we need to do induction on a list *)
+lemma program_list_of_lst_validate_pushn [rule_format] :
+"(! l' .  x < length l' \<longrightarrow>
+   (! dl . l' ! x = Stack (PUSH_N dl) \<longrightarrow>
+(* Some pref @ l' *)
+   (! l . program_list_of_lst_validate l = Some (l') \<longrightarrow>
+    length dl \<le> 32)))"
+proof(induction x)
+case 0
+  then show ?case 
+    apply(simp)
+    apply(auto) apply(case_tac l, auto)
+    apply(case_tac l', auto)
+    apply(case_tac a, auto split:option.split_asm)
+    apply(case_tac x10)
+      apply(auto split:option.split_asm)
+     apply(case_tac x2, auto)
+    apply(case_tac x2, auto)
+     apply(case_tac "31 < length listb", auto)
+
+    done 
+  next
+  case (Suc x)
+  then show ?case
+    apply(clarsimp)
+    apply(case_tac l, clarsimp)
+    apply(auto)
+    apply(subgoal_tac "program_list_of_lst_validate ([a]@list) = Some l'")
+     apply(drule_tac program_list_of_lst_validate_split, auto)
+    apply(case_tac a', auto)
+
+    apply(case_tac a, simp)
+                apply(auto split:option.split_asm)
+    apply(case_tac x10, simp)
+                apply(auto split:option.split_asm)
+     apply(case_tac x2, auto)
+     apply(case_tac "31 < length lista", auto)
+
+apply(case_tac a, simp)
+                apply(auto split:option.split_asm)
+    apply(case_tac x10, simp)
+                apply(auto split:option.split_asm)
+     apply(case_tac x2, auto)
+    apply(case_tac "31 < length listb", auto)
+
+    apply(drule_tac x = "Unknown a # map Unknown listb @ b'" in spec)
+    apply(auto)
+    apply(drule_tac x = "Unknown a # map Unknown listb @ list" in spec)
+    apply(auto)
+    apply(case_tac "program_list_of_lst_validate (map Unknown listb @ list)")
+     apply(auto)
+
+(* need another splitting lemma for program_list_of_lst_validate *)
+     apply(drule_tac program_list_of_lst_validate_split2)
+     apply(auto)
+     apply(simp add:  program_list_of_lst_validate_unknown)
+
+    apply(drule_tac program_list_of_lst_validate_split)
+    apply(auto)
+    apply(simp add:  program_list_of_lst_validate_unknown)
+    done
+qed
+
+(*
+next up, we need a lemma to bound the size of addresses output
+by output_address based on the length in bytes
+(or express in terms of bintrunc?)
+(another way of looking at this is to prove that if the
+output of output_address is 32 bytes or shorter,
+then the input must have been less than 2^32)
+*)
 
 (* idea: use clearprog' *)
 (* generalize based on whether continuing or ending *)
@@ -3393,14 +3582,141 @@ i.e., the JUMP
        apply(case_tac nata, auto)
         apply(auto simp add:Int.nat_add_distrib)
 
-    apply(case_tac " index x2a (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))))))")
-     apply(auto)
-
+    apply(case_tac " index x2a (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)))")
+    apply(auto)
+    print_state
 (* need a  lemma relating the address to the result on the stack *)
+    apply(simp add:word_of_int_def)
+    apply(simp add:Abs_word_inverse)
+apply(cut_tac cl = cl in "reconstruct_address_gen2")
+    apply(simp add: sym[OF Bit_Representation.bintrunc_mod2p])
+(* descend_eq_lr2, but we need to do a case split on ej @ st first *)
+     apply(case_tac "ej @ dj", clarify) apply(simp)
+    apply(simp)
+    apply(frule_tac kh = ab in ll_descend_eq_l2r)
+    apply(frule_tac validate_jump_targets_spec)
+     apply(simp)
+(* case split on whether cl > 2 ^ 256.
+if it is greater, then we can derive a contradiction from the fact that 
+PUSH_N (output_address cl) is in x2a
+and that x2a passed through program_list_of_lst_validate
+(need an auxiliary result about how if PUSH_N is in a result of
+program_list_of_lst_validate, then the PUSH_N argument has 1-32 bytes
+)
+(then, need a lemma about how if we have a bytestream of 1-32 bytes,
+bincat'ing them will yield a number less than 2^256)
 
+otherwise, we know cl mod 2 ^ 256 = cl
+so we can proceed with the theorem and use the fact that JUMPDEST
+is at cl.
+*)
+    apply(simp) apply(safe)
+(* we need a fact about label/inst *)
+(* something weird is happening here.
+i think we need uniqueness of labels, which comes from
+valid3' of the root *)
+
+(*
+another thought.
+perhaps what we actually need is
+to use list_of_lst_validate_head' on the label,
+so we can prove that the lookup results in a PC Jumpdest
+*)
+
+(* we have a fact about "!" here, but we may need an additional
+fact about index being less than length *)
+(* know aa < length x2a
+we know this b/c of one of our desc_bounded lemmas
+*)
+    apply(simp add:ll_valid3'_def)
+     apply(drule_tac "ll_valid3'p.cases")
+           apply(simp_all)
+
+    print_state
+
+     apply(safe)
+    apply(case_tac "those (map codegen'_check l)")
+      apply (simp) apply(simp)
+
+    print_state
+
+     apply(drule_tac x = "(ej @ st)" in spec) (* need it twice? *)
+     apply(clarsimp)
+     apply(case_tac "k") apply(clarsimp)
+     apply(clarsimp)
+     apply(case_tac "ej @ st", clarsimp)
+     apply(simp)
+(* seems OK here? *)
+(* NB:
+either ej = nil or ab = ae
+*)
+    apply(case_tac "those (map codegen'_check l)")
+      apply (simp) apply(simp)
+
+     apply(safe)
+
+(* need to somehow use the fact that ab = ae
+actually i think we have a contradiction here.
+*)
+(* ej needs to be nil, i'm pretty sure *)
+      apply(case_tac "ll_get_node_list l (ac # lista) ", simp)
+      apply(clarsimp)
+    apply(rename_tac boo)
+      apply(case_tac boo, clarsimp)
+         apply(clarsimp)
+    print_state
+      apply(case_tac ej) apply(simp)
+       apply(case_tac dj) apply(simp)
+    apply(simp) apply(case_tac list, simp)
+(* need to transform get_node_list back into descend? *)
+    apply(frule_tac q = "(0, length x2a)" and e = "ac#lista" in  ll_descend_eq_l2r_list) 
+
+     apply(simp add:ll3'_descend_def)
+
+     apply(safe)
+      apply(simp)
+      apply(rotate_tac -2)
+
+    apply(subgoal_tac "
+
+        (((0, length x2a), llt.LSeq (ac # lista) l),
+        ((a, b), llt.LLab cpre cj), (ae # listb)) \<in> ll3'_descend
+")
+       apply(rotate_tac -1)
+    apply(drule_tac e' = e in ll3'_descend_relabel)
+(* wrong annotation *)
+        apply(simp)
+       apply(drule_tac x = a in spec) apply(rotate_tac -1)
+       apply(drule_tac x = b in spec) apply(rotate_tac -1)
+       apply(drule_tac x = cpre in spec) apply(rotate_tac -1)
+    print_state
+       apply(subgoal_tac "cj = (length ej + length st - Suc 0)")
+        apply(simp add:ll3'_descend_def)
+    print_state
+
+(* "Suc cj = length st"? seems suspicious *)
+(*    apply(safe)
+    apply(simp)
+    apply(drule_tac x = "" in spec)
+       
+       apply(simp)
+    apply(auto)
+
+    apply(simp add:sym[OF reconstruct_address_gen2]) (* need this line? *)
+     apply(frule_tac t = "llt.LSeq er ls" and cp = "er"
+and d = "llt.LLab el idxl" in program_list_of_lst_validate_head1)
+         apply(auto)
+    apply(rotate_tac -3)
+      apply(frule_tac ll_descend_eq_r2l) apply(simp)
+      apply(case_tac " those (map codegen'_check ls)", simp)
+    apply(auto)
+*)
+(* cp next none *)
+(* list of lst validate head is what we need here *)
+(* need a lemma talking about bintrunc'ing the result to 256 bytes *)
 
 (* old stuff *)
-
+(*
     apply(case_tac "check_resources (vi\<lparr>vctx_pc := int aa\<rparr>)
              (st'\<lparr>cctx_program :=
                     program.make (\<lambda>i. index x2a (nat i))
@@ -3527,6 +3843,7 @@ apply(simp add:program.defs)
     print_state
     apply(frule_tac program_list_of_lst_validate_jmp1)
     apply(simp)
+*)
     sorry
 next
   case (6 t cpre cj xj ej dj nj cl cc net st st' st'')
