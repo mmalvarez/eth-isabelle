@@ -2268,12 +2268,13 @@ definition ellecompile :: "ll1 \<Rightarrow> constant_ctx option" where
 (* need a function for dumping an ll4 to a program *)
 
 (* wrap program sem to take in an ellest' *)
+(*
 fun my_program_sem :: "ellest \<Rightarrow> nat \<Rightarrow> ellest" where
 "my_program_sem (ir, cc, net) n =
   ((Evm.program_sem
     (\<lambda> _ . ())
     cc n net ir), cc, net)"
-
+*)
 (*
 
 initial states:

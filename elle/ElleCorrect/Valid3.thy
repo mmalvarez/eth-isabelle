@@ -2627,4 +2627,24 @@ apply(drule_tac x = "[]" in spec)
     apply(drule_tac off' = 0 in gather_ll3_nil_gen2) apply(auto)
     done
 qed
+
+lemma ll_valid3'_desc_full [rule_format] :
+"
+((q, t), (qd, td), k) \<in> ll3'_descend \<Longrightarrow>
+((q, t) \<in> ll_valid3' \<longrightarrow>
+  (qd, td) \<in> ll_valid3')
+"
+proof(induction rule:ll3'_descend.induct)
+case (1 c q e ls t)
+  then show ?case
+    apply(clarsimp)
+    apply(auto simp add:ll_valid3'_child)
+    done
+next
+  case (2 t t' n t'' n')
+  then show ?case
+    apply(clarsimp)
+    done
+qed
+
 end
