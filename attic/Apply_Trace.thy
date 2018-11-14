@@ -187,11 +187,11 @@ let
 
 
 in
- if (can_clear (Proof.theory_of state)) then
-   Proof.refine (Method.Combinator (Method.no_combinator_info,Method.Then, [raw_primitive_text (clear_deps),text,
-	raw_primitive_text (fn thm' => (save_deps (used_facts ctxt thm');join_deps thm thm'))])) state
- else
-   (if (#silent_fail args) then (save_deps [];Proof.refine text state) else error "Apply_Trace theory must be imported to trace applies")
+  if (can_clear (Proof.theory_of state)) then
+    Proof.refine (Method.Combinator (Method.no_combinator_info,Method.Then, [raw_primitive_text (clear_deps),text,
+      raw_primitive_text (fn thm' => (save_deps (used_facts ctxt thm');join_deps thm thm'))])) state
+  else
+    (if (#silent_fail args) then (save_deps [];Proof.refine text state) else error "Apply_Trace theory must be imported to trace applies")
 end
 
 (* Boilerplate from Proof.ML *)
@@ -235,7 +235,7 @@ fun parse_thm_index name =
  *)
 fun adjust_thm_name ctxt (name,index) term =
 let
-  val possible_names = case index of NONE => distinct (op =) [(name, NONE), parse_thm_index name]
+  val possible_names = case index of NONE => distinct (=) [(name, NONE), parse_thm_index name]
                                    | SOME i => [(name,SOME i)]
 
   fun match (n, i) =
@@ -290,7 +290,7 @@ let
 
   val deps = case query of SOME (raw_query,pos) =>
     let
-      val pos' = perhaps (try (Position.advance_offset 1)) pos;
+      val pos' = perhaps (try (Position.advance_offsets 1)) pos;
       val q = Find_Theorems.read_query pos' raw_query;
       val results = Find_Theorems.find_theorems_cmd ctxt (SOME thm) (SOME 1000000000) false q
                     |> snd

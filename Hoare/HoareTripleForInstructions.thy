@@ -1570,13 +1570,7 @@ proof -
   then have "(int pos) mod 2^256 = (uint (max_word :: 256 word))"
     by (simp add: word_of_int_mod)
   then have "pos \<ge> nat (uint (max_word :: 256 word))"
-    (* sledgehammer *)
-    proof -
-    have "(0::int) \<le> 2"
-      by auto
-    then show ?thesis
-      by (metis (no_types) Divides.mod_less_eq_dividend Divides.transfer_nat_int_functions(2) Nat_Transfer.transfer_nat_int_function_closures(4) Nat_Transfer.transfer_nat_int_function_closures(9) \<open>int pos mod 2 ^ 256 = uint max_word\<close> nat_int.Rep_inverse)
-    qed
+    by (metis (full_types) mem_Collect_eq nat_int.Rep nat_le_iff zmod_le_nonneg_dividend)
   then show "(pos :: nat) \<ge> 2 ^ 256 - 1"
     by(simp add: max_word_def)
   qed
@@ -3263,6 +3257,8 @@ memory_range_sep
 code_sep
 sent_data_sep
 sent_value_sep
+logged_sep
+log_number_sep
 
 lemmas constant_diff_simps =
   constant_diff_gas

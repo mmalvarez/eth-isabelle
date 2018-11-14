@@ -31,7 +31,7 @@ lemma log256floor_ge_0:
   apply (induct s rule: log256floor.induct)
   subgoal for x
     by (case_tac "\<not> x \<le> 255")
-       (clarsimp simp: log256floor.simps)+
+       (clarsimp)+
   done
 declare  log256floor.simps[simp del ]
 
@@ -46,8 +46,7 @@ lemma Cgascap_gt_0:
   apply (rule zdiv_le_dividend)
   apply linarith
   apply simp
-done
-(*  by (case_tac " b = 0" ; auto simp:L_def gas_simps)+*)
+  done
 
 lemma Ccall_gt_0:
   "0 < Ccall s0 s1 s2 recipient_empty
@@ -80,9 +79,9 @@ lemma thirdComponentOfC_gt_0:
                 apply (case_tac "s2 = 0" ; auto simp: word_less_def word_neq_0_conv)
                 apply (case_tac "s2 = 0" ; auto simp: word_less_def word_neq_0_conv)
               apply (case_tac "s3 = 0" ; auto simp: word_less_def word_neq_0_conv)
-            apply (case_tac x8; simp add: gas_simps Csstore_def)
-            apply (case_tac x9; simp add: gas_simps Csstore_def)
-           apply (case_tac x10; simp add: gas_simps Csstore_def)
+            apply (case_tac x8; simp add: gas_simps)
+            apply (case_tac x9; simp add: gas_simps)
+           apply (case_tac x10; simp add: gas_simps)
           apply ( case_tac x12; case_tac "s1 = 0"; 
              simp add: gas_simps word_less_def word_neq_0_conv)
          apply (clarsimp split: misc_inst.splits)
@@ -107,7 +106,7 @@ lemma vctx_memory_usage_never_decreases:
   "max 0 (vctx_memory_usage v) \<le> (new_memory_consumption i(max 0 (vctx_memory_usage   v)) (vctx_stack_default(( 0 :: int)) v) (vctx_stack_default(( 1 :: int)) v) (vctx_stack_default(( 2 :: int)) v) (vctx_stack_default(( 3 :: int)) v)
       (vctx_stack_default(( 4 :: int)) v) (vctx_stack_default(( 5 :: int)) v) (vctx_stack_default(( 6 :: int)) v))"
 apply(case_tac i)
-apply(rename_tac x, case_tac x; simp add: new_memory_consumption.simps vctx_stack_default_def M_def max_def)+
+apply(rename_tac x, case_tac x; simp add: vctx_stack_default_def M_def max_def)+
 done
 
 lemma meter_gas_gt_0:
@@ -116,22 +115,21 @@ lemma meter_gas_gt_0:
     inst \<noteq> Misc SUICIDE \<Longrightarrow>
     inst \<notin> range Unknown \<Longrightarrow>
     inst \<notin>  (if before_homestead net then {Misc DELEGATECALL} else {}) \<Longrightarrow>
-program_content (cctx_program const) (vctx_pc var) = Some inst \<Longrightarrow>
    0 < meter_gas inst var const net"
 
   using Cmem_lift[OF
     vctx_memory_usage_never_decreases[where i=inst and v=var]]
   apply (clarsimp simp add: C_def meter_gas_def Cmem_def Gmemory_def Let_def)
   apply(case_tac inst)
-apply( simp add: new_memory_consumption.simps vctx_next_instruction_default_def vctx_next_instruction_def;
-   fastforce  intro: ordered_comm_monoid_add_class.add_nonneg_pos 
-          thirdComponentOfC_gt_0) +
+  (* 13 *)
+  apply(simp add:vctx_next_instruction_default_def vctx_next_instruction_def;
+        fastforce  intro: ordered_comm_monoid_add_class.add_nonneg_pos thirdComponentOfC_gt_0) +
 done
 
 lemma subtract_gas_lower_gas:
    "subtract_gas m k (InstructionContinue var) = InstructionContinue v
     \<Longrightarrow> 0 < m \<Longrightarrow> vctx_gas v < vctx_gas var "
-  by (auto simp add: subtract_gas.simps)
+  by (auto)
 
 lemmas stack_op_simps = stack_0_0_op_def stack_0_1_op_def
    stack_2_1_op_def stack_1_1_op_def stack_3_1_op_def
@@ -144,7 +142,7 @@ lemmas op_simps = mstore8_def mload_def sha3_def
   
 lemmas instruction_sem_simps =
   stack_op_simps instruction_failure_result_def
-  subtract_gas.simps vctx_advance_pc_def
+  vctx_advance_pc_def
   op_simps vctx_update_storage_def
   blocked_jump_def blockedInstructionContinue_def
   strict_if_def vctx_pop_stack_def
@@ -153,27 +151,27 @@ lemmas instruction_sem_simps =
 lemma instruction_sem_not_continuing:
   "\<lbrakk> inst \<in> {Misc STOP, Misc RETURN, Misc SUICIDE} \<union> range Unknown \<rbrakk> \<Longrightarrow>
 \<forall>v. instruction_sem var const inst net \<noteq> InstructionContinue v"
-  apply (case_tac inst; clarsimp simp: instruction_sem_def instruction_failure_result_def subtract_gas.simps)
+  apply (case_tac inst; clarsimp simp: instruction_sem_def instruction_failure_result_def)
   subgoal for opcode 
-   apply (case_tac opcode; simp add: ret_def suicide_def image_def stop_def instruction_sem_def instruction_failure_result_def subtract_gas.simps split:list.splits)
+   apply (case_tac opcode; simp add: ret_def suicide_def image_def stop_def instruction_sem_def instruction_failure_result_def split:list.splits)
    done
   done
 
 lemma instruction_sem_continuing:
   "\<lbrakk> instruction_sem var const inst net = InstructionContinue v \<rbrakk> \<Longrightarrow>
 inst \<notin> {Misc STOP, Misc RETURN, Misc SUICIDE} \<union> range Unknown \<union> (if  before_homestead net then {Misc DELEGATECALL} else {})"
-  apply (case_tac inst; clarsimp simp: instruction_sem_def instruction_failure_result_def subtract_gas.simps)
+  apply (case_tac inst; clarsimp simp: instruction_sem_def instruction_failure_result_def)
   subgoal for opcode
-   apply (case_tac opcode; simp add: ret_def suicide_def image_def stop_def instruction_sem_def instruction_failure_result_def subtract_gas.simps split:list.splits if_split_asm)
+   apply (case_tac opcode; simp add: ret_def suicide_def image_def stop_def instruction_sem_def instruction_failure_result_def split:list.splits if_split_asm)
    done
   done
 
 lemma inst_sem_gas_consume:
   "instruction_sem var const inst net = InstructionContinue v \<Longrightarrow>
-   inst \<notin> {Misc STOP, Misc RETURN, Misc SUICIDE} \<union> range Unknown \<union> (if before_homestead net then {Misc DELEGATECALL} else {}) \<Longrightarrow>
   \<not> vctx_gas var \<le> 0 \<Longrightarrow>
   program_content (cctx_program const) (vctx_pc var) = Some inst \<Longrightarrow>
   vctx_gas v < vctx_gas var"
+  apply (frule instruction_sem_continuing)
   apply (cut_tac meter_gas_gt_0[where inst=inst and var=var and const=const and net=net]; simp)
   apply (simp only: instruction_sem_def)
   apply (case_tac inst; clarsimp)
@@ -194,6 +192,18 @@ lemma inst_sem_gas_consume:
   apply (case_tac "x13"; clarsimp simp: instruction_sem_simps  split: pc_inst.splits option.splits list.splits if_splits)
     done
 
+
+lemma inst_sem_cont_gas_decrease:
+ "instruction_sem var const inst net = InstructionContinue x1
+ \<Longrightarrow> \<not> vctx_gas var \<le> 0
+ \<Longrightarrow> vctx_next_instruction var const = Some inst
+ \<Longrightarrow> meter_gas inst var const net \<le> vctx_gas var
+ \<Longrightarrow> vctx_gas x1 < vctx_gas var"
+     apply (frule instruction_sem_continuing)
+     apply (erule (1) inst_sem_gas_consume)
+  apply (simp add: vctx_next_instruction_def split:option.splits)
+done
+
 termination program_sem_t
   apply (relation "measure (\<lambda>(c,net,ir). nat (case ir of InstructionContinue v \<Rightarrow>  vctx_gas v | _ \<Rightarrow> 0))")
    apply (simp)
@@ -201,12 +211,9 @@ termination program_sem_t
   subgoal for const net var inst
     apply (case_tac "instruction_sem var const inst net" ; simp)
     apply (clarsimp simp add: check_resources_def prod.case_eq_if )
-     apply (frule instruction_sem_continuing)
-     apply (erule (2) inst_sem_gas_consume)
-  apply (simp add: vctx_next_instruction_def split:option.splits)
-    done
-done
-    
+    by (erule inst_sem_cont_gas_decrease)
+ done
+
 lemma program_sem_t_no_gas_not_continuing:
   "\<lbrakk>vctx_gas var \<le> 0 \<rbrakk> \<Longrightarrow>
 \<forall>v. program_sem_t const net (InstructionContinue var) \<noteq> InstructionContinue v"
@@ -219,7 +226,6 @@ lemma program_sem_t_no_gas_not_continuing:
  done
 
 declare program_sem_t.simps[simp del]
-declare next_state_def[simp del]
 
 lemma program_sem_t_imp_program_sem:
   notes if_split[split del]
@@ -245,22 +251,22 @@ lemma program_sem_t_imp_program_sem:
     apply (rule conjI)
      apply clarsimp
      apply (rule exI[where x="Suc 0"])
-     apply (simp add: program_sem.simps next_state_def )
+     apply (simp add: next_state_def )
     apply (rule impI)
     apply (clarsimp split:if_split)
     apply (rule_tac x="Suc k" in exI)
-    apply (simp add: program_sem.simps next_state_def)
+    apply (simp add: next_state_def)
    apply (clarsimp )
    apply (rule exI[where x="Suc 0"])
-   apply (clarsimp simp: program_sem.simps next_state_def)
+   apply (clarsimp simp: next_state_def)
   apply (rule exI[where x="Suc 0"])
-  apply (clarsimp simp: program_sem_t.simps program_sem.simps next_state_def)
+  apply (clarsimp simp: program_sem_t.simps  next_state_def)
   done
   
 lemma program_sem_ItoE :
-"program_sem (\<lambda>_. ()) const k net (InstructionToEnvironment a b c) = InstructionToEnvironment a b c"
-  apply(induct_tac k, simp add: program_sem.simps next_state_def split: if_split)
-  apply(simp add: program_sem.simps next_state_def split: if_split)
+"program_sem stp const k net (InstructionToEnvironment a b c) = InstructionToEnvironment a b c"
+  apply(induct_tac k, simp add: next_state_def split: if_split)
+  apply(simp add: next_state_def split: if_split)
   done
 
 (* perhaps rename this to 'program_sem_no_gas_not_continuing' and 
@@ -270,20 +276,20 @@ lemma program_sem_no_gas_not_continuing' :
 \<forall>k>0. \<forall>v. program_sem (\<lambda>_. ()) c k net (InstructionContinue var) \<noteq> InstructionContinue v"
   apply clarify
   apply(case_tac k, simp)
-  apply (simp add: program_sem.simps next_state_def split: if_split_asm)
+  apply (simp add: next_state_def split: if_split_asm)
   apply (case_tac "vctx_next_instruction var c", simp  split:option.splits)
    apply(simp add: program_sem_ItoE)
-    apply(simp split: if_split_asm)
+  apply(simp split: if_split_asm)
     apply (clarsimp simp add: check_resources_def prod.case_eq_if split:option.split)
     apply(clarsimp simp: vctx_next_instruction_def split:option.splits)
-     apply(simp add: instruction_sem_def stop_def subtract_gas.simps)
+     apply(simp add: instruction_sem_def stop_def)
      apply(simp add: program_sem_ItoE)
     apply(rename_tac inst)
     apply(case_tac "instruction_sem var c inst net")
-      apply(drule instruction_sem_continuing, clarsimp)
-    apply(drule_tac const=c in meter_gas_gt_0[where net=net], assumption+)
-      apply fastforce
-     apply clarsimp
+     apply(drule instruction_sem_continuing, clarsimp)
+     apply (drule (4) meter_gas_gt_0[where net=net and var=var and const=c])
+     apply fastforce
+    apply clarsimp
     apply(simp add: program_sem_ItoE)
    apply(simp add: program_sem_ItoE)
   apply(simp add: program_sem_ItoE)
@@ -316,33 +322,33 @@ theorem program_sem_t_in_program_sem:
     apply(rule conjI)
     apply clarify
     apply(rule exI[where x="Suc 0"])    
-    apply(simp add: program_sem.simps next_state_def split: if_split)
+    apply(simp add: next_state_def split: if_split)
     apply(drule_tac c=c and net=net in program_sem_no_gas_not_continuing')
     apply fastforce
     apply(rule impI, simp)
     apply(erule exE)
     apply(rule_tac x="k + 1" in exI, clarify)
-    apply(simp add: program_sem.simps next_state_def)
+    apply(simp add: next_state_def)
     apply(rule conjI)
      apply(rule allI, rule impI)
      apply(case_tac l, simp)
      apply(rename_tac l')
      apply(drule_tac x=l' in spec, drule mp, simp)
-     apply(simp add: program_sem.simps next_state_def)       
+     apply(simp add: next_state_def)       
     apply(rule allI, rule impI)
-    apply(case_tac l, simp add: program_sem.simps)
+    apply(case_tac l, simp)
     apply(rename_tac l', clarify)
     apply(drule_tac x=l' in spec, drule mp, assumption)   
-    apply(clarsimp simp: program_sem.simps next_state_def)
+    apply(clarsimp simp: next_state_def)
    apply(rule impI)
    apply(rule exI[where x="Suc 0"])  
-   apply(simp add: program_sem.simps next_state_def)
+   apply(simp add: next_state_def)
    apply clarify
    apply(case_tac l, simp)
    apply clarify
-   apply(simp add: program_sem.simps next_state_def)    
+   apply(simp add: next_state_def)    
   apply(simp add: program_sem_ItoE)   
-  apply(simp add: program_sem.simps next_state_def)
+  apply(simp add: next_state_def)
   apply(simp add: program_sem_ItoE program_sem_t.simps)
   apply fastforce
   done

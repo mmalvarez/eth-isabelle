@@ -98,6 +98,7 @@ let rec hex_str_of_bl_inner (acc : string) (bs : Word8.word8 list) : string =
 let hex_string_of_byte_list (prefix : string) (bs : Word8.word8 list) : string =
   prefix^(hex_str_of_bl_inner "" bs)
 
+(*
 let rec be_byte_list_of_big_int_compact_inner (ret : Word8.word8 list) b =
   if Big_int.(eq_big_int zero_big_int b) then ret
   else
@@ -119,19 +120,25 @@ let be_byte_list_of_big_int (target_len : int) (b : Big_int.big_int) =
 let be_byte_list_of_address (w : Word256.word256) : Word8.word8 list =
   be_byte_list_of_big_int 20 (big_int_of_word256 w)
 
+let byte_list_of_big_int (w : Big_int.big_int) : Word8.word8 list =
+  be_byte_list_of_big_int 32 w
+*)
+
 let char_pair_to_word8 (a, b) : Word8.word8 =
-  byte_of_int (int_of_string ("0x" ^ BatString.of_list [a; b]))
+  byte_of_int (int_of_string ("0x" ^ BatString.of_char a ^ BatString.of_char b))
 
 let rec parse_hex_inner result (str : char list) : Word8.word8 list =
   match str with
   | [] -> List.rev result
   | [x] -> failwith "odd-length hex"
   | a :: b :: rest ->
-     parse_hex_inner ((char_pair_to_word8 (a, b)) :: result) rest
+     let v = char_pair_to_word8 (a, b) in
+     parse_hex_inner (v :: result) rest
 
 let parse_hex_string (str : string) : Word8.word8 list =
+  (* let _ = Printf.printf "hx-str: %s\n" str in *)
   let str =
-    if BatString.starts_with "0x" str then
+    if BatString.starts_with str "0x" then
       BatString.tail str 2
     else
       str in
@@ -211,6 +218,9 @@ let string_of_bool_list (lst : bool list) =
 
 let decimal_of_word256 (w : Word256.word256) =
   Big_int.string_of_big_int (big_int_of_word256 w)
+
+let decimal_of_word160 (w : Word160.word160) =
+  Big_int.string_of_big_int (big_int_of_word160 w)
 
 let char_as_byte (c : char) : Word8.word8 =
   byte_of_int (BatChar.code c)

@@ -85,6 +85,9 @@ fun arith_3_1:: "arith_inst \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> 
 			else (\<lambda> i .  word_of_int ( i)) ((Word.uint a * Word.uint b) mod (Word.uint divisor))))"
 | "arith_3_1 _ = (\<lambda> a b c . 0)"
 
+abbreviation
+ "sha3_gas len memu memaddr \<equiv> (Gsha3 + Gsha3word * ((uint len + 31) div 32) - Cmem memu + Cmem (M memu memaddr len))"
+
 inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
   inst_arith_mul :
     "triple_inst_arith net
@@ -186,7 +189,7 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
       (program_counter (n + 1) \<and>* continuing \<and>*
        stack_height (Suc h) \<and>* stack h (arith_3_1 MULMOD u v w) \<and>*
        gas_pred (g - Gmid) \<and>* rest)"
-| inst_iszero :
+| inst_arith_iszero :
     "triple_inst_arith net
       (\<langle> h \<le> 1023 \<and> Gverylow \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
@@ -195,16 +198,34 @@ inductive triple_inst_arith :: "network \<Rightarrow> pred \<Rightarrow> pos_ins
       (program_counter (n + 1) \<and>* continuing \<and>*
        stack_height (Suc h) \<and>* stack h (iszero_stack w) \<and>*
        gas_pred (g - Gverylow) \<and>* rest)"
-(*| inst_exp :(*Written from lem - syntax error*)
+| inst_arith_exp:
     "triple_inst_arith net
-      (\<langle> h \<le> 1022 \<and> Gverylow \<le> g\<rangle> \<and>*
+      (\<langle> h \<le> 1022 \<and> (Gexp + (if w = 0 then 0 else Gexpbyte net * (1 + log256floor (uint w:: int)))) \<le> g\<rangle> \<and>*
        continuing \<and>* program_counter n \<and>*
        stack_height (Suc (Suc h)) \<and>* stack (Suc h) v \<and>* stack h w \<and>*
 			 gas_pred g \<and>* rest)
       (n, Arith EXP)
       (program_counter (n + 1) \<and>* continuing \<and>*
-       stack_height (Suc h) \<and>* stack h (word_of_int (word_exp (uint v) (unat w))) \<and>*
-       gas_pred (g - (Gexp + if w = 0 then 0 else Gexbyte net * (1 + log256floor (uint w:: int)))) \<and>* rest)"*)
+       stack_height (Suc h) \<and>* stack h (word_of_int ((uint v ^ unat w) mod (2 ^  256))) \<and>*
+       gas_pred (g - (Gexp + (if w = 0 then 0 else Gexpbyte net * (1 + log256floor (uint w:: int))))) \<and>* rest)"
+  | inst_arith_sha3:
+    "triple_inst_arith net (\<langle> h \<le> 1022 \<and> unat len = length xs \<and>  0 \<le> memu \<and> sha3_gas len memu memaddr \<le> g\<rangle> \<and>*
+       continuing \<and>* program_counter k \<and>*   
+       stack_height (h+2) \<and>*
+       stack (h+1) memaddr \<and>*
+       stack h len \<and>*
+       memory_usage memu \<and>*
+       memory_range memaddr xs \<and>*
+       gas_pred g \<and>*
+       rest)
+     (k, Arith SHA3)
+    (continuing \<and>* program_counter (k + 1) \<and>*
+     stack_height (h + 1) \<and>*
+     stack h (keccak xs) \<and>*
+     memory_range memaddr xs \<and>*
+     memory_usage (M memu memaddr len) \<and>*
+     gas_pred (g - sha3_gas len memu memaddr) \<and>*
+     rest)"
 
 fun bits_2_1_verylow:: "bits_inst \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> w256" where
  "bits_2_1_verylow BYTE = get_byte"
@@ -437,6 +458,33 @@ inductive triple_inst_info :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<
        stack_height (Suc h) \<and>* gas_pred (g - Gbase) \<and>*
        stack h (ucast c) \<and>* rest)"
 
+definition
+ log_gas :: "int \<Rightarrow> w256 \<Rightarrow> w256 \<Rightarrow> int \<Rightarrow> int" where
+ "log_gas n st sz m = Cmem (M (max 0 m) st sz) - Cmem (max 0 m) + (Glog + Glogdata * uint sz + n * Glogtopic)"
+
+inductive triple_inst_log :: "pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
+ inst_log3:
+   "triple_inst_log
+      (\<langle> h \<le> 1019 \<and> length data = unat logged_size \<and> log_gas 3 logged_start logged_size m \<le> g\<rangle> \<and>*
+       memory_range logged_start data \<and>*
+       this_account this \<and>*
+       log_number n \<and>*
+       gas_pred g \<and>*
+       stack_topmost h [topic2, topic1, topic0, logged_size, logged_start] \<and>*
+       program_counter k \<and>*
+       memory_usage m \<and>*
+       continuing \<and>* rest)
+       (k, Log LOG3)
+      (memory_range logged_start data \<and>*
+       this_account this \<and>*
+       log_number (Suc n) \<and>*
+       logged n \<lparr> log_addr = this, log_topics = [topic0, topic1, topic2], log_data = data \<rparr> \<and>*
+       stack_topmost h [] \<and>*
+       gas_pred (g - log_gas 3 logged_start logged_size m) \<and>*
+       program_counter (k + 1) \<and>*
+       memory_usage (M m logged_start logged_size) \<and>*
+       continuing \<and>* rest)"
+
 inductive triple_inst :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Rightarrow> pred \<Rightarrow> bool" where
   inst_arith :
     "triple_inst_arith net p (n, Arith i) q \<Longrightarrow> triple_inst net p (n, Arith i) q"
@@ -478,6 +526,8 @@ inductive triple_inst :: "network \<Rightarrow> pred \<Rightarrow> pos_inst \<Ri
          stack (h - unat n - 1) w \<and>*
          stack h w \<and>*
          continuing \<and>* rest)"
+| inst_log:
+  "triple_inst_log p (n, Log i) q \<Longrightarrow> triple_inst net p (n, Log i) q"
 | inst_unknown :
     "triple_inst net
 (\<langle> h \<le> 1024 \<and> 0 \<le> g\<rangle> \<and>*
@@ -557,8 +607,22 @@ inductive triple_blocks :: "network \<Rightarrow> basic_blocks \<Rightarrow> pre
   "triple_blocks net blocks p f q \<Longrightarrow>
    (\<And>s. r s \<Longrightarrow> p s) \<Longrightarrow>
    triple_blocks net blocks r f q"
-definition triple :: "network \<Rightarrow> pred \<Rightarrow> basic_blocks \<Rightarrow> pred \<Rightarrow> bool" where
-"triple net pre blocks post = triple_blocks net blocks pre (hd blocks) post"
+definition bbtriple :: "network \<Rightarrow> pred \<Rightarrow> basic_blocks \<Rightarrow> pred \<Rightarrow> bool" where
+"bbtriple net pre blocks post = triple_blocks net blocks pre (hd blocks) post"
+
+lemma blocks_next_ex:
+  "\<lbrakk>triple_seq net pre insts (program_counter i \<and>* q);
+    i = n + inst_size_list insts;
+    block_lookup blocks i = Some (bi, ti);
+    \<exists>r''. triple_blocks net blocks (program_counter i \<and>* q) (i, bi, ti) (post \<and>* r'')\<rbrakk> \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Next) (post \<and>* r)"
+  apply clarsimp
+  apply (drule  blocks_next)
+     apply (rule refl)
+    apply assumption
+   apply assumption
+  apply (erule exI)
+  done
 
 lemma blocks_jumpi_uint:
 "\<lbrakk>  triple_seq net pre insts
@@ -583,6 +647,25 @@ apply(assumption)+
 apply(simp)
 done
 
+lemma blocks_jumpi_uint_ex:
+"\<lbrakk>  triple_seq net pre insts
+      ((\<langle> h \<le> 1022  \<and> Ghigh \<le> g \<and> m \<ge> 0\<rangle> \<and>*
+       stack_height (Suc (Suc h)) \<and>*
+       stack (Suc h) dest \<and>*
+       stack h cond \<and>* gas_pred g \<and>*
+       continuing \<and>* memory_usage m \<and>*
+       program_counter (n + inst_size_list insts) \<and>* rest));
+    j = n + 1 + inst_size_list insts;
+    block_lookup blocks (uint dest) = Some (bi, ti);
+    bi = (uint dest, Pc JUMPDEST) # bbi;
+    block_lookup blocks j = Some (bj, tj);
+    r = (stack_height h \<and>* gas_pred (g - Ghigh) \<and>*
+         continuing \<and>* memory_usage m \<and>* rest);
+    (cond \<noteq> 0 \<Longrightarrow> \<exists>r'. triple_blocks net blocks (r \<and>* program_counter (uint dest)) (uint dest, bi, ti) (post \<and>* r'));
+    (cond = 0 \<Longrightarrow> \<exists>r'. triple_blocks net blocks (r \<and>* program_counter j) (j, bj, tj) (post \<and>* r'))\<rbrakk> \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Jumpi) (post \<and>* r)"
+  by (case_tac "cond = 0"; fastforce dest:blocks_jumpi_uint)
+
 lemma blocks_jump_uint :
   "\<lbrakk>triple_seq net pre insts
       (\<langle> h \<le> 1023 \<and> Gmid \<le> g \<and> m \<ge> 0\<rangle> \<and>*
@@ -598,7 +681,38 @@ lemma blocks_jump_uint :
        continuing \<and>* rest)
       (uint dest, bi, ti) post\<rbrakk> \<Longrightarrow>
    triple_blocks net blocks pre (n, insts, Jump) post"
-by(rule blocks_jump; simp)
+  by(rule blocks_jump; simp)
+
+lemma blocks_jump_uint_ex :
+  "\<lbrakk>triple_seq net pre insts
+      (\<langle> h \<le> 1023 \<and> Gmid \<le> g \<and> m \<ge> 0\<rangle> \<and>*
+       program_counter (n + inst_size_list insts) \<and>* gas_pred g \<and>*
+       memory_usage m \<and>* stack_height (Suc h) \<and>*
+       stack h dest \<and>*
+       continuing \<and>* rest);
+    block_lookup blocks (uint dest) = Some (bi, ti);
+    bi = (uint dest, Pc JUMPDEST) # bbi;
+    \<exists>r'. triple_blocks net blocks
+      (program_counter (uint dest) \<and>* gas_pred (g - Gmid) \<and>*
+       memory_usage m \<and>* stack_height h \<and>*
+       continuing \<and>* rest)
+      (uint dest, bi, ti) (post \<and>* r')\<rbrakk> \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Jump) (post \<and>* r)"
+  apply clarsimp
+  apply (drule (1) blocks_jump_uint)
+    apply (rule refl)
+   apply assumption
+  apply (erule exI)
+  done
+
+
+lemma  blocks_no_ex :
+  "triple_seq net pre insts (post \<and>* r') \<Longrightarrow>
+   \<exists>r. triple_blocks net blocks pre (n, insts, Terminal) (post \<and>* r)"
+  apply (drule blocks_no)
+  apply (rule exI[where x=r'])
+  apply (simp)
+  done
 
 lemma inst_return_memory :
     "triple_inst_misc net

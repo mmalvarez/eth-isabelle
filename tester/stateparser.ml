@@ -14,7 +14,8 @@ module DH = Ecdh (PrimeField)
 module DSA = Ecdsa (PrimeField)
 module F = PrimeField
 
-let curve = PrimeField.lookup_curve "secp256k1"
+
+let curve = PrimeField.lookup_curve "secp256k1" 
 
 let secret_to_address str =
   let sk = Z.of_string_base 16 str in
@@ -59,6 +60,7 @@ type test_case =
   }
 
 let parse_test_case (j : json) : test_case =
+  let _ = Printf.printf "\nstateparser.parse_test_case\n" in
   Util.(
   { env = parse_env (member "env" j)
   ; tr = parse_tr (member "transaction" j)

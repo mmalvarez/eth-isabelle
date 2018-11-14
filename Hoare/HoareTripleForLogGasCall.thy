@@ -9,15 +9,13 @@ context
            sep_crunch_bundle simp_for_triples_bundle
 
 begin
+declare logged_sep[simp]
+
 
 lemma account_existence_not_stack_top [simp] :
   "\<forall> len. AccountExistenceElm x29 \<notin> stack_topmost_elms len ss"
  by (induction ss; auto)
 
-lemma logged_sep [simp]:
-  "(logged n l ** a) s =
-   (LogElm (n, l) \<in> s \<and> a (s - {LogElm (n, l)}))"
-  by (solve_sep_iff simp: logged_def)
     
 lemma memory_range_elms_conjD:
   "memory_range_elms logged_start data \<subseteq> {x. x \<noteq> v \<and> P x} \<Longrightarrow> v \<notin> range MemoryElm  \<Longrightarrow>

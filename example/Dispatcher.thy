@@ -7,72 +7,74 @@ imports
   "../Word_Lib/Word_Lemmas_32"
 begin
 
-definition 
-dispatch1_hash :: "32 word"
-where
-"dispatch1_hash == 0x3ecb5edf"
-
-definition 
-dispatch2_hash :: "32 word"
-where
-"dispatch2_hash == 0x8cd5b077"
-
 lemmas blocks_simps = build_blocks_def byteListInt_def find_block_def blocks_indexes_def build_basic_blocks_def
  aux_basic_block.simps add_address_def block_pt_def
 
-value "parse_bytecode ''90''"
+abbreviation "blk_num \<equiv> block_number_pred"
 
-value"(parse_bytecode ''60606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680633ecb5edf1460475780638cd5b07714607b575b600080fd5b3415605157600080fd5b6065600480803590602001909190505060a1565b6040518082815260200191505060405180910390f35b3415608557600080fd5b608b60ad565b6040518082815260200191505060405180910390f35b6000600190505b919050565b6000600290505b905600a165627a7a72305820c9cf1e9d83721f6f9afecea62b7e868d98502ee8556dcaf6abb24acb8bc0d9fb0029'')"
+lemma address_mask:
+ "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF = mask 160"
+  by (simp add: mask_def)
 
-definition insts_ex where
-"insts_ex == [Stack (PUSH_N [0x60]), Stack (PUSH_N [0x40]), Memory MSTORE, Stack (PUSH_N [0]), Stack CALLDATALOAD,
-  Stack (PUSH_N [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-  Swap 0, Arith DIV, Stack (PUSH_N [0xFF, 0xFF, 0xFF, 0xFF]), Bits inst_AND, Dup 0,
-  Stack (PUSH_N [0x3E, 0xCB, 0x5E, 0xDF]), Arith inst_EQ, Stack (PUSH_N [0x47]), Pc JUMPI, Dup 0,
-  Stack (PUSH_N [0x8C, 0xD5, 0xB0, 0x77]), Arith inst_EQ, Stack (PUSH_N [0x7B]), Pc JUMPI, Pc JUMPDEST,
-  Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST, Info CALLVALUE, Arith ISZERO,
-  Stack (PUSH_N [0x51]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST,
-  Stack (PUSH_N [0x65]), Stack (PUSH_N [4]), Dup 0, Dup 0, Stack CALLDATALOAD, Swap 0,
-  Stack (PUSH_N [0x20]), Arith ADD, Swap 0, Swap 1, Swap 0, Stack POP, Stack POP, Stack (PUSH_N [0xA1]),
-  Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Dup 2, Dup 1, Memory MSTORE,
-  Stack (PUSH_N [0x20]), Arith ADD, Swap 1, Stack POP, Stack POP, Stack (PUSH_N [0x40]), Memory MLOAD,
-  Dup 0, Swap 1, Arith SUB, Swap 0, Misc RETURN, Pc JUMPDEST, Info CALLVALUE, Arith ISZERO,
-  Stack (PUSH_N [0x85]), Pc JUMPI, Stack (PUSH_N [0]), Dup 0, Unknown 0xFD, Pc JUMPDEST,
-  Stack (PUSH_N [0x8B]), Stack (PUSH_N [0xAD]), Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0x40]), Memory MLOAD,
-  Dup 0, Dup 2, Dup 1, Memory MSTORE, Stack (PUSH_N [0x20]), Arith ADD, Swap 1, Stack POP, Stack POP,
-  Stack (PUSH_N [0x40]), Memory MLOAD, Dup 0, Swap 1, Arith SUB, Swap 0, Misc RETURN, Pc JUMPDEST,
-  Stack (PUSH_N [0]), Stack (PUSH_N [1]), Swap 0, Stack POP, Pc JUMPDEST, Swap 1, Swap 0, Stack POP,
-  Pc JUMP, Pc JUMPDEST, Stack (PUSH_N [0]), Stack (PUSH_N [2]), Swap 0, Stack POP, Pc JUMPDEST, Swap 0,
-  Pc JUMP, Misc STOP, Log LOG1, Stack (PUSH_N [0x62, 0x7A, 0x7A, 0x72, 0x30, 0x58]), Arith SHA3,
-  Unknown 0xC9, Unknown 0xCF, Unknown 0x1E, Swap 0xD, Dup 3,
-  Stack (PUSH_N
-          [0x1F, 0x6F, 0x9A, 0xFE, 0xCE, 0xA6, 0x2B, 0x7E, 0x86, 0x8D, 0x98, 0x50, 0x2E, 0xE8, 0x55, 0x6D,
-           0xCA, 0xF6, 0xAB]),
-  Unknown 0xB2, Unknown 0x4A, Unknown 0xCB, Dup 0xB, Unknown 0xC0, Unknown 0xD9, Unknown 0xFB, Misc STOP,
-  Unknown 0x29]"
+lemma address_mask_ucast:
+ "ucast (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF && (ucast (w::address))::w256) = w"
+  apply (simp add: ucast_ucast_mask address_mask ucast_mask_drop word_bool_alg.conj.commute)
+  apply (simp add: mask_def)
+  done
 
-lemma
- "parse_bytecode ''60606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680633ecb5edf1460475780638cd5b07714607b575b600080fd5b3415605157600080fd5b6065600480803590602001909190505060a1565b6040518082815260200191505060405180910390f35b3415608557600080fd5b608b60ad565b6040518082815260200191505060405180910390f35b6000600190505b919050565b6000600290505b905600a165627a7a72305820c9cf1e9d83721f6f9afecea62b7e868d98502ee8556dcaf6abb24acb8bc0d9fb0029'' = insts_ex"
-  unfolding insts_ex_def
-  by eval
+lemma ucast_and_w256_drop:
+ "((ucast (w::address))::w256) && 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF = ucast w"
+  by word_bitwise
 
-definition blocks_ex where
-"blocks_ex == build_blocks insts_ex"
+definition
+  bytestr_to_w256 :: "byte list \<Rightarrow> w256"  where
+ "bytestr_to_w256 \<equiv> word_rcat"
 
-schematic_goal blocks_ex_val:
- " blocks_ex  = ?p"
- by(simp add: ex3_def insts_ex_def  word_rcat_simps Let_def dropWhile.simps blocks_simps next_i_def
-  split:if_splits nat.splits option.splits )
+lemma hash_diff:
+  "ucast (hash::32 word) = (0xa9059cbb::w256) \<Longrightarrow> hash = 0xa9059cbb "
+  "ucast (hash::32 word) = (0x70a08231::w256) \<Longrightarrow> hash = 0x70a08231 "
+  "ucast (hash::32 word) = (0x18160ddd::w256) \<Longrightarrow> hash = 0x18160ddd "
+  by word_bitwise+
 
-context
-notes if_split[ split del ] sep_fun_simps[simp del]
-gas_value_simps[simp add] pure_emp_simps[simp add]
-evm_fun_simps[simp add] sep_lc[simp del] sep_conj_first[simp add]
-pure_false_simps[simp add] iszero_stack_def[simp add]
-begin
+lemma ucast_160_upto_256_eq:
+  " ((ucast (x::160 word))::w256) = ucast y \<Longrightarrow> x = y"
+  by (drule ucast_up_inj; simp)
+
+
+lemma length_word_rsplit_32:
+  "length (word_rsplit (x::w256)::byte list) = 32"
+by(simp add: length_word_rsplit_exp_size' word_size)
+
+lemma word_of_int_hash_not_0:
+"word_of_int
+ (bin_rcat 8
+   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) \<noteq>
+(0::w256)"
+by(simp add: bin_rcat_def bin_cat_def)
+
+lemmas calldataload_simps=
+read_word_from_bytes_def
+byte_list_fill_right_def
+
+lemmas words_simps=
+word_of_int_hash_not_0
+word_rcat_eq
+length_word_rsplit_32
+
+bundle dispatcher_bundle =
+  words_simps[simp add]
+  calldataload_simps[simp add]
+  M_def[simp add]
+  Cmem_def[simp add]
+  if_split[ split del ] sep_fun_simps[simp del]
+  gas_value_simps[simp add] gas_simps[simp] pure_emp_simps[simp add]
+  evm_fun_simps[simp add] sep_lc[simp del] sep_conj_first[simp add]
+  pure_false_simps[simp add] iszero_stack_def[simp add]
+  word256FromNat_def[simp add]
 
 lemma stack_height_not_stack:
-"stack n m s \<Longrightarrow> \<not> stack_height h s"
+  "stack n m s \<Longrightarrow> \<not> stack_height h s"
 by(simp add: stack_height_def stack_def)
 
 lemma memory_elm_not_stack:
@@ -81,9 +83,10 @@ by(simp add: memory8_def stack_def)
 
 lemma memory_range_not_stack:
 "stack n m s \<Longrightarrow> \<not> memory_range h d s"
-apply(induction d arbitrary: h s; simp add: stack_def)
-apply(simp add: memory8_sep)
-done
+  including dispatcher_bundle
+  apply(induction d arbitrary: h s; simp add: stack_def)
+  apply(simp add: memory8_sep)
+  done
 
 lemma memory_not_stack:
 "stack n m s \<Longrightarrow> \<not> memory h d s"
@@ -139,47 +142,19 @@ lemma stack_height_first:
 "(a \<and>* stack_height h \<and>* b) = (stack_height h \<and>* a \<and>* b)"
 by(rule sep.mult.left_commute)
 
+lemma gas_pred_first:
+"(a \<and>* gas_pred g \<and>* b) = (gas_pred g \<and>* a \<and>* b)"
+by(rule sep.mult.left_commute)
+
 lemma stack_first:
 "\<forall>n m s. stack n m s \<longrightarrow> \<not> a s \<Longrightarrow>
 (a \<and>* stack h d \<and>* b) = (stack h d \<and>* a \<and>* b)"
 by(rule sep.mult.left_commute)
 
 method order_sep_conj=
+(simp add: gas_pred_first)?,
 (simp add: stack_first not_stack)?,
 (simp add: stack_height_first)?
-
-method sep_imp_solve =
-(clarsimp?),
-(rule conjI),
-  (clarsimp simp add: word_rcat_simps)?,
-  order_sep_conj?,
-  (sep_cancel, simp?)+,
-  (erule instantiate_emp)?,
-(simp add:word_rcat_simps)?
-value "word_rsplit (0x3ecb5edf::32 word):: byte list"
-find_theorems "size" name:word
-
-lemma length_word_rsplit_32:
-"length (word_rsplit (x::w256)::byte list) = 32"
-by(simp add: length_word_rsplit_exp_size' word_size)
-
-lemma word_of_int_hash_not_0:
-"word_of_int
- (bin_rcat 8
-   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) \<noteq>
-(0::w256)"
-by(simp add: bin_rcat_def bin_cat_def)
-
-
-lemmas calldataload_simps=
-read_word_from_bytes_def
-byte_list_fill_right_def
-
-lemmas words_simps=
-word_of_int_hash_not_0
-word_rcat_eq
-length_word_rsplit_32
 
 method blocks_rule_vcg=
 rule blocks_jumpi_uint |
@@ -187,21 +162,107 @@ rule blocks_jump_uint |
 rule blocks_next |
 rule blocks_no
 
-method block_vcg=
-((blocks_rule_vcg; (rule refl)?), triple_seq_vcg),
-(sep_imp_solve; simp?)+,
-(simp_all add: word_rcat_simps bin_cat_def)?
+method sep_imp_solve uses simp =
+   solves \<open>rule conjI; rule refl\<close>
+ | solves \<open>match conclusion in "block_lookup _ _ = Some _"  \<Rightarrow> \<open>simp add:word_rcat_simps\<close>
+             , (rule conjI, (rule refl)+)\<close>
+ | solves \<open>simp\<close>
+ | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|simp add:simp|rule conjI)+)[1])\<close>
+ | solves \<open>(clarsimp?, order_sep_conj, ((((sep_cancel, clarsimp?)+)|(clarsimp split:if_split simp: simp)|rule conjI)+)[1])\<close>
+ | solves \<open>(clarsimp split:if_splits simp:word_rcat_simps) ; sep_imp_solve \<close>
 
-context
-notes
-  words_simps[simp add]
-  calldataload_simps[simp add]
-  M_def[simp add]
-  Cmem_def[simp add]
-  memory_range.simps[simp del]
-  blocks_ex_def[simp add]
-  insts_ex_def[simp add]
-begin
+method split_conds =
+ (split if_split_asm; clarsimp simp add: word_rcat_simps)?
+
+method block_vcg uses simp=
+  split_conds,
+  ((blocks_rule_vcg; (rule refl)?), triple_seq_vcg),
+  (sep_imp_solve simp:simp)+,
+  (solves \<open>split_conds\<close>)?
+
+method triple_blocks_vcg =
+  (clarsimp simp only: sep_conj_ac(2)[symmetric])?,
+  ((rule blocks_jumpi_uint_ex blocks_jump_uint_ex blocks_no_ex blocks_next_ex); 
+   (clarsimp simp only: sep_conj_ac(2))?),
+  triple_seq_vcg
+
+definition w256 :: "'a::len0 word \<Rightarrow> w256"  where
+ "w256 v \<equiv> ucast v"
+
+definition bytestr :: "'a::len0 word \<Rightarrow> byte list"  where
+ "bytestr \<equiv> word_rsplit"
+
+type_synonym erc20_balances = "address \<rightharpoonup> w256"
+
+definition balance_upd :: "address \<Rightarrow> (w256 \<Rightarrow> w256) \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
+  where
+ "balance_upd addr upd m \<equiv> m(addr \<mapsto> upd (the (m addr)))"
+
+definition
+ transfer :: "address \<Rightarrow> address \<Rightarrow> w256 \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
+ where
+ "transfer from to amount m \<equiv> balance_upd to (\<lambda>v. v + amount) (balance_upd from (\<lambda>v. v - amount) m)"
+
+definition
+ zero :: "address \<Rightarrow> erc20_balances \<Rightarrow> erc20_balances"
+ where
+ "zero addr m \<equiv> m(addr \<mapsto> 0)"
+
+definition
+ balances_mapping :: "address \<Rightarrow> w256"
+ where
+ "balances_mapping addr \<equiv>  keccak (bytestr (w256 addr) @ bytestr (0::w256))"
+
+definition
+ balances_to_storage :: "erc20_balances \<Rightarrow> state_element set \<Rightarrow> bool"
+ where
+ "balances_to_storage m s \<equiv> s = (\<lambda>addr. StorageElm (balances_mapping addr, the (m addr))) ` dom m"
+
+definition
+ addrs_hash_consistency :: "address set \<Rightarrow> bool"
+ where
+ "addrs_hash_consistency s \<equiv>
+   \<forall>a1\<in>s.\<forall>a2 \<in> s. a1 \<noteq> a2 \<longrightarrow> balances_mapping a1 \<noteq> balances_mapping a2"
+
+lemma balances_to_storage_sep':
+ "addrs_hash_consistency (dom m)
+ \<Longrightarrow> m addr = Some v
+ \<Longrightarrow>  balances_to_storage m = (storage (balances_mapping addr) v ** balances_to_storage (m(addr:=None)))"
+  apply (rule ext)
+  apply (rule iffI)
+   apply (clarsimp simp add: sep_basic_simps balances_to_storage_def storage_def)
+   apply (fastforce simp: balances_mapping_def addrs_hash_consistency_def image_def)
+  apply (clarsimp simp: balances_to_storage_def sep_basic_simps  split:if_splits)
+  apply (simp add: image_def storage_def)
+  apply (rule equalityI)
+   apply fastforce
+  apply fastforce
+  done
+
+lemma balances_to_storage_sep:
+ "addrs_hash_consistency (insert addr (dom m))
+ \<Longrightarrow> balances_to_storage (m(addr\<mapsto>v)) = (storage (balances_mapping addr) v ** balances_to_storage (m(addr:=None)))"
+  by (subst  balances_to_storage_sep'[where addr=addr and v=v]; simp)
+
+lemma balances_to_storage_singleton:
+ "a1 \<noteq> a2
+ \<Longrightarrow> balances_to_storage ([a1 \<mapsto> v](a2 := None)) = (storage (balances_mapping a1) v)"
+  apply (rule ext)
+  apply ( simp add: balances_to_storage_def storage_def image_def)
+  done
+
+lemma transfer_sep:
+ "addrs_hash_consistency {a2,a1}
+  \<Longrightarrow> a1 \<noteq> a2
+  \<Longrightarrow> (balances_to_storage (transfer a1 a2 v1 ([a1\<mapsto>v1, a2\<mapsto>v2])) ** R) = (storage (balances_mapping a2) (v2 + v1) \<and>* storage (balances_mapping a1) 0 \<and>* R)"
+  apply (simp add: transfer_def balance_upd_def)
+  apply (sep_simp simp: balances_to_storage_sep)
+  apply simp
+  apply (sep_simp simp: balances_to_storage_sep)
+  apply (simp add: sep_conj_assoc sep_conj_commute)
+  apply (sep_simp simp: balances_to_storage_singleton)
+  apply (simp)+
+  done
 
 lemma length_word_rsplit_4:
 "length (word_rsplit (x::32 word)::byte list) = 4"
@@ -279,8 +340,8 @@ apply(subgoal_tac "f > 0")
  apply(subst wi_hom_mult)
  apply(subst sym[OF word_less_alt[where a="word_of_int (f * 256^n)" and b="word_of_int (uint (2^248::w256))::w256", simplified]])
  apply(subst wi_less[where n="f * 256^n" and m="uint (2^248::w256)" and 'a=256, simplified])
- apply(subgoal_tac "f < 256 ^4"; simp)
-	apply(subst int_mod_eq'[where a="f * 256 ^ n" and b="2^256", simplified]; simp?)
+   apply(subgoal_tac "f < 256 ^4"; simp)
+	apply(subst int_mod_eq'[where l="2^256", simplified]; simp?)
    apply(rule mult_strict_mono[where d="256^28::int" and b=4294967296, simplified]; simp?)
    apply(rule Power.linordered_semidom_class.power_strict_increasing[where N=28 and a=256, simplified], simp)
   apply(rule mult_less_le_imp_less[where d="256^27::int" and b=4294967296, simplified]; simp?)
@@ -366,8 +427,8 @@ apply(subgoal_tac "f > 0")
  apply(subst wi_hom_mult)
  apply(subst sym[OF word_less_alt[where a="word_of_int (f * 256^n)" and b="word_of_int (uint (2^248::w256))::w256", simplified]])
  apply(subst wi_less[where n="f * 256^n" and m="uint (2^248::w256)" and 'a=256, simplified])
- apply(subgoal_tac "f < 256 ^4"; simp)
-	apply(subst int_mod_eq'[where a="f * 256 ^ n" and b="2^256", simplified]; simp?)
+   apply(subgoal_tac "f < 256 ^4"; simp)
+	apply(subst mod_pos_pos_trivial[where l="2^256", simplified]; simp?)
    apply(rule mult_strict_mono[where d="256^28::int" and b=4294967296, simplified]; simp?)
    apply(rule Power.linordered_semidom_class.power_strict_increasing[where N=28 and a=256, simplified], simp)
   apply(rule mult_less_le_imp_less[where d="256^27::int" and b=4294967296, simplified]; simp?)
@@ -564,100 +625,254 @@ method bit_mask_solve=
 (simp add: ucast_def)
 
 lemmas bit_mask_rev = sym[OF bit_mask_def]
+lemma len_bytestr_simps: 
+ "\<And>x. length (bytestr (x::32 word)) = 4"
+ "\<And>x. length (bytestr (x::64 word)) = 8"
+ "\<And>x. length (bytestr (x::256 word)) = 32"
+  by(simp add: bytestr_def length_word_rsplit_exp_size' word_size)+
 
-definition return_action' ::"32 word  \<Rightarrow> contract_action" where
-"return_action' z = 
-  (if z = dispatch1_hash then ContractReturn (word_rsplit (1::w256))
-  else (if z = dispatch2_hash then ContractReturn (word_rsplit (2:: w256))
-  else ContractFail [ShouldNotHappen]))"
-(*
-lemma spec_fail:
-notes bit_mask_rev[simp add]
-shows
-"z \<noteq> dispatch1_hash \<Longrightarrow>
-z \<noteq> dispatch2_hash \<Longrightarrow>
-\<exists>r.
-triple 
-  (
-program_counter 0 ** stack_height 0 ** (sent_data (word_rsplit (z::32 word)::byte list)) ** sent_value 0 **
-   memory_usage 0 ** continuing ** gas_pred 3000 ** memory (word_rcat [64::byte]) (word_rcat [x::byte]::256 word) **
-   memory (word_rcat [96::byte]) (word_rcat [y::byte]::256 word))
-  blocks_ex
-  (action (ContractFail [ShouldNotHappen]) ** r)"
-apply (simp add: blocks_simps triple_def dispatch1_hash_def dispatch2_hash_def)
-apply(rule exI)
-apply(block_vcg; bit_mask_solve)
-apply(block_vcg; bit_mask_solve)
-apply(block_vcg)
-apply(sep_cancel)+
-done
-    
-lemma spec_fun1:
-"\<exists>r.
-triple 
-  (
-program_counter 0 ** stack_height 0 ** (sent_data (word_rsplit (0x3ecb5edf::32 word))) ** sent_value 0 **
-   memory_usage 0 ** continuing ** gas_pred 3000 ** memory (word_rcat [64::byte]) (word_rcat [x::byte]::256 word) **
-   memory (word_rcat [96::byte]) (word_rcat [y::byte]::256 word))
-  blocks_ex
-  (action (ContractReturn (word_rsplit (1:: w256))) ** r)"
-apply (simp add: triple_def blocks_simps)
-apply(rule exI)
-apply(block_vcg)
-apply(block_vcg)
-apply(block_vcg)
-apply(block_vcg)
-apply(block_vcg)
-apply(block_vcg)
-apply(sep_cancel)+
-done
+lemma two_power_of_224:
+ "(0x100000000000000000000000000000000000000000000000000000000::nat) = 2^224"
+  by simp
 
-lemma spec_fun2:
-"\<exists>r.
-triple 
-  (
-program_counter 0 ** stack_height 0 ** (sent_data (word_rsplit (0x8cd5b077::32 word))) ** sent_value 0 **
-   memory_usage 0 ** continuing ** gas_pred 3000 ** memory (word_rcat [64::byte]) (word_rcat [x::byte]::256 word) **
-   memory (word_rcat [96::byte]) (word_rcat [y::byte]::256 word))
-  blocks_ex
-  (action (ContractReturn (word_rsplit (2:: w256))) ** r)"
-apply (simp add: blocks_simps triple_def)
-apply(rule exI)
-apply(block_vcg)
-apply(block_vcg)
-apply(block_vcg)
-apply(block_vcg)
-	apply(block_vcg)
-	apply(block_vcg)+
-apply(sep_cancel)+
-done
 
-lemma verify_dispatcher:
-notes
-  bit_mask_rev[simp add]
-shows
-"\<exists>r. triple 
-  (program_counter 0 ** stack_height 0 ** (sent_data (word_rsplit (z::32 word)::byte list)) ** sent_value 0 **
-   memory_usage 0 ** continuing ** gas_pred 3000 ** memory (word_rcat [64::byte]) (word_rcat [x::byte]::256 word) **
-   memory (word_rcat [96::byte]) (word_rcat [y::byte]::256 word))
-  blocks_ex
-  (action (return_action' z) ** r)"
-apply(simp add: return_action'_def blocks_simps triple_def dispatch1_hash_def dispatch2_hash_def)
-apply(split if_split, rule conjI)
- apply(rule impI, rule exI)
- apply((block_vcg)+)[1]
- apply(sep_cancel)+
-apply(clarsimp simp add: dispatch2_hash_def)
-apply(split if_split, rule conjI)
- apply(rule impI, rule exI)
- apply((block_vcg)+)[1]
- apply(sep_cancel)+
-apply(clarsimp simp add: dispatch2_hash_def)
-apply(rule exI)
-apply((block_vcg; bit_mask_solve?)+)[1]
-apply(sep_cancel)+
-done
+(* *** word_rcat shifts more generally *** *)
+lemma concat_map_take :
+"\<forall>x \<in> set xs. length (f x) = n \<Longrightarrow>
+List.concat (map f (take k xs)) = take (k*n) (List.concat (map f xs))"
+  apply(induct xs arbitrary: k, simp)
+  apply(case_tac k, simp)
+  apply clarsimp
+  done
+
+
+lemma word_rcat_shiftr_take : 
+"length ys = 32 \<Longrightarrow> k \<le> 32 \<Longrightarrow>
+ word_rcat (ys::byte list) >> 8 * k = (word_rcat (take (length ys - k) ys) ::w256)"
+  apply (simp add: word_rcat_bl shiftr_bl)
+  apply (simp add: word_rep_drop size_rcat_lem)
+  apply(subst concat_map_take[where n=8])
+   apply clarsimp
+  apply(subst diff_mult_distrib)
+  apply simp
+  apply(subst Groups.ab_semigroup_mult_class.mult.commute)
+  by(rule refl)
+
+lemma word_rcat_append_shiftr :
+  "length ys + length xs = 32 \<Longrightarrow>
+   word_rcat ((ys::byte list) @ xs) >> (8 * length xs) = (word_rcat ys :: w256)"
+  by(subst word_rcat_shiftr_take, simp_all)
+(* ************************************************ *)  
+
+lemma take_32_of_w256:
+  fixes w1::byte and w2 :: byte and w3 :: byte and w4 :: byte and xs :: "bool list"
+  shows
+ "length xs = 224 \<Longrightarrow> 
+  take 32 (to_bl (of_bl (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4 @ xs) :: 256 word)) =
+   take 32 (to_bl w1 @ to_bl w2 @ to_bl w3 @ to_bl w4)"
+  by (simp add: word_rep_drop)
+
+lemma word_rcat_div_rep0:
+  "length xs = 28 \<Longrightarrow>
+  (word_rcat ([a::byte, b, d, e] @ xs)::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
+   word_rcat [a, b, d, e]"
+  apply (subst word_unat.Rep_inject [symmetric])
+  apply (subst unat_div)
+  apply (simp add: )
+  apply (subst two_power_of_224)
+  apply (subst shiftr_div_2n'[symmetric])
+  apply(subgoal_tac "unat (word_rcat (a # b # d # e # xs) >> 224) = 
+                     unat (word_rcat ([a, b, d, e] @ xs) >> 8 * length xs)")
+   apply(erule ssubst, subst word_rcat_append_shiftr)
+    apply simp
+   apply(rule refl)
+  by simp
+
+lemma word_rcat_word_rsplit_div_rep0:
+  "length xs = 28 \<Longrightarrow>
+  (word_rcat (word_rsplit (w::32 word) @ (xs::byte list))::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
+   word_rcat (word_rsplit w :: byte list)"
+  apply (subst word_unat.Rep_inject [symmetric])
+  apply (subst unat_div)
+  apply (simp add: )
+  apply (subst two_power_of_224)
+  apply (subst shiftr_div_2n'[symmetric])
+  apply(subgoal_tac "unat (word_rcat (word_rsplit w @ xs) >> 224) = 
+                     unat (word_rcat (word_rsplit w @ xs) >> 8 * length xs)")
+   apply(erule ssubst, subst word_rcat_append_shiftr)
+    apply(simp add: length_word_rsplit_4)
+   apply(rule refl)
+  by simp
+
+(* ? ? ? ?
+lemma take_to_bl_of_bl_word_list:
+  fixes w::"'b::len0 word"
+    and w'::"'a::len0 word"
+    and xs :: "bool list"
+  shows
+ "length xs = LENGTH('b) - LENGTH('a) \<Longrightarrow>
+  w = of_bl (to_bl w' @ xs) \<Longrightarrow>
+  LENGTH('b) > LENGTH('a) \<Longrightarrow>
+  take LENGTH('a) (to_bl w) =
+   take LENGTH('a) (to_bl w')"
+  by (simp add: word_rep_drop)
+
+lemma take_32_concat_to_bl_word_rsplit:
+  fixes w :: "32 word"
+  and xs :: "byte list"
+  shows
+  "length xs = 28 \<Longrightarrow>
+    take 32 (to_bl (of_bl (List.concat (map to_bl (word_rsplit w :: byte list)) @ List.concat (map to_bl xs)):: w256)) =
+    List.concat (map to_bl (word_rsplit w :: byte list))"
+  by (simp add:word_rev_tf takefill_alt size_rcat_lem length_word_rsplit_4)
+
+lemma word_rcat_word_rsplit_div_rep0:
+  "length xs = 28 \<Longrightarrow>
+  (word_rcat (word_rsplit (w::32 word) @ (xs::byte list))::w256) div (0x100000000000000000000000000000000000000000000000000000000::w256) =
+   word_rcat (word_rsplit w :: byte list)"
+  apply (subst word_unat.Rep_inject [symmetric])
+  apply (subst unat_div)
+  apply (simp add: )
+  apply (subst two_power_of_224)
+  apply (subst shiftr_div_2n'[symmetric])
+  apply (simp add: word_rcat_bl shiftr_bl)
+  apply (rule arg_cong[where f=of_bl])
+  apply (simp add: take_32_concat_to_bl_word_rsplit)
+  done
 *)
-end
-end
+
+
+lemma w256_mask_32:
+  "(0xFFFFFFFF::w256) = mask 32"
+  by (simp add: mask_def)
+
+lemma unat_ucast:
+  assumes "LENGTH('a) \<le> LENGTH('b)"
+  shows "unat (UCAST ('a::len0\<rightarrow>'b::len) x) = unat x"
+  unfolding ucast_def unat_def
+  apply (subst int_word_uint)
+  apply (subst mod_pos_pos_trivial)
+    apply simp
+   apply (rule lt2p_lem)
+  apply (rule assms)
+   apply simp
+  done
+
+lemma ucast_le_ucast:
+  "LENGTH('a) \<le> LENGTH('b) \<Longrightarrow> (UCAST('a::len0\<rightarrow>'b::len) x \<le> (ucast y)) = (x \<le> y)"
+  by (simp add: word_le_nat_alt unat_ucast)
+
+lemma minus_1_w32:
+  " (-1::32 word) = 0xffffffff"
+  by simp
+
+lemma ucast_32_256_minus_1_eq:
+  "UCAST(32 \<rightarrow> 256) (- 1) = 0xFFFFFFFF"
+  apply (simp add: ucast_def unat_arith_simps unat_def)
+  apply (subst int_word_uint)
+  apply (subst mod_pos_pos_trivial)
+    apply simp
+   apply (clarsimp split: uint_splits)
+  apply (simp add: minus_1_w32)
+  done
+
+lemma ucast_frm_32_le_mask_32:
+ "UCAST(32\<rightarrow>256) z \<le> mask 32"
+  apply (subgoal_tac "mask 32 = UCAST(32\<rightarrow>256) (mask 32)")
+   apply (simp add: ucast_le_ucast mask_32_max_word)
+  apply (simp add: mask_def)
+  apply (simp add: ucast_32_256_minus_1_eq)
+  done
+
+lemma dispatcher_hash_extract:
+ "length xs = 28 \<Longrightarrow>
+  0xFFFFFFFF && word_of_int (uint (word_rcat (bytestr (z::32 word) @ xs) :: w256) div
+      0x100000000000000000000000000000000000000000000000000000000) =
+    (word_rcat (bytestr z)::w256)"
+  apply (simp add: bytestr_def)
+  apply(rule subst[where P="\<lambda>x. _ AND word_of_int x = _"])
+  apply (rule uint_div[where x="word_rcat (word_rsplit z @ xs)"
+        and y="0x100000000000000000000000000000000000000000000000000000000::w256", simplified])
+  apply (subst word_rcat_word_rsplit_div_rep0; simp)
+  apply (simp add: w256_mask_32)
+  apply (subst word_bw_comms(1))
+  apply (simp add: and_mask_eq_iff_le_mask)
+  apply (simp add: word_rcat_rsplit_ucast)
+  apply (simp add: ucast_frm_32_le_mask_32)
+  done
+
+lemma word_rsplit_byte_split:
+"(word_rsplit (w1::w256) :: byte list) =
+       a # aa # ab # ac # ad # ae # af # ag # ah # ai # aj #
+ ak # al # am # an # ao # ap # aq # ar # as # a't # au # av #
+ aw # ax # ay # az # ba # bb # bc # bd # be # lisue  \<Longrightarrow> lisue = []"
+  using length_word_rsplit_32[where x=w1]
+  by simp
+
+lemma memory_range_0_w256_append:
+  "(memory_range 0 (word_rsplit (w1::w256)) \<and>* memory_range 0x20  (word_rsplit (w2::w256))) =
+     memory_range 0 (word_rsplit w1 @ word_rsplit w2)"
+  including dispatcher_bundle
+  apply (rule ext)
+  apply (case_tac "(word_rsplit w1 :: byte list)")
+   apply (simp add: length_0_conv[symmetric])
+  apply (rename_tac list , case_tac list, solves \<open>simp add: list_eq_iff_zip_eq[where xs="word_rsplit _"]\<close>)+
+  apply (simp add:)
+  apply (drule word_rsplit_byte_split)
+  apply simp
+  done
+
+lemma two_memory_memory_range_eq:
+ "(R' \<and>* memory 0x20 w2 \<and>* R  \<and>* memory 0 w1  \<and>* R'') = (memory_range 0 (word_rsplit w1 @ word_rsplit w2) \<and>* R' \<and>* R  \<and>* R'')"
+  by (simp add: memory_def, simp add: ac_simps, sep_simp simp: memory_range_0_w256_append)
+
+lemma  stack_topmost_unfold_sep:
+  "(stack_topmost h [a, b, c, d, e] ** R)
+  = (stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
+  ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
+  apply (unfold stack_topmost_def)
+  apply clarsimp
+  apply (rule ext)
+  apply (rule iffI)
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (rule_tac x="insert (StackElm (Suc (Suc (Suc (Suc h))), e))
+                 (insert (StackElm (Suc (Suc (Suc h)), d))
+                   (insert (StackElm (Suc (Suc h), c))
+                     (insert (StackElm (Suc h, b)) (insert (StackElm (h, a)) y))))" in exI)
+  apply clarsimp
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d),
+                      StackElm (Suc (Suc h), c), StackElm (Suc h, b)} \<union> y" in exI)
+   apply clarsimp
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d),
+                      StackElm (Suc (Suc h), c)} \<union> y" in exI)
+   apply clarsimp
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e), StackElm (Suc (Suc (Suc h)), d) } \<union> y" in exI)
+   apply clarsimp
+  
+   apply (rule conjI)
+    apply blast
+  apply (rule_tac x="{StackElm (Suc (Suc (Suc (Suc h))), e) } \<union> y" in exI)
+ 
+   apply clarsimp
+   apply blast  
+  apply (clarsimp simp add: sep_basic_simps stack_def stack_height_def )
+  apply (drule_tac x=ye in spec)
+  apply blast
+  done
+
+lemma sep_stack_topmost_unfold_sep:
+  "(R' ** stack_topmost h [a, b, c, d, e] ** R)
+  = (R' ** stack_height (Suc (Suc (Suc (Suc (Suc h))))) ** stack h a ** stack (Suc h) b  ** stack (Suc (Suc h)) c** stack (Suc (Suc (Suc h))) d  
+  ** stack (Suc (Suc (Suc (Suc h)))) e ** R)"
+  by (sep_simp simp: stack_topmost_unfold_sep)
+
+lemma memory_range_last:
+ "unat (len::w256) = length data \<Longrightarrow> 
+  (a \<and>* memory_range st data \<and>* b) = (a \<and>* b \<and>*  memory_range st data)"
+ by (sep_simp simp: memory_range_sep)+
+
 end

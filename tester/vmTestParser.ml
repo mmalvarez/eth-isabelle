@@ -90,6 +90,7 @@ type exec =
   }
 
 let parse_exec (j : json) : exec =
+  let _ = Printf.printf "\nParser.parse_exec\n" in
   Util.(
     { address = parse_address_from_field "address" j
     ; caller = parse_address_from_field "caller" j

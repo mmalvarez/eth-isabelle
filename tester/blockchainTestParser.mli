@@ -42,7 +42,7 @@ val parse_transaction : json -> transaction
 
 val format_transaction : transaction -> Easy_format.t
 
-val sender_of_transaction : transaction -> Evm.address
+val sender_of_transaction : transaction -> string -> Evm.address
 
 type block =
   { blockHeader : blockHeader

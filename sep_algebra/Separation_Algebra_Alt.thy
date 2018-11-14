@@ -16,7 +16,7 @@
 chapter "Abstract Separation Logic, Alternative Definition"
 
 theory Separation_Algebra_Alt
-imports "~~/src/HOL/Main"
+imports Main
 begin
 
 text {*
@@ -27,8 +27,8 @@ text {*
   it would look like.
 *}
 
-(* The @{text "++"} notation is a horrible choice, but this theory is 
-   only intended to show how the development would look like, not to 
+(* The @{text "++"} notation is a horrible choice, but this theory is
+   only intended to show how the development would look like, not to
    actually use it. We remove the notation for map-add so it doesn't
    conflict.
 *)

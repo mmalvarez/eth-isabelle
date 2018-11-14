@@ -18,7 +18,7 @@ chapter "Abstract Separation Algebra"
 theory Separation_Algebra
 imports
   Arbitrary_Comm_Monoid
-  "~~/src/Tools/Adhoc_Overloading"
+  "HOL-Library.Adhoc_Overloading"
 begin
 
 text {* This theory is the main abstract separation algebra development *}
@@ -145,7 +145,7 @@ lemma sep_add_zero_sym [simp]: "0 + x = x"
   by (simp add: sep_add_commute)
 
 lemma sep_disj_addD2: "\<lbrakk> x ## y + z; y ## z \<rbrakk> \<Longrightarrow> x ## z"
-  by (metis sep_add_commute sep_disj_addD1 sep_disj_commuteI)  
+  by (metis sep_add_commute sep_disj_addD1 sep_disj_commuteI)
 
 lemma sep_disj_addD: "\<lbrakk> x ## y + z; y ## z \<rbrakk> \<Longrightarrow> x ## y \<and> x ## z"
   by (metis sep_disj_addD1 sep_disj_addD2)
@@ -667,20 +667,20 @@ subclass sep_algebra by standard auto
 
 end
 
-interpretation sep: ab_semigroup_mult "op **"
+interpretation sep: ab_semigroup_mult "( ** )"
   by unfold_locales (simp add: sep_conj_ac)+
 
-interpretation sep: comm_monoid "op **" \<box>
+interpretation sep: comm_monoid "( ** )" \<box>
   by unfold_locales simp
 
-interpretation sep: comm_monoid_mult "op **" \<box>
+interpretation sep: comm_monoid_mult "( ** )" \<box>
   by unfold_locales simp
 
 section {* Folding separating conjunction over lists and sets of predicates *}
 
 definition
   sep_list_conj :: "('a::sep_algebra \<Rightarrow> bool) list \<Rightarrow> ('a \<Rightarrow> bool)"  where
-  "sep_list_conj Ps \<equiv> foldl (op **) \<box> Ps"
+  "sep_list_conj Ps \<equiv> foldl (( ** )) \<box> Ps"
 
 abbreviation
   sep_map_list_conj :: "('b \<Rightarrow> 'a::sep_algebra \<Rightarrow> bool) \<Rightarrow> 'b list \<Rightarrow> ('a \<Rightarrow> bool)"
@@ -721,7 +721,7 @@ syntax (HTML output)
 syntax (latex output)
   "_sep_map_set_conj" :: "pttrn => 'a set => 'b => 'b::comm_monoid_add"    ("(3\<And>\<^sup>*(00\<^bsub>_\<in>_\<^esub>) _)" [0, 51, 10] 10)
 
-translations -- {* Beware of argument permutation! *}
+translations \<comment> \<open>Beware of argument permutation!\<close>
   "SETSEPCONJ x:A. g" == "CONST sep_map_set_conj (%x. g) A"
   "\<And>* x\<in>A. g" == "CONST sep_map_set_conj (%x. g) A"
 
@@ -757,7 +757,7 @@ in [(@{const_syntax sep_map_set_conj}, K setsepconj_tr')] end
 *}
 
 
-interpretation sep: folding "op \<and>*" \<box>
+interpretation sep: folding "(\<and>*)" \<box>
   by unfold_locales (simp add: comp_def sep_conj_ac)
 
 lemma "\<And>* [\<box>,P] = P"
@@ -867,7 +867,7 @@ lemma sep_list_conj_map_add:
 
 
 lemma filter_empty:
-  "x \<notin> set xs \<Longrightarrow> filter (op = x) xs = []"
+  "x \<notin> set xs \<Longrightarrow> filter ((=) x) xs = []"
   by (induct xs, clarsimp+)
 
 lemma filter_singleton:
@@ -989,8 +989,8 @@ lemma sep_map_set_conj_sub_sub_disjoint:
   done
 
 lemma foldl_use_filter_map:
-  "foldl op \<and>* Q (map (\<lambda>x. if T x then P x else \<box>) xs) =
-   foldl op \<and>* Q (map P (filter T xs))"
+  "foldl (\<and>*) Q (map (\<lambda>x. if T x then P x else \<box>) xs) =
+   foldl (\<and>*) Q (map P (filter T xs))"
   by (induct xs arbitrary: Q, simp_all)
 
 lemma sep_list_conj_filter_map:
@@ -1039,7 +1039,7 @@ definition
   precise :: "('a \<Rightarrow> bool) \<Rightarrow> bool" where
   "precise P = (\<forall>h hp hp'. hp \<preceq> h \<and> P hp \<and> hp' \<preceq> h \<and> P hp' \<longrightarrow> hp = hp')"
 
-lemma "precise (op = s)"
+lemma "precise ((=) s)"
   by (metis (full_types) precise_def)
 
 lemma sep_add_cancel:
@@ -1106,8 +1106,8 @@ next
     have "\<forall>Q R. ((Q and R) \<and>* P) (z + hp) = ((Q \<and>* P) and (R \<and>* P)) (z' + hp')"
       by (fastforce simp: h_eq sep_add_ac sep_conj_commute)
 
-    hence "((op = z and op = z') \<and>* P) (z + hp) =
-           ((op = z \<and>* P) and (op = z' \<and>* P)) (z' + hp')" by blast
+    hence "(((=) z and (=) z') \<and>* P) (z + hp) =
+           (((=) z \<and>* P) and ((=) z' \<and>* P)) (z' + hp')" by blast
 
     thus  "hp = hp'" using php php' hpz hpz' h_eq
       by (fastforce dest!: iffD2 cong: conj_cong

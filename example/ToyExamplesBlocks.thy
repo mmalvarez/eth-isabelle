@@ -75,7 +75,9 @@ inst_strengthen_pre[OF inst_arith[OF inst_arith_eq]]
 inst_strengthen_pre[OF inst_arith[OF inst_arith_lt]]
 inst_strengthen_pre[OF inst_arith[OF inst_arith_addmod]]
 inst_strengthen_pre[OF inst_arith[OF inst_arith_mulmod]]
-inst_strengthen_pre[OF inst_arith[OF inst_iszero]]
+inst_strengthen_pre[OF inst_arith[OF inst_arith_iszero]]
+inst_strengthen_pre[OF inst_arith[OF inst_arith_exp]]
+inst_strengthen_pre[OF inst_arith[OF inst_arith_sha3]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_not]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_and]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_and]]
@@ -83,6 +85,7 @@ inst_strengthen_pre[OF inst_bits[OF inst_bits_or]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_xor]]
 inst_strengthen_pre[OF inst_bits[OF inst_bits_byte]]
 inst_strengthen_pre[OF inst_unknown]
+inst_strengthen_pre[OF inst_log[OF inst_log3]]
 
 
 lemma instantiate_emp:

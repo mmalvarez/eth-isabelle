@@ -171,7 +171,7 @@ lemma ex_conj_commute:
   by (simp only: conj_commute)
     
 method exI_pick_last_conj =
-  --\<open>Group all conjs on the left and then commute to get the
+  \<comment> \<open>Group all conjs on the left and then commute to get the
      last conjunction element in first position.\<close>
   (simp (no_asm) only: conj_assoc[symmetric],
    subst ex_conj_commute)?,
@@ -288,6 +288,16 @@ lemma sep_logged:
   "(a ** logged n l) s =
    (LogElm (n, l) \<in> s \<and> a (s - {LogElm (n, l)}))"
   by (solve_sep_iff simp: logged_def)
+
+lemma logged_sep:
+  "(logged n l ** a) s =
+   (LogElm (n, l) \<in> s \<and> a (s - {LogElm (n, l)}))"
+  by (solve_sep_iff simp: logged_def)
+
+lemma log_number_sep:
+  "(log_number n ** R) s =
+   (LogNumElm n \<in> s \<and> R (s - {LogNumElm n}))"
+  by (solve_sep_iff simp: log_number_def)
 
 definition gas_pred :: "int \<Rightarrow> state_element set \<Rightarrow> bool"
   where
@@ -601,6 +611,15 @@ lemma stackElmEquiv: "StackElm (pos, w) \<in> contexts_as_set v c =
   (pos < length (vctx_stack v) \<and> rev (vctx_stack v) ! pos = w)"
 by (auto simp add:context_rw)
 
+lemma logNumElmEquiv: "LogNumElm h \<in> contexts_as_set v c =
+  (length (vctx_logs v) = h)
+  "
+by (auto simp add:context_rw)
+
+lemma logElmEquiv: "LogElm (pos, w) \<in> contexts_as_set v c =
+  (pos < length (vctx_logs v) \<and> rev (vctx_logs v) ! pos = w)"
+by (auto simp add:context_rw)
+
 lemma pcElmEquiv : "PcElm k \<in> contexts_as_set va_ctx co_ctx =
   (vctx_pc va_ctx = k)"
 by (auto simp add:context_rw)
@@ -621,6 +640,8 @@ lemmas stateelm_equiv_simps =
   pcElmEquiv
   gasElmEquiv
   codeElmEquiv
+  logElmEquiv
+  logNumElmEquiv
 
 lemma insert_minus : "a \<noteq> b \<Longrightarrow> insert a s - { b } = insert a (s - {b})"
   apply(simp add: insert_Diff_if)
@@ -1050,6 +1071,8 @@ sep_memory_usage[simp]
 sep_memory_usage_sep[simp]
 stackHeightElmEquiv[simp]
 stackElmEquiv[simp]
+logElmEquiv[simp]
+logNumElmEquiv[simp]
 pcElmEquiv[simp]
 gasElmEquiv[simp]
 codeElmEquiv[simp]

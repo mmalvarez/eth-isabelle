@@ -198,7 +198,7 @@ value "''foobar'' ! 1  :: char"
 
 definition byte_of_char :: "char \<Rightarrow> byte"
 where
-"byte_of_char c = of_nat (String.nat_of_char c)"
+"byte_of_char c = of_nat (String.of_char c)"
 
 declare byte_of_char_def [simp]
 

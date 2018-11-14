@@ -20,6 +20,8 @@ imports "HoareTripleForBasicBlocks"
 "../Word_Lib/Word_Lemmas"
 begin
 
+declare new_memory_consumption.simps[simp del]
+
 lemmas instruction_simps =
 instruction_sem_simps gas_value_simps
 inst_size_simps inst_numbers_simps
@@ -49,6 +51,8 @@ done
 lemma inst_false_pre_sem:
   "triple_inst_sem n \<langle>False\<rangle> i q"
 by(simp add: triple_inst_sem_def sep_basic_simps pure_def)
+
+declare program_sem.simps[simp del]
 
 method inst_sound_set_eq uses simp =
  simp add: triple_inst_sem_def program_sem.simps as_set_simps,
@@ -840,9 +844,135 @@ lemma inst_suicide_sem:
   apply(simp add: mask_def)
  done
 
+lemma inst_arith_sha3_sem:
+  "triple_inst_sem net
+        (\<langle> h \<le> 1022 \<and> unat len = length xs \<and> memu \<ge> 0 \<and> g \<ge> sha3_gas len memu memaddr\<rangle> \<and>*
+         continuing \<and>*
+         program_counter k \<and>*
+         stack_height (Suc (Suc h)) \<and>*
+         stack (Suc h) memaddr \<and>*
+         stack h len \<and>* memory_usage memu \<and>* memory_range memaddr xs \<and>* gas_pred g \<and>* rest)
+        (k, Arith SHA3)
+        (continuing \<and>*
+         program_counter (k + 1) \<and>*
+         stack_height (Suc h) \<and>*
+         stack h (keccak xs) \<and>*
+         memory_range memaddr xs \<and>*
+         memory_usage (M memu memaddr len) \<and>*
+         gas_pred (g - sha3_gas len memu memaddr) \<and>*
+         rest)"
+ apply(simp add: triple_inst_sem_def)
+ apply(simp add: program_sem.simps  as_set_simps instruction_sem_def)
+ apply(clarify)
+ apply(case_tac presult; clarsimp)
+   defer
+   apply(simp add: as_set_simps)
+   apply(sep_simp simp: continuing_sep; clarsimp)
+ apply(sep_simp simp: pure_sep)
+ 			apply(sep_simp simp: evm_sep, simp?, (erule conjE)?)+
+ 				 apply(simp add: instruction_simps )
+ 			apply(simp add: stateelm_means_simps stateelm_equiv_simps)
+ 				apply(simp add: memory_range_sep memory_range_elms_set_simps)
+ apply(clarify)
+ apply(clarsimp)
+ 			apply(simp add: instruction_simps Let_def max_absorb2)
+ 				apply(simp add: stateelm_means_simps stateelm_equiv_simps)
+ 				apply(simp add:  memory_range_elms_cut_memory)
+ 	apply(rule conjI)
+ 	 defer
+  apply clarsimp
+ 	apply(rule conjI,clarsimp?)+
+ 	apply(erule_tac P="(_ \<and>* _)" in back_subst)
+  apply (simp add: max_absorb1)
+     apply(set_solve)
+  apply -
+    apply (simp add: memory_range_elms_in_vctx contexts_as_set_def  )
+    apply clarsimp
+    apply (drule subsetD, assumption)
+  apply (clarsimp simp: variable_ctx_as_set_def)
+  sorry
+
+lemma word_exp_eq_pow_mod :
+"word_exp a n = (a ^ n) mod (( 2 :: int) ^( 256 :: nat))"
+  apply(induct n arbitrary: a rule: less_induct)
+  apply(simp (no_asm) add: word_exp.simps)
+  apply(case_tac x, simp)
+  apply(rename_tac k, clarsimp simp: Let_def)
+  apply(subst mod_mult_eq[THEN sym])
+  apply(subst mod_mod_trivial)
+  apply(subst mod_mult_eq[THEN sym])
+  apply(subst mod_mod_trivial)
+  apply(subst mod_mult_eq)
+  apply(subst mod_mult_eq)
+  apply(rule_tac f="\<lambda>x. x mod _" in arg_cong)
+  apply(case_tac "even k")
+   apply(subst even_succ_div_two[where 'a=nat, simplified], assumption)+
+   apply(subst odd_iff_mod_2_eq_one[THEN iffD1], simp)
+   apply simp
+   apply(rule disjI2)
+   apply(subst power_add[THEN sym])
+   apply(subst div_plus_div_distrib_dvd_left[THEN sym], assumption)
+   apply simp
+  apply(subst even_iff_mod_2_eq_zero[THEN iffD1], simp)
+  apply(subst semigroup_mult_class.mult.assoc)
+  apply(subst power_add[THEN sym])
+  apply(subst div_plus_div_distrib_dvd_left[THEN sym], simp)
+  apply simp
+  done
+
+lemmas memory_range_elms_cut_memory_contexts =
+  memory_range_elms_cut_memory[rule_format, OF _ memory_range_elms_in_c[THEN iffD1]]
+
+lemma memory_range_elms_logs:
+  "x \<in> memory_range_elms in_begin input \<Longrightarrow>
+      (x \<in> variable_ctx_as_set (x1\<lparr>vctx_logs := p\<rparr>)) = (x \<in> variable_ctx_as_set x1)"
+by (auto simp add: as_set_simps dest: memory_range_elms_all)
+
+lemma inst_log_sound:
+ "triple_inst_log p (n, Log i) q \<Longrightarrow> triple_inst_sem net p (n, Log i) q"
+  apply(erule triple_inst_log.cases; clarsimp)
+  apply ( simp add: triple_inst_sem_def program_sem.simps as_set_simps,
+ clarify,
+ sep_simp simp: evm_sep; simp,
+ simp split: instruction_result.splits,
+ simp add: stateelm_means_simps stateelm_equiv_simps,
+ simp add: vctx_next_instruction_def,
+ clarsimp simp add: instruction_simps )
+  apply (simp add: Let_def)
+  apply (rule conjI[rotated])
+   apply (simp add: log_gas_def Glogdata_def Glogtopic_def Glog_def)
+  apply (clarsimp simp: not_memory_range_elms_all[simplified image_def])
+  apply (simp add: create_log_entry_def log_gas_def Glogdata_def Glogtopic_def Glog_def)
+  apply (subst (asm) memory_range_sep[rule_format, OF sym], assumption)
+  apply clarsimp
+  apply (rule conjI[rotated])
+   apply (simp add: vctx_returned_bytes_def)
+   apply (subst memory_range_elms_cut_memory_contexts[where c=co_ctx], assumption)
+
+    apply (erule subset_trans)
+    apply clarsimp
+   apply clarsimp
+   apply (drule subsetD, assumption)
+   apply clarsimp
+  apply (clarsimp simp: contexts_as_set_def)
+   apply (simp only: memory_range_simps)
+   apply (erule notE[where P="_ \<in> variable_ctx_as_set _ "])
+   apply (simp add: memory_range_elms_set_simps memory_range_elms_logs)
+  apply ( erule_tac P="(_ \<and>* _)" in back_subst)
+   apply (cut_tac in_begin=a and c=co_ctx and ?x1.0=x1 in memory_range_elms_cut_memory_contexts)
+    apply assumption
+    apply (erule subset_trans)
+    apply clarsimp
+  apply (thin_tac "_ \<subseteq> _")
+  apply set_solve
+     apply (simp add: vctx_returned_bytes_def)
+  done
+
 lemma triple_inst_soundness:
 notes
   if_split[split del]
+  word_exp.simps[simp del]
+  log256floor.simps[simp del]
 shows
   "triple_inst net p i q \<Longrightarrow> triple_inst_sem net p i q"
   apply(induction rule:triple_inst.induct)
@@ -864,7 +994,15 @@ shows
               apply(split if_split, rule conjI, rule impI)
                apply(inst_sound_set_eq, set_solve)
               apply(inst_sound_set_eq, set_solve)
-             apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
+               apply(inst_sound_set_eq simp: iszero_stack_def, set_solve)
+(* Arith EXP *)
+                apply(split if_split, rule conjI, rule impI)
+                apply(inst_sound_set_eq simp: word_exp.simps, set_solve)
+                apply(inst_sound_set_eq simp: word_exp_eq_pow_mod word_exp.simps, set_solve)
+              apply -
+(* Arith SHA3 *)
+  apply (rule inst_arith_sha3_sem)
+(* BITS ... *)
             apply(erule triple_inst_bits.cases; clarsimp)
                 apply(inst_sound_set_eq, set_solve)
                apply(inst_sound_set_eq, set_solve)
@@ -894,6 +1032,7 @@ shows
     apply(inst_sound_set_eq simp: cut_data_def, set_solve)
     	apply(rule inst_swap_sound)
   	 apply(rule inst_dup_sound)
+   apply(erule inst_log_sound)
   	apply(inst_sound_set_eq, set_solve)
  apply(simp add: inst_strengthen_pre_sem)
 apply(simp add: inst_false_pre_sem)
@@ -1173,7 +1312,7 @@ done
 definition
  uniq_stateelm :: "state_element set \<Rightarrow> bool"
 where
- "uniq_stateelm s ==
+ "uniq_stateelm s \<equiv>
 (\<forall>v. PcElm v \<in> s \<longrightarrow> (\<forall>x. PcElm x \<in> s \<longrightarrow> x = v)) \<and>
 (\<forall>v. GasElm v \<in> s \<longrightarrow> (\<forall>x. GasElm x \<in> s \<longrightarrow> x = v)) \<and>
 (\<forall>v. StackHeightElm v \<in> s \<longrightarrow> (\<forall>v'. StackHeightElm v' \<in> s \<longrightarrow> v' = v)) \<and>
@@ -1181,7 +1320,11 @@ where
 (\<forall>v. StackHeightElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> StackElm (h,u) \<notin> s)) \<and>
 (\<forall>h v. MemoryElm (h, v) \<in> s \<longrightarrow> (\<forall>v'. MemoryElm (h, v') \<in> s \<longrightarrow> v' = v)) \<and>
 (\<forall>h v. StorageElm (h, v) \<in> s \<longrightarrow> (\<forall>v'. StorageElm (h, v') \<in> s \<longrightarrow> v' = v)) \<and>
-(\<forall>v. MemoryUsageElm v \<in> s \<longrightarrow> (\<forall>x. MemoryUsageElm x \<in> s \<longrightarrow> x = v))"
+(\<forall>v. MemoryUsageElm v \<in> s \<longrightarrow> (\<forall>x. MemoryUsageElm x \<in> s \<longrightarrow> x = v))\<and>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>v'. LogNumElm v' \<in> s \<longrightarrow> v' = v)) \<and>
+(\<forall>h v. LogElm (h, v) \<in> s \<longrightarrow> (\<forall>v'. LogElm (h, v') \<in> s \<longrightarrow> v' = v)) \<and>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> LogElm (h,u) \<notin> s))
+"
 
 lemma uniq_gaselm:
 "s = instruction_result_as_set co_ctx presult \<Longrightarrow>
@@ -1232,7 +1375,37 @@ lemma stack_max_elm_plus[rule_format]:
 "instruction_result_as_set co_ctx presult = s + y \<Longrightarrow>
 (\<forall>v. StackHeightElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> StackElm (h,u) \<notin> s))"
 	by (drule sym, drule stack_max_elm, simp add: plus_set_def)
-		
+
+lemma uniq_lognumelm:
+"x = instruction_result_as_set co_ctx presult \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> x \<longrightarrow> (\<forall>v'. LogNumElm v' \<in> x \<longrightarrow> v' = v))"
+by (simp add:instruction_result_as_set_def logNumElmEquiv split:instruction_result.splits)
+
+lemma uniq_lognumelm_plus[rule_format]:
+"instruction_result_as_set co_ctx presult = x + y \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> x \<longrightarrow> (\<forall>v'. LogNumElm v' \<in> x \<longrightarrow> v' = v))"
+by (drule sym, drule uniq_lognumelm, simp add: plus_set_def)
+
+lemma uniq_logelm:
+"x = instruction_result_as_set co_ctx presult \<Longrightarrow>
+(\<forall>h v. LogElm (h, v) \<in> x \<longrightarrow> (\<forall>v'. LogElm (h, v') \<in> x \<longrightarrow> v' = v))"
+by (simp add:instruction_result_as_set_def logElmEquiv split:instruction_result.splits)
+
+lemma uniq_logelm_plus[rule_format]:
+"instruction_result_as_set co_ctx presult = x + y \<Longrightarrow>
+(\<forall>h v. LogElm (h, v) \<in> x \<longrightarrow> (\<forall>v'. LogElm (h, v') \<in> x \<longrightarrow> v' = v))"
+by (drule sym, drule uniq_logelm, simp add: plus_set_def)
+
+lemma log_max_elm:
+"s = instruction_result_as_set co_ctx presult \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> LogElm (h,u) \<notin> s))"
+by(simp add:instruction_result_as_set_def logElmEquiv logNumElmEquiv split:instruction_result.splits)
+
+lemma log_max_elm_plus[rule_format]:
+"instruction_result_as_set co_ctx presult = s + y \<Longrightarrow>
+(\<forall>v. LogNumElm v \<in> s \<longrightarrow> (\<forall>h u. h \<ge> v \<longrightarrow> LogElm (h,u) \<notin> s))"
+	by (drule sym, drule log_max_elm, simp add: plus_set_def)
+
 lemma uniq_memuelm:
 "x = instruction_result_as_set co_ctx presult \<Longrightarrow>
 (\<forall>v. MemoryUsageElm v \<in> x \<longrightarrow> (\<forall>v'. MemoryUsageElm v' \<in> x \<longrightarrow> v' = v))"
@@ -1267,7 +1440,8 @@ lemmas uniq_stateelm_simps=
 uniq_stateelm_def
 uniq_gaselm_plus uniq_pcelm_plus uniq_stackheightelm_plus
 stack_max_elm_plus uniq_stackelm_plus uniq_memuelm_plus
-uniq_memelm_plus uniq_storageelm_plus
+uniq_memelm_plus uniq_storageelm_plus uniq_logelm_plus
+uniq_lognumelm_plus log_max_elm_plus
 
 lemma inst_res_as_set_uniq_stateelm:
 "(pre \<and>* code (blocks_insts blocks) \<and>* resta)
@@ -1479,10 +1653,16 @@ lemma memory_range_elms_same_addr:
   apply(case_tac zs, simp)
   apply fastforce
   done
-    
+
+lemma program_counter_first:
+  "(a \<and>* program_counter p \<and>* b) = (program_counter p \<and>* a \<and>* b)"
+  by (rule ac_simps)
+
 lemma pc_after_inst:
 notes
   if_split[split del]
+  word_exp.simps [simp del]
+  log256floor.simps [simp del]
 shows
 "triple_inst net pre x post \<Longrightarrow> x = (n, i) \<Longrightarrow> reg_inst i \<Longrightarrow>
 \<exists>s. pre s \<and> uniq_stateelm s \<Longrightarrow>
@@ -1637,6 +1817,62 @@ apply(after_arith_if)
              {StackElm (h, w)} - {GasElm g}) \<union> {StackElm (h, iszero_stack w)} \<union>
              {GasElm (g-Gverylow)} \<union> {PcElm (n+1)} " in exI)
            apply(easy_case_pc_after_inst)
+    (* EXP *)
+            apply(find_q_pc_after_inst)
+            apply(rule_tac x="(s - {PcElm n} - {StackHeightElm (Suc (Suc h))} -
+             {StackElm (Suc h, v)} - {StackElm (h, w)} - {GasElm g}) \<union> {StackElm (h, (word_of_int (word_exp (uint v) (unat w))))} \<union>
+             {GasElm (g- (Gexp + (if w = 0 then 0 else Gexpbyte neta * (1 + log256floor (uint w)))))} \<union> {StackHeightElm (Suc h)} \<union> {PcElm (n+1)} " in exI)
+            apply(after_arith_if)
+                apply(solves \<open>drule (2) only_one_stack_elm, simp\<close>)
+    					 apply(solves \<open>drule (2) only_one_stack_elm, simp\<close>)
+    					apply (case_tac t; clarsimp)
+    					apply (drule (1) only_one_gas[rotated -1])
+    					  apply (rule ordered_comm_monoid_add_class.add_pos_nonneg ; clarsimp simp: Gexpbyte_def log256floor_ge_0 split: if_split)
+    					 apply assumption
+    					apply simp
+    				 apply(auto)[1]
+             apply (simp add: word_exp_eq_pow_mod)
+             apply (simp add: word_exp_eq_pow_mod)
+             apply (simp add: word_exp_eq_pow_mod)
+    				apply (uniq_state_elm_quasi)
+    				 apply(case_tac "ha=Suc h"; simp)
+        (* SHA3 *)
+  apply (simp (no_asm) add: program_counter_first)
+            apply(find_q_pc_after_inst)
+          apply(rule_tac x="(s - {PcElm n} -
+             {StackHeightElm (Suc (Suc h))} - {StackElm (h, len)} - {StackElm (Suc h, memaddr)}  - {MemoryUsageElm memu} - {GasElm g})
+             \<union> {StackElm (h, keccak xs)} \<union> {StackHeightElm (Suc h)} \<union>
+             {GasElm (g-sha3_gas len memu memaddr)} \<union> {PcElm (n+1)} \<union>
+             {MemoryUsageElm (M memu memaddr len)}" in exI)
+
+(**)
+          apply(sep_simp simp: program_counter_sep memory_usage_sep gas_pred_sep stack_sep stack_height_sep pure_sep, (erule conjE)?)+
+          apply(clarsimp simp add: gas_value_simps)
+          apply(rule conjI)
+          apply(erule_tac P="_ \<and>* _" in back_subst)
+      		 apply(rule  Set.equalityI)
+           apply(simp add: Set.subset_iff, clarify)
+          apply(rule conjI)
+            apply(rule notI; drule only_one_pc; simp)
+            			 apply(rule conjI, rule notI,simp add: uniq_stateelm_def)
+            		 apply(rule conjI, rule notI; simp add: uniq_stateelm_def)
+           apply(auto simp add: uniq_stateelm_def)[1]
+             apply(auto simp add: uniq_stateelm_def)[1]
+  apply -
+            apply(clarsimp simp add: uniq_stateelm_def )
+  apply (rule conjI, fastforce)
+  apply (rule conjI, fastforce)
+  apply (rule conjI, fastforce)
+  apply (rule conjI, clarsimp)
+  apply (rule conjI, fastforce)
+  apply clarsimp
+  apply (rule conjI, clarsimp)
+  apply (rule conjI, clarsimp)
+  apply (case_tac "ha = Suc h" ; clarsimp)
+  apply clarsimp
+  apply clarsimp
+  apply (rule conjI, fastforce)
+  apply (fastforce)
     (**BITS**)
     			apply(erule triple_inst_bits.cases; clarsimp)
     (*NOT*)
@@ -1900,7 +2136,46 @@ apply(rule_tac x="(s - {PcElm n} - {GasElm g} -
    apply (simp add: uniq_stateelm_def)
    apply(rule conjI, fastforce)+
    	 apply(fastforce)
-   	  apply(drule meta_mp)
+  	    apply(erule triple_inst_log.cases; clarsimp)
+      	apply((rule exI; rule conjI),
+rule ext,
+rule iffI)
+      apply ((clarsimp simp add: program_counter_first)?, assumption)
+     apply (sep_simp simp: program_counter_sep)
+apply(rule_tac x="(s - {PcElm n} - {GasElm g} -
+             {StackHeightElm (Suc (Suc (Suc (Suc (Suc h)))))} - {StackElm (h, topic2)} - 
+             {StackElm (Suc h, topic1)} - {StackElm (Suc (Suc h), topic0)} - 
+              {StackElm (Suc (Suc (Suc h)), logged_size)} - {StackElm (Suc (Suc (Suc (Suc h))),logged_start)} -
+              {MemoryUsageElm m} - {LogNumElm na}) \<union> 
+              {StackHeightElm (h)} \<union>
+             {GasElm (g- log_gas 3 logged_start logged_size m)} \<union> {PcElm (n+1)}
+              \<union> {LogNumElm (Suc na)} \<union> {LogElm (na, \<lparr>log_addr = this, log_topics = [topic0, topic1, topic2], log_data = data\<rparr>)}
+              \<union> {MemoryUsageElm (M m logged_start logged_size)} " in exI)
+  apply simp
+          apply(sep_simp simp: program_counter_sep gas_pred_sep stack_sep stack_height_sep pure_sep this_account_sep log_number_sep logged_sep memory_usage_sep stack_topmost_sep continuing_sep , ((erule conjE)+)?)+
+     apply (clarsimp simp: set_diff_eq)
+  apply(rule conjI)
+  apply(erule_tac P="_ \<and>* _" in back_subst)
+   		 apply(rule  Set.equalityI)
+           apply(simp add: Set.subset_iff, clarify)
+        apply(rule conjI)
+            apply(rule notI; drule only_one_pc; simp)
+            		  apply(auto simp add: uniq_stateelm_def)[2]
+       apply(simp add: uniq_stateelm_def)
+       apply(rule conjI, fastforce)
+       apply(rule conjI, fastforce)
+    apply(rule conjI, fastforce)
+    apply (rule conjI, clarsimp)+
+  apply (rename_tac ln u)
+  apply (case_tac "ln = h"; clarsimp)
+  apply (case_tac "ln = Suc h"; clarsimp)
+  apply (case_tac "ln = Suc (Suc h)"; clarsimp)
+  apply (case_tac "ln = Suc (Suc (Suc h))"; clarsimp)
+  apply (case_tac "ln = Suc (Suc (Suc (Suc h)))"; clarsimp)
+  apply clarsimp
+    apply(rule conjI, fastforce)+
+  apply fastforce
+  apply(drule meta_mp)
   apply(rule_tac x=s in exI; rule conjI; simp)
   apply(assumption)
   apply(simp add: pure_def)
@@ -2544,6 +2819,8 @@ PcElm n \<in> s"
       apply(erule triple_inst_pc.cases; clarsimp; sep_simp simp: pure_sep sep_fun_simps; simp)
      apply(erule triple_inst_stack.cases; clarsimp; sep_simp simp: pure_sep sep_fun_simps; simp)
     apply(sep_simp simp: pure_sep sep_fun_simps; simp)+
+   apply(erule triple_inst_log.cases; clarsimp; sep_simp simp: pure_sep sep_fun_simps; simp)
+  apply(sep_simp simp: pure_sep sep_fun_simps; simp)+
  apply(simp add: pure_def)
 done
 

@@ -6,6 +6,7 @@ open TestResult
 
 let bighex x = Z.format "%x" (Z.of_string (Big_int.string_of_big_int x))
 
+
 let construct_block_info (t : test_case) : block_info =
   let block_number = Conv.word256_of_big_int t.env.currentNumber in
   { block_blockhash = (fun num ->
@@ -53,6 +54,36 @@ let make_state_list lst =
      let stor_lst = List.map (fun (p,v) -> (Conv.word256_of_big_int p, string_to_w256 v)) st.VmTestParser.storage in
      (addr, convert_state addr st, stor_lst)) lst
 
+let w256hex i = Z.format "%064x" (Word256.word256ToNatural i)
+let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
+let w160hex i = Z.format "%040x" (Word160.word160ToNatural i)
+let w8hex i = Z.format "%02x" (Word8.word8ToNatural i)
+let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
+
+let string_of_transaction tr =
+  "transaction {" ^
+  "tr_from  = 0x" ^ w160hex tr.tr_from ^ 
+  "\ntr_to  = " ^ 
+   (match tr.tr_to with
+    | None -> "Nothing"
+    | Some v -> "0x" ^ w160hex v) ^ 
+  "\ntr_gas_limit  = 0x" ^ w256hex tr.tr_gas_limit ^ 
+  "\ntr_gas_price  = 0x" ^ w256hex tr.tr_gas_price ^ 
+  "\ntr_value  = 0x" ^ w256hex tr.tr_value ^ 
+  "\ntr_nonce  = 0x" ^ w256hex tr.tr_nonce ^ 
+  "\ntr_data  = " ^ String.concat " " (*List.map w8hex tr.tr_data*)[] ^
+  "\n}\n"
+
+let string_of_block_info (bi: block_info) : string =
+  "block {" ^
+  "\nblock_number = " ^ w256dec (bi.block_number ) ^
+  "\nblock_blockhash = 0x" ^ (*w256hex (bi.block_blockhash*) 
+  "\nblock_coinbase  = 0x" ^ w160hex (bi.block_coinbase)^ 
+  "\nblock_timestamp = " ^ w256dec (bi.block_timestamp) ^
+  "\nblock_difficulty = " ^ w256dec (bi.block_difficulty) ^ 
+  "\nblock_gaslimit = " ^ w256dec (bi.block_gaslimit) ^
+  "\n}\n"
+
 let construct_tr a = {
   tr_from = Conv.word160_of_big_int a.address;
   tr_to = (match a.target with None -> None | Some x -> Some (Conv.word160_of_big_int x));
@@ -63,8 +94,6 @@ let construct_tr a = {
   tr_data = Conv.byte_list_of_hex_string a.data;
 }
 
-let w256hex i = Z.format "%x" (Word256.word256ToNatural i)
-let w256dec i = Z.format "%d" (Word256.word256ToNatural i)
 
 let debug_vm c1 pr =
  match pr with
@@ -88,24 +117,46 @@ let debug_mode = if Array.length Sys.argv > 2 then true else false
 exception Skip
 
 let run_tr tr state block net =
+  let _ = Printf.printf "\nrun_tr %s\n" (string_of_transaction tr) in
   let res = start_transaction tr state block in
   let rec do_run = function
-   | Finished fi -> fi
-   | Unimplemented -> raise Skip
+   | Finished fi ->
+     let _ = Printf.printf "start_transaction() returned Finished\n" in
+     fi
+   | Unimplemented ->
+     let _ = Printf.printf "start_transaction() returned Unimplemented\n" in
+     raise Skip
    | a ->
+     let _ = Printf.printf "start_transaction() returned Continue\n" in
      if debug_mode then debug_state a;
      do_run (step net a) in
-  let fi = do_run res in
+  (* let fi = do_run res in *)
+  
+  let fi = 
+    (match res with
+    | Finished fi' -> 
+      let _ = Printf.printf "start_transaction() returned Finished\n" in
+      fi'
+    | Unimplemented -> 
+      let _ = Printf.printf "start_transaction() returned Unimplemented\n" in
+      raise Skip
+    | Continue g ->
+      let _ = Printf.printf "start_transaction() returned COntinue, calling global_sem\n" in
+        match global_sem net g with
+        | Some fi' -> fi'
+        | None -> raise Skip
+    ) in
   if debug_mode then begin
-    prerr_endline ("Bal " ^ w256dec (fi.f_state tr.tr_from).block_account_balance);
+    (* prerr_endline ("Bal " ^ w256dec (fi.f_state tr.tr_from).block_account_balance); *)
     prerr_endline ("Killed " ^ string_of_int (List.length fi.f_killed));
   end;
+  let _ = Printf.printf "\nend_transaction(coinbase=0x%s)\n" (w160hex block.block_coinbase) in
   let final_state = end_transaction fi tr block in
   final_state
 
 let compare_storage diff_found a stor (p,v) =
   if stor p <> v then begin
-      Printf.printf "address %s has storage %s at %s, but it should be %s!\n" (Conv.string_of_address a)
+      Printf.printf "|||address %s has storage %s at %s, but it should be %s!\n" (Conv.string_of_address a)
        (Conv.decimal_of_word256 (stor p)) (Conv.decimal_of_word256 p) (Conv.decimal_of_word256 v);
       diff_found := true
   end
@@ -114,6 +165,7 @@ let run_test (label, elm) : testResult =
   let () = Printf.printf "%s\n%!" label in
   let tc = parse_test_case elm in
   let block_info = construct_block_info tc in
+  let () = Printf.printf "%s\n" (string_of_block_info block_info) in
   let tr = construct_tr tc.tr in
   let pre_st = List.map (fun (a,b,_) -> (a,b)) (make_state_list tc.pre) in
   let post_st = make_state_list tc.post in
@@ -125,7 +177,7 @@ let run_test (label, elm) : testResult =
     List.iter (fun (a,cmp, storage_list) ->
       let acc = state a in
       if acc.block_account_balance <> cmp.block_account_balance then begin
-        Printf.printf "address %s has balance %s, but it should be %s!\n%!" (Conv.string_of_address a) (Conv.decimal_of_word256 acc.block_account_balance)
+        Printf.printf "|||address %s has balance %s, but it should be %s!\n%!" (Conv.string_of_address a) (Conv.decimal_of_word256 acc.block_account_balance)
          (Conv.decimal_of_word256 cmp.block_account_balance);
         diff_found := true
       end;

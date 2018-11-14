@@ -39,22 +39,23 @@ fun global_as_set :: "global_state \<Rightarrow> global_element set" where
     State ` instruction_result_as_set (g_cctx g) (g_vmstate g) \<union>
     backup_as_set (g_orig g) \<union>
     saved_stack_as_set (g_stack g)"
+|  "global_as_set (Unimplemented ) = {}"
 
 fun iter :: "network \<Rightarrow> nat \<Rightarrow> global_state \<Rightarrow> global_state" where
 "iter net 0 x = x"
 | "iter net (Suc n) x = step net (iter net n x)"
-
+(* 
 fun good_context :: "global_state \<Rightarrow> bool" where
 "good_context (Continue g) = no_assertion (g_cctx g)"
 | "good_context _ = True"
-
+ *)
 definition global_triple ::
- "global_pred \<Rightarrow> global_pred \<Rightarrow> bool"
+ "network \<Rightarrow> global_pred \<Rightarrow> global_pred \<Rightarrow> bool"
 where
-  "global_triple pre post ==
-    \<forall> presult rest. good_context presult \<longrightarrow>
+  "global_triple net pre post ==
+    \<forall> presult rest. \<comment>\<open> good_context presult \<longrightarrow> \<close>
        (pre ** rest) (global_as_set presult) \<longrightarrow>
-       (\<exists> k. (post ** rest) (global_as_set (iter k presult)))"
+       (\<exists> k. (post ** rest) (global_as_set (iter net k presult)))"
 
 definition lift_pred :: "state_element set_pred \<Rightarrow> global_pred" where
 "lift_pred p s == p {x|x. State x \<in> s} \<and> s \<subseteq> {State x|x. State x \<in> s}"
@@ -70,7 +71,7 @@ lemmas rw = instruction_sem_def instruction_failure_result_def
 blockedInstructionContinue_def
 
 lemma inst_no_reasons :
-"instruction_sem v c aa \<noteq>
+"instruction_sem  v c aa net \<noteq>
        InstructionToEnvironment
         (ContractFail []) a b"
 apply (cases aa)
@@ -114,69 +115,55 @@ done
 
 lemma no_reasons_next :
    "failed_for_reasons {}
-   (next_state stopper c (InstructionContinue v)) = False"
+   (next_state stopper c net (InstructionContinue v)) = False"
 apply (auto simp:failed_for_reasons_def)
-apply (cases "vctx_next_instruction v c"; auto)
-apply (auto simp:check_resources_def)
-apply (case_tac "case inst_stack_numbers aa of
-        (consumed, produced) \<Rightarrow>
-          int (length (vctx_stack v)) +
-          produced -
-          consumed
-          \<le> 1024 \<and>
-          meter_gas aa v c \<le> vctx_gas v")
-apply auto
-using inst_no_reasons apply fastforce
-using length_greater_0_conv apply fastforce
-using n_not_Suc_n apply fastforce
-done
-
-lemma program_annotation :
-"program_sem stopper c n InstructionAnnotationFailure =
- InstructionAnnotationFailure"
-apply (induction n)
-apply (auto simp:program_sem.simps)
-done
+  done
 
 lemma program_environment :
-"program_sem stopper c n (InstructionToEnvironment a b d) =
+"program_sem stopper c n net (InstructionToEnvironment a b d) =
  (InstructionToEnvironment a b d)"
 apply (induction n)
-apply (auto simp:program_sem.simps)
+apply (auto simp: next_state_def)
 done
-
-declare next_state_def [simp del]
 
 lemma no_reasons :
    "failed_for_reasons {}
-   (program_sem stopper c n (InstructionContinue v)) = False"
+   (program_sem stopper c n net (InstructionContinue v)) = False"
 apply (induction n arbitrary:v)
-apply (simp add:program_sem.simps failed_for_reasons_def
-  program_annotation no_reasons_next)
-apply (simp add:program_sem.simps no_reasons_next
-  failed_for_reasons_def)
-apply (case_tac "next_state stopper c
-             (InstructionContinue v)")
-using no_reasons_next
-apply force
-using program_annotation
-apply force
-using no_reasons_next 
-apply (auto simp add: program_environment failed_for_reasons_def)
+apply (simp add: failed_for_reasons_def
+   no_reasons_next)
+apply (simp add:  failed_for_reasons_def)
 done
+
+lemma state_set_compr:
+ "({v. State v \<in> t} = s) = (t = State ` s \<union> {v. v \<in> t \<and> v \<notin> State ` UNIV})"
+  by (auto simp: image_def)
+  
 
 lemma sep_lift_commute :
   "lift_pred (a**b) t = (lift_pred a ** lift_pred b) t"
-apply (auto simp:lift_pred_def sep_def)
-subgoal for u v 
-apply (rule_tac exI[of _ "{State uu| uu. uu \<in> u}"]; auto)
-apply (rule_tac exI[of _ "{State uv| uv. uv \<in> v}"]; auto)
-apply (case_tac x; auto)
-done
-subgoal for u v 
-apply (rule_tac exI[of _ "{uu| uu. State uu \<in> u}"]; auto)
-done
-done
+  apply (rule iffI; clarsimp simp: sep_conj_def lift_pred_def sep_disj_set_def)
+  subgoal for x y
+    apply (rule_tac x="State `x" in exI)
+    apply (rule_tac x="State `y" in exI)
+    apply (clarsimp simp add: lift_pred_def image_def plus_set_def)
+    apply (rule conjI, fastforce)
+    apply (rule conjI[rotated], fastforce)
+    apply (simp add: subset_eq)
+    apply (simp only: state_set_compr)
+    apply (erule HOL.trans)
+    apply auto
+    done
+  apply auto
+  subgoal for x y
+    apply (clarsimp simp add: lift_pred_def image_def plus_set_def )
+    apply (rule_tac x="{u. State u \<in> x}" in exI)
+    apply (rule_tac x="{u. State u \<in> y}" in exI)
+    apply auto
+    done
+  subgoal for x y
+    by (auto simp add: lift_pred_def image_def plus_set_def )
+  done
 
 lemma state_lifted_aux :
   "State x \<notin> saved_stack_as_set lst"
@@ -200,35 +187,35 @@ done
 lemma get_continue_elem :
 "(lift_pred continuing ** rest) (global_as_set presult) \<Longrightarrow>
  State (ContinuingElm True) \<in> global_as_set presult"
-apply (auto simp: sep_def lift_pred_def continuing_def)
-done
+  by (auto simp: sep_conj_def plus_set_def lift_pred_def  continuing_def sep_disj_set_def)
 
 declare global_as_set.simps [simp del]
 
 lemma continuing_false :
  "ContinuingElm True \<in> contexts_as_set v c \<Longrightarrow> False"
 apply (auto simp:contexts_as_set_def constant_ctx_as_set_def
-   program_as_set_def variable_ctx_as_set_def
-   stack_as_set_def data_sent_as_set_def
+   program_as_set_def variable_ctx_as_set_def memory_as_set_def
+  storage_as_set_def balance_as_set_def log_as_set_def
+   stack_as_set_def (* data_sent_as_set_def *) account_existence_as_set_def
    ext_program_as_set_def)
 done
 
 lemma continuing_extract:
 "(lift_pred continuing ** rest) (global_as_set presult) \<Longrightarrow>
  \<exists>x y. presult = Continue x \<and> g_vmstate x = InstructionContinue y"
-apply (cases presult; auto)
-apply (case_tac "g_vmstate x1")
-apply simp
-using get_continue_elem and state_lifted
-apply force
-subgoal for x1 x31 x32 x33
-using get_continue_elem [of rest presult]
-  and state_lifted [of "ContinuingElm True" x1]
-apply (auto simp: instruction_result_as_set_def)
-apply (rule continuing_false; auto)
-done
-using state_finished and get_continue_elem
-apply force
+  apply (cases presult; auto)
+    apply (clarsimp simp add: global_as_set.simps lift_pred_def sep_conj_def plus_set_def continuing_def)
+  apply (rename_tac x)
+apply (case_tac "g_vmstate x")
+    apply simp
+   apply (drule get_continue_elem)
+   apply (drule state_lifted)
+   apply (simp add: instruction_result_as_set_def contexts_as_set_def constant_ctx_as_set_def
+        variable_ctx_as_set_def program_as_set_def stack_as_set_def memory_as_set_def
+        storage_as_set_def balance_as_set_def log_as_set_def ext_program_as_set_def
+        account_existence_as_set_def)
+  apply (drule get_continue_elem)
+   apply (simp add: global_as_set.simps state_as_set_def )
 done
 
 lemma lift_triple_finished :
@@ -237,11 +224,11 @@ assumes a:"(rest ** lift_pred (continuing ** pre ** code inst))
 shows  "False"
 proof -
   have b:"lift_pred (continuing ** pre ** code inst) =
-    lift_pred continuing ** lift_pred (pre ** code inst)"
+    ((lift_pred continuing) ** (lift_pred (pre ** code inst)))"
    by (auto simp:sep_lift_commute)
   then have
-   "rest ** lift_pred (continuing ** pre ** code inst) =
-    lift_pred continuing ** (rest ** lift_pred (pre ** code inst))"
+   "(rest ** lift_pred (continuing ** pre ** code inst)) =
+    (lift_pred continuing ** (rest ** lift_pred (pre ** code inst)))"
   by auto
   then show ?thesis
     by (metis assms get_continue_elem state_finished)

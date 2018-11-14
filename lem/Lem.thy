@@ -1,5 +1,3 @@
-(*** This file is part of Lem.  eth-isabelle project just uses it.  See lem-license. ***)
-
 (*========================================================================*)
 (*                        Lem                                             *)
 (*                                                                        *)
@@ -11,9 +9,16 @@
 (*          Peter Sewell, University of Cambridge                         *)
 (*          Scott Owens, University of Kent                               *)
 (*          Thomas Tuerk, University of Cambridge                         *)
+(*          Brian Campbell, University of Edinburgh                       *)
+(*          Shaked Flur, University of Cambridge                          *)
+(*          Thomas Bauereiss, University of Cambridge                     *)
+(*          Stephen Kell, University of Cambridge                         *)
+(*          Thomas Williams                                               *)
+(*          Lars Hupel                                                    *)
+(*          Basile Clement                                                *)
 (*                                                                        *)
-(*  The Lem sources are copyright 2010-2013                               *)
-(*  by the UK authors above and Institut National de Recherche en         *)
+(*  The Lem sources are copyright 2010-2018                               *)
+(*  by the authors above and Institut National de Recherche en            *)
 (*  Informatique et en Automatique (INRIA).                               *)
 (*                                                                        *)
 (*  All files except ocaml-lib/pmap.{ml,mli} and ocaml-libpset.{ml,mli}   *)
@@ -46,21 +51,18 @@
 (*  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                         *)
 (*========================================================================*)
 
-(* header{* Mappings of Syntax needed by Lem *} *)
+chapter\<open>Mappings of Syntax needed by Lem\<close>
 
-theory "Lem" 
+theory "Lem"
 
-imports 
- 	 Main
+imports
          LemExtraDefs
-         "~~/src/HOL/Map"
-         "~~/src/HOL/Library/Code_Target_Numeral"
-
-begin 
+         "HOL-Word.Word"
+begin
 
 type_synonym numeral = nat
 
-subsection{* Finite Maps *}
+subsection \<open>Finite Maps\<close>
 
 abbreviation (input) "map_find k m \<equiv> the (m k)"
 abbreviation (input) "map_update k v m \<equiv> m (k \<mapsto> v)"
@@ -68,43 +70,39 @@ abbreviation (input) "map_remove k m \<equiv> m |` (- {k})"
 abbreviation (input) "map_any P m \<equiv> \<exists> (k, v) \<in> map_to_set m. P k v"
 abbreviation (input) "map_all P m \<equiv> \<forall> (k, v) \<in> map_to_set m. P k v"
 
-subsection{* Lists *}
+subsection \<open>Lists\<close>
 
 abbreviation (input) "list_mem e l \<equiv> (e \<in> set l)"
 abbreviation (input) "list_forall P l \<equiv> (\<forall>e\<in>set l. P e)"
 abbreviation (input) "list_exists P l \<equiv> (\<exists>e\<in>set l. P e)"
 abbreviation (input) "list_unzip l \<equiv> (map fst l, map snd l)"
 
-subsection{* Sets *}
+subsection \<open>Sets\<close>
 
 abbreviation (input) "set_filter P (s::'a set) \<equiv> {x \<in> s. P x}"
 abbreviation (input) "set_bigunion S \<equiv> \<Union> S"
 abbreviation (input) "set_biginter S \<equiv> \<Inter> S"
 
-subsection{* Natural numbers *}
+subsection \<open>Natural numbers\<close>
 
-subsection{* Integers *}
+subsection \<open>Integers\<close>
 
 
-subsection {* Dummy *}
+subsection \<open>Dummy\<close>
 
-definition bitwise_xor :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "bitwise_xor x y = undefined"
+consts
+  bitwise_xor :: "nat \<Rightarrow> nat \<Rightarrow> nat"
+  num_asr :: "nat \<Rightarrow> nat \<Rightarrow> nat"
+  num_lsl :: "nat \<Rightarrow> nat \<Rightarrow> nat"
+  bitwise_or :: "nat \<Rightarrow> nat \<Rightarrow> nat"
+  bitwise_not :: "nat \<Rightarrow> nat"
+  bitwise_and :: "nat \<Rightarrow> nat \<Rightarrow> nat"
 
-definition num_asr :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "num_asr n m = undefined"
+subsection \<open>Machine words\<close>
 
-definition num_lsl :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "num_lsl n m = undefined"
-
-definition bitwise_or :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "bitwise_or n m = undefined"
-
-definition bitwise_not :: "nat \<Rightarrow> nat" where
-  "bitwise_not n = undefined"
-
-definition bitwise_and :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "bitwise_and n m = undefined"
-
+definition word_update :: "'a::len word \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'b::len word \<Rightarrow> 'a word" where
+  "word_update v lo hi w =
+    (let sz = size v in
+    of_bl (take (sz-hi-1) (to_bl v) @ to_bl w @ drop (sz-lo) (to_bl v)))"
 
 end
