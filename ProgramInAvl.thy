@@ -48,15 +48,15 @@ fun program_avl_of_lst ::
    \<Rightarrow> (int * inst) avl_tree (* result *)"
 where
   "program_avl_of_lst _ [] = Leaf"
-  -- {* the empty program is translated into the empty tree. *}
+  (* {* the empty program is translated into the empty tree. *} *)
 | "program_avl_of_lst pos (Stack (PUSH_N bytes) # rest) =
    store_byte_list_in_program (pos + 1) bytes 
    (update pos (Stack (PUSH_N bytes))
           (program_avl_of_lst (pos + 1 + (int (length bytes))) rest))"
-  -- {* The PUSH instruction is translated together with the immediate value. *}
+  (* {* The PUSH instruction is translated together with the immediate value. *} *)
 | "program_avl_of_lst pos (i # rest) =
    update pos i (program_avl_of_lst (pos + 1) rest)"
-  -- {* The other instructions are simply inserted into the AVL tree. *}
+  (* {* The other instructions are simply inserted into the AVL tree. *} *)
   
 abbreviation program_content_of_lst :: "inst list \<Rightarrow> (int \<Rightarrow> inst option)"
 where
