@@ -45,9 +45,9 @@ The following relation captures these possibilities.
 
 inductive account_state_natural_change :: "account_state \<Rightarrow> account_state \<Rightarrow> bool"
 where
-natural: -- {* The balance of this account might increase
+natural: (*-- {* The balance of this account might increase
 whenever the code in our contract is not executing.  Some other account might
-destroy itself and give its balance to our account.  *}
+destroy itself and give its balance to our account.  *} *)
  "old_bal \<le> new_bal \<Longrightarrow>
   account_state_natural_change
    \<lparr> account_address = addr
@@ -64,9 +64,9 @@ destroy itself and give its balance to our account.  *}
    , account_ongoing_calls = going
    , account_killed = killed
    \<rparr>"
-| cleaned: -- {* This happens only at the end of a transaction, but we don't know
+| cleaned: (*-- {* This happens only at the end of a transaction, but we don't know
               the transaction boundaries.  
-              So this can happen at any moment when there are no ongoing calls.  *}
+              So this can happen at any moment when there are no ongoing calls.  *} *)
   "account_state_natural_change
   \<lparr> account_address = addr
   , account_storage = str
@@ -128,8 +128,8 @@ where
 | "returnable_result (InstructionToEnvironment (ContractCreate _) _ _) = True"
 | "returnable_result (InstructionToEnvironment (ContractSuicide _) _ _) = False"
 | "returnable_result (InstructionToEnvironment (ContractFail _) _ _) = False"
--- {* because we are not modeling nested calls here, the effect of the nested calls are modeled in
-      account\_state\_return\_change *}
+(*-- {* because we are not modeling nested calls here, the effect of the nested calls are modeled in
+      account\_state\_return\_change *} *)
 | "returnable_result (InstructionToEnvironment (ContractReturn _) _ _) = False"
 
 fun returnable_from_delegate_call :: "instruction_result \<Rightarrow> bool"
@@ -140,8 +140,8 @@ where
 | "returnable_from_delegate_call (InstructionToEnvironment (ContractCreate _) _ _) = False"
 | "returnable_from_delegate_call (InstructionToEnvironment (ContractSuicide _) _ _) = False"
 | "returnable_from_delegate_call (InstructionToEnvironment (ContractFail _) _ _) = False"
--- {* because we are not modeling nested calls here, the effect of the nested calls are modeled in
-      account\_state\_return\_change *}
+(*-- {* because we are not modeling nested calls here, the effect of the nested calls are modeled in
+      account\_state\_return\_change *} *)
 | "returnable_from_delegate_call (InstructionToEnvironment (ContractReturn _) _ _) = False"
 
 subsection {* A Round of the Game *}
@@ -163,16 +163,16 @@ inductive environment_turn ::
       and the variable environment from which our contract must start. *)
 \<Rightarrow> bool (* a boolean indicating if that is a possible environment's move. *)"
 where
-  environment_call: -- {* the environment might call our contract.  We only consider the initial invocation here
+  environment_call: (* {* the environment might call our contract.  We only consider the initial invocation here
   because the deeper reentrant invocations are considered as a part of the adversarial environment. 
-  The deeper reentrant invocations are performed without the environment replying to the contract. *}
+  The deeper reentrant invocations are performed without the environment replying to the contract. *} *)
   "(* If a variable environment is built from the old account state *)
    (* and the call arguments, *)
    build_vctx_called old_state callargs next_vctx \<Longrightarrow>
    
    (* the environment makes a move, showing the variable environment. *)
    environment_turn I (old_state, Init callargs) (old_state, next_vctx)"
-| environment_return: -- {* the environment might return to our contract. *}
+| environment_return: (* -- {* the environment might return to our contract. *} *)
   "(* If the account state can be changed during reentrancy,*)
    account_state_return_change I account_state_going_out account_state_back \<Longrightarrow>
 
@@ -187,7 +187,7 @@ where
    environment_turn I (account_state_going_out, Execution program_r)
                 (account_state_pop_ongoing_call account_state_back, new_v)"
 
-| environment_return_after_delegate_call: -- {* the environment might return to our contract. *}
+| environment_return_after_delegate_call: (* -- {* the environment might return to our contract. *} *)
   "(* If the account state can be changed during reentrancy,*)
    (* the account state might be completely broken *)
    build_vctx_returned account_state_back result new_v \<Longrightarrow>
@@ -201,7 +201,7 @@ where
                 (account_state_pop_ongoing_call account_state_back, new_v)"
 
   
-| environment_fail: -- {* the environment might fail from an account into our contract. *}
+| environment_fail: (*-- {* the environment might fail from an account into our contract. *} *)
   "(* If a variable environment can be recovered from the previous account state,*)
    build_vctx_failed account_state_going_out = Some new_v \<Longrightarrow>
    

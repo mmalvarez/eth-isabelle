@@ -483,10 +483,11 @@ fun  program_list_of_lst_validate  :: "inst list \<Rightarrow> inst list option"
 
 (* seeing if the list version is easier to work with *)
 (* this one doesn't seem to quite be what we want *)
+(*
 fun ll4_load_lst_map_cctx :: "constant_ctx \<Rightarrow> ll4 \<Rightarrow> constant_ctx" where
 "ll4_load_lst_map_cctx cc t =
   (cc \<lparr> cctx_program := Evm.program_of_lst (codegen' t) (\<lambda> il i . program_map_of_lst 0 il (nat i)) \<rparr>)"
-
+*)
 fun ll4_load_lst_cctx :: "constant_ctx \<Rightarrow> ll4 \<Rightarrow> constant_ctx" where
 "ll4_load_lst_cctx cc t =
   (cc \<lparr> cctx_program := 
@@ -2036,11 +2037,12 @@ with 1 fuel vs running EVM with higher fuel amounts
 (Hoare.execution_continue looks useful))
 *)
 
+(*
 lemma bytetrunc :
 "x < 256 \<Longrightarrow>
  bintrunc 8 x = x
 "
-  apply(simp add:word_ubin.
+(*  apply(simp add:word_ubin. *)
   apply(simp add:bintrunc_def)
   apply(simp add:bin_last_def bin_rest_def)
   apply(case_tac "x mod 2 = 1", simp)
@@ -2055,7 +2057,7 @@ lemma bytetrunc :
   print_state
   print_state
   sorry
-
+*)
 (* need to satisfy the premise of this lemma
 
 however, it may be that this is easy, because we
@@ -2171,15 +2173,15 @@ apply(split prod.splits) apply(auto)
 
 (* this seems maybe ok *)
 
-      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+      apply(simp add:Divides.divmod_nat_def) apply(clarify)
      apply(arith)
 
 
     apply(drule_tac x = "Suc nata" in spec) apply(auto)
-     apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+     apply(simp add:Divides.divmod_nat_def) apply(clarify)
      apply(arith)
 
-     apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+     apply(simp add:Divides.divmod_nat_def) apply(clarify)
     apply(arith)
     done
 qed
@@ -2194,7 +2196,7 @@ proof(induction rule:my_nat_strong_induct[of _ cl])
     apply(case_tac x1, auto)
      apply(simp add:Divides.divmod_nat_if)
      apply(simp add:byteFromNat_def word8FromNat_def)
-    apply(simp add: Divides.divmod_nat_zero_left)
+    apply(simp add: Divides.divmod_nat_if)
     done
 
 case (2 n)
@@ -2205,7 +2207,7 @@ case (2 n)
     apply(case_tac x1, auto)
      apply(simp add:Divides.divmod_nat_if)
      apply(simp add:byteFromNat_def word8FromNat_def)
-     apply(simp add: Divides.divmod_nat_zero_left)
+     apply(simp add: Divides.divmod_nat_if)
 
     apply(simp add:output_address_def) apply(split prod.splits) apply(auto)
     apply(case_tac x1, auto)
@@ -2215,12 +2217,15 @@ case (2 n)
       apply(simp add:uint_word_of_int)
 (* need a lemma about results of div *)
 (* div_less *)
-      apply(simp add:Divides.divmod_nat_div_mod) apply(clarify)
+      apply(simp add:Divides.divmod_nat_def) apply(clarify)
      apply(simp)
      apply(case_tac "m \<le> 8")
       apply(frule_tac Orderings.min_absorb1) apply(simp)
       apply(simp add: bintrunc_mod2p)
+      apply (simp add: nat_add_distrib nat_mod_distrib nat_power_eq)
 
+(*
+    sledgehammer
       apply(subgoal_tac "2^m dvd 256")
        apply(frule_tac a = "1+ int nata" in mod_mod_cancel) apply(simp)
        apply(simp add: "Divides.nat_mod_distrib")
@@ -2228,22 +2233,32 @@ case (2 n)
        apply(subgoal_tac "0 \<le> 2") apply(rotate_tac -1)
     apply(frule_tac n = m in "Int.nat_power_eq")
         apply(simp)
-        apply(presburger)
-       apply(simp)
+        apply (simp add: nat_add_distrib nat_power_eq)
+    apply(simp)
       apply(subgoal_tac "2^m dvd 2^8")
        apply(rule_tac[2] Power.comm_semiring_1_class.le_imp_power_dvd)
        apply(simp) apply(simp)
-
+*)
      apply(subgoal_tac "min m 8 = 8")
     apply(simp)
       apply(simp add: bintrunc_mod2p)
        apply(simp add: "Divides.nat_mod_distrib")
       apply(simp add: SMT.Suc_as_int)
+      apply(simp add: Euclidean_Division.div_eq_0_iff)
 
-(* here, we need to use the fact that int nata + 1 < 256*)
+      apply(subgoal_tac "2^m > (256 :: nat)")
+    apply(subgoal_tac "nat (int nata + 1) < (2 ^ m :: nat)")
+    apply(clarsimp)
+        apply(presburger)
+    apply(drule_tac Orderings.order_class.order.strict_trans)
+        apply(simp)
+       apply(simp)
 
-    defer
-      apply(simp)
+      apply(auto)
+    apply(subgoal_tac "8 < m") apply(rotate_tac -1)
+      apply(drule_tac a = 2 in Power.linordered_semidom_class.power_strict_increasing)
+       apply(simp)
+    apply(simp) apply(simp)
 
 (* final goal *)
 (*
@@ -2283,7 +2298,7 @@ int (Suc nataa mod 2 ^ (m - 8))
          apply(simp)
     apply(simp add:bin_cat_num)
          apply(simp add: Bit_Representation.bintrunc_mod2p)
-         apply(simp add:Divides.divmod_nat_div_mod) apply(auto)
+         apply(simp add:Divides.divmod_nat_def) apply(auto)
        apply(simp add: byteFromNat_def word8FromNat_def)
        apply(simp add: Word.uint_word_of_int)
        apply(simp add:Divides.zmod_int)
@@ -2299,29 +2314,22 @@ Suc nata mod ((256 * 2 ^ ((m :: nat) - 8))) = (256 * (Suc nata div 256 mod 2 ^ (
 (* mult2_eq ? should solve it, very nice! *)
        apply(subgoal_tac "m > 8") apply(rotate_tac -1)
         apply(drule_tac base = 2 in my_pow_add) apply(simp)
-       apply(simp)
+      apply(simp)
+(*
       apply(simp add: div_eq_0_iff)
       apply(subgoal_tac "(2 :: nat) ^ m > 256")
        apply(auto)
+*)
+     apply(simp add: divmod_nat_def) apply(auto)
 
-      apply(subgoal_tac "m > 8")
-    apply(rotate_tac -1)
-       apply(drule_tac a = 2 in Power.linordered_semidom_class.power_strict_increasing)
-        apply(simp) apply(simp)
-      apply(simp)
-
-(* deferred *)
-     apply(simp add: divmod_nat_div_mod) apply(clarsimp)
-
-(* deferred *)
-
-     apply(simp add: divmod_nat_div_mod) apply(clarsimp)
+     apply(simp add: divmod_nat_def) apply(auto)
         apply(simp add: Int.nat_add_distrib Int.nat_mult_distrib Divides.nat_mod_distrib
                         Int.nat_power_eq)
-    apply(subgoal_tac "(2 ^ m) dvd 256")
-     apply(drule_tac a = "Suc nata" in  Divides.semiring_div_class.mod_mod_cancel)
-     apply(simp)
 
+    apply(subgoal_tac "(2 ^ m) dvd 256")
+     apply(drule_tac a = "Suc nata" in Euclidean_Division.euclidean_semiring_cancel_class.mod_mod_cancel)
+     apply(simp)
+    apply(rotate_tac -2)
     apply(drule_tac a = 2 in Power.comm_semiring_1_class.le_imp_power_dvd)
     apply(simp)
     done
@@ -2948,7 +2956,18 @@ calldatacopy_def extcodecopy_def
 read_word_from_bytes_def ucast_def
 variable_ctx.simps
 split:list.splits prod.splits instruction_result.splits option.splits )
-(* INTERACTION REQUIRED HERE to continue tracing. let's try to fix this.... or is there? ? ?*)
+
+(*
+    apply(simp only: irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def sha3_def mload_def mstore_def mstore8_def cut_memory_def
+calldatacopy_def extcodecopy_def
+read_word_from_bytes_def ucast_def
+variable_ctx.simps
+split:list.splits prod.splits instruction_result.splits option.splits)*)
+(*    apply(simp) (* TODO: changes being made here, was originally just the
+simp add line, now too slow *) *)
 apply(simp add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
 program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
 arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps

@@ -89,12 +89,12 @@ fun program_map_of_lst ::
    \<Rightarrow> (nat, inst) map (* result *)"
 where
   "program_map_of_lst _ [] = empty"
-  -- {* the empty program is translated into the empty tree. *}
+  (* {* the empty program is translated into the empty tree. *} *)
 | "program_map_of_lst pos (Stack (PUSH_N bytes) # rest) =
    store_byte_list_in_map (pos + 1) bytes 
    ((program_map_of_lst (pos + 1 + length bytes) rest)
        (pos := Some (Stack (PUSH_N bytes))))"
-  -- {* The PUSH instruction is translated together with the immediate value. *}
+  (* {* The PUSH instruction is translated together with the immediate value. *} *)
 | "program_map_of_lst pos (i # rest) =
    (program_map_of_lst (pos + 1) rest)(pos := Some i)"
 
@@ -466,6 +466,7 @@ fun get_stack :: "inst \<Rightarrow> stack_inst" where
 fun get_push_bytes :: "inst \<Rightarrow> byte list" where
 "get_push_bytes (Stack (PUSH_N s)) = s"
 
+(*
 theorem get_unknown [simp] :
   "n < length lst \<Longrightarrow>
    make_unknown t lst (n+t) = Some (Unknown (lst!n))"
@@ -617,7 +618,7 @@ proof -
     by (smt content_eq map_tree_eq_def nat_0 nat_int of_nat_0_le_iff)
   from a and b show ?thesis by auto
 qed
-
+*)
 end
 
 
