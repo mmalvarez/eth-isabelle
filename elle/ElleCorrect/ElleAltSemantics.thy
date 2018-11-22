@@ -3322,10 +3322,26 @@ in elle_instD'_correct)
 
 (* final goal *)
 (* under construction  *)
-(*
+     apply(case_tac "index aa ab")
+      apply(clarsimp del:instruction_sem_def next_state_def)
+
     apply(case_tac " check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (cc\<lparr>cctx_program := bogus_prog\<rparr>)
             (vctx_stack vi) (aa ! ab) net")
-     apply(simp del:instruction_sem_def next_state_def)
+     apply(clarsimp del:instruction_sem_def next_state_def)
+     apply(case_tac "index aa ab")
+      apply(clarsimp del:instruction_sem_def next_state_def)
+      apply(case_tac "length (inst_code (aa ! ab))")
+       apply(clarsimp)
+      apply(clarsimp)
+
+     apply(clarsimp del:instruction_sem_def next_state_def check_resources_def)
+    apply(case_tac
+"check_resources (vi\<lparr>vctx_pc := int ab\<rparr>)
+             (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>)
+             (vctx_stack vi) (aa ! ab) net"
+)
+     apply(clarsimp del:instruction_sem_def next_state_def)
+apply(clarsimp)
 
     print_state
     apply(case_tac " next_state (\<lambda>_. ())
@@ -3333,6 +3349,7 @@ in elle_instD'_correct)
                  \<lparr>program_content = \<lambda>i. index aa (nat i),
                     program_length = int (length aa)\<rparr>\<rparr>)
            net (InstructionContinue (vi\<lparr>vctx_pc := int ab\<rparr>))")
+    apply(simp)
       apply(simp del:instruction_sem_def next_state_def)
 apply(simp del:instruction_sem_def next_state_def)
      apply(clarify)
@@ -3367,7 +3384,7 @@ apply(rotate_tac -1) apply(drule_tac x = x23 in spec)
     apply(simp del:instruction_sem_def next_state_def)
 
     done
-*)
+
     sorry
 next
   case (3 t cp x e d cc net st st')
