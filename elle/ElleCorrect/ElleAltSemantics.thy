@@ -1,5 +1,5 @@
 theory ElleAltSemantics
-  imports Main "Valid4" "../../EvmFacts" "../../example/termination/ProgramList"
+  imports Main "ElleCorrect.Valid4" "ElleCorrect.EvmFacts" "ElleCorrect.ProgramList"
 begin
 
 (*
@@ -3076,6 +3076,28 @@ lemma my_exec_continue :
 (not arbitrary InstructionToEnvironment)
 *)
 
+lemma check_resources_gen :
+"check_resources v c s i net \<Longrightarrow>
+ inst_valid i \<Longrightarrow>
+ v' = (v \<lparr> vctx_pc := pc' \<rparr>) \<Longrightarrow>
+ c' = (c \<lparr> cctx_program := prog' \<rparr>) \<Longrightarrow>
+ check_resources v' c' s i net
+"
+  apply(case_tac i)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+       apply(simp add: check_resources_def)
+      apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+              apply(simp add: check_resources_def)
+   apply(simp add: check_resources_def)
+  apply(simp add: check_resources_def del:meter_gas_def)
+  done
 
 (*
 TODO: we also need to prove a case that if the Elle semantics fails,
@@ -3322,70 +3344,110 @@ in elle_instD'_correct)
 
 (* final goal *)
 (* under construction  *)
+(* need case_tac nata? *)
      apply(case_tac "index aa ab")
-      apply(clarsimp del:instruction_sem_def next_state_def)
+     apply(clarsimp del:instruction_sem_def next_state_def)
+     apply(case_tac "inst_code (aa ! ab)", auto)
+
+    apply(case_tac " check_resources (vi\<lparr>vctx_pc := int ab\<rparr>) (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>)
+             (vctx_stack vi) (aa ! ab) net")
+    apply(simp only:)
+     apply(simp del:instruction_sem_def next_state_def check_resources_def)
+
+     apply(case_tac "check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (cc\<lparr>cctx_program := bogus_prog\<rparr>) (vctx_stack vi) (aa ! ab) net")
+    apply(simp only:)
+      apply(simp del:instruction_sem_def next_state_def check_resources_def)
+
+    apply(case_tac nata)
+       apply(simp del:instruction_sem_def next_state_def check_resources_def)
+
+    apply(frule_tac elle_alt_sem_halted)
+      apply(simp del:instruction_sem_def next_state_def check_resources_def)
+
+    apply(frule_tac elle_alt_sem_halted)
+      apply(simp del:instruction_sem_def next_state_def check_resources_def)
+      apply(clarify)
+
+      apply(simp del:instruction_sem_def check_resources_def)
+
+(* next_state_halted?
+need to show that b/c we start in
+a ToEnvironment state,
+that same state is returned in the end *)
+
+    apply(case_tac "
+ instruction_sem (vi\<lparr>vctx_pc := int ab\<rparr>)
+               (cc\<lparr>cctx_program :=
+                     \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>)
+               (aa ! ab) net
+")
+      apply(simp del:instruction_sem_def check_resources_def)
+      apply(simp del:instruction_sem_def check_resources_def)
+
+    apply(simp only:)
+
+     apply(frule_tac elle_alt_sem_halted)
+     apply(simp only: split:if_splits, clarify)
+
+(* need a lemma about check_resources
+if two cctx differ only in programs
+
+ *)
+      apply(frule_tac
+  v' = "(vi\<lparr>vctx_pc := 0\<rparr>)" and
+  c' =  "(cc\<lparr>cctx_program := bogus_prog\<rparr>)" and
+  pc' = 0 and
+  prog' = bogus_prog in
+ check_resources_gen) apply(clarify)
+        apply(simp del:instruction_sem_def check_resources_def)
+       apply(simp del:instruction_sem_def check_resources_def)
+      apply(clarify)
+
+      apply(frule_tac
+  v' = "(vi\<lparr>vctx_pc := 0\<rparr>)" and
+  c' =  "(cc\<lparr>cctx_program := bogus_prog\<rparr>)" and
+  pc' = 0 and
+  prog' = bogus_prog in
+ check_resources_gen) apply(clarify)
+        apply(simp del:instruction_sem_def check_resources_def)
+       apply(simp del:instruction_sem_def check_resources_def)
+      apply(clarify)
 
     apply(case_tac " check_resources (vi\<lparr>vctx_pc := 0\<rparr>) (cc\<lparr>cctx_program := bogus_prog\<rparr>)
-            (vctx_stack vi) (aa ! ab) net")
-     apply(clarsimp del:instruction_sem_def next_state_def)
-     apply(case_tac "index aa ab")
-      apply(clarsimp del:instruction_sem_def next_state_def)
-      apply(case_tac "length (inst_code (aa ! ab))")
-       apply(clarsimp)
-      apply(clarsimp)
-
-     apply(clarsimp del:instruction_sem_def next_state_def check_resources_def)
-    apply(case_tac
-"check_resources (vi\<lparr>vctx_pc := int ab\<rparr>)
-             (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>)
-             (vctx_stack vi) (aa ! ab) net"
-)
-     apply(clarsimp del:instruction_sem_def next_state_def)
-apply(clarsimp)
-
-    print_state
-    apply(case_tac " next_state (\<lambda>_. ())
-           (cc\<lparr>cctx_program :=
-                 \<lparr>program_content = \<lambda>i. index aa (nat i),
-                    program_length = int (length aa)\<rparr>\<rparr>)
-           net (InstructionContinue (vi\<lparr>vctx_pc := int ab\<rparr>))")
-    apply(simp)
-      apply(simp del:instruction_sem_def next_state_def)
-apply(simp del:instruction_sem_def next_state_def)
+            (vctx_stack vi) (aa ! ab) net") 
+           apply(frule_tac
+  v' = "(vi\<lparr>vctx_pc := ab\<rparr>)" and
+  c' =  "(cc\<lparr>cctx_program :=
+              \<lparr>program_content = \<lambda>i. index aa (nat i),
+                 program_length = int (length aa )\<rparr>\<rparr>)" and
+  pc' = ab and
+  prog' = "\<lparr>program_content = \<lambda>i. index aa (nat i),
+                 program_length = int (length aa )\<rparr>" in
+ check_resources_gen) apply(clarify)
+       apply(simp (no_asm_simp))
+      apply(simp (no_asm_simp))
      apply(clarify)
-     apply(case_tac x22) apply(case_tac vc) apply(clarify)
-     apply(simp del:instruction_sem_def next_state_def)
-     apply(frule_tac elle_alt_sem_halted)
-     apply(simp del:instruction_sem_def next_state_def)
+    apply(rotate_tac -2)
+    print_simpset
+        apply(simp only: HOL.if_not_P HOL.if_False)
+    apply(case_tac nata) apply(clarify)
+    apply(simp only:program_sem.simps)
+        apply(simp del:instruction_sem_def meter_gas_def inst_stack_numbers.simps check_resources_def)
+     apply(clarify)
+    apply(drule_tac spec)
+     apply(clarify)
+       apply(simp (no_asm_simp))
 
-    print_state
-    apply(subgoal_tac "index aa ab = Some (aa ! ab)")
-     apply(rule_tac [2] LemExtraDefs.index_simps)
-     defer
-    print_state
-     apply(case_tac "inst_code(aa ! ab)") 
-      apply(simp del:instruction_sem_def next_state_def)
-     apply(simp del:instruction_sem_def next_state_def)
-    print_state
-    apply(frule_tac elle_alt_sem_halted)
-    apply(rotate_tac -1) apply(drule_tac x = x21 in spec)
-    apply(rotate_tac -1) apply(drule_tac x = x22 in spec)
-apply(rotate_tac -1) apply(drule_tac x = x23 in spec)
-    apply(auto simp only:)
-     apply(simp del:instruction_sem_def next_state_def)
-    apply(clarify)
-    apply(auto simp only:)
-    print_state
-     apply(simp del:instruction_sem_def next_state_def)
-    print_state
-    apply(case_tac "(next_state (\<lambda>_. ()) (cc\<lparr>cctx_program := \<lparr>program_content = \<lambda>i. index aa (nat i), program_length = int (length aa)\<rparr>\<rparr>) net
-          (InstructionContinue (vi\<lparr>vctx_pc := int ab\<rparr>)))")
-     apply(simp del:instruction_sem_def next_state_def)
-    apply(simp del:instruction_sem_def next_state_def)
+apply(clarify)
+    apply(simp only:program_sem.simps)
+        apply(simp del:instruction_sem_def meter_gas_def inst_stack_numbers.simps check_resources_def)
 
+     apply(clarify)
+    apply(drule_tac spec)
+     apply(clarify)
+    apply(simp (no_asm_simp))
     done
 
-    sorry
 next
   case (3 t cp x e d cc net st st')
   then show ?case 
@@ -3642,6 +3704,8 @@ otherwise, we know cl mod 2 ^ 256 = cl
 so we can proceed with the theorem and use the fact that JUMPDEST
 is at cl.
 *)
+
+(* *** Here is where the branching gets going *** *)
     apply(simp) apply(safe)
 (* we need a fact about label/inst *)
 (* something weird is happening here.
@@ -3670,9 +3734,12 @@ we know this b/c of one of our desc_bounded lemmas
 *)
     print_state
      apply(simp add:ll_valid3'_def)
+(* *** first use of valid3'_cases - should be the only one, I think *** *)
      apply(drule_tac "ll_valid3'p.cases")
            apply(simp_all)
     print_state
+
+(* *** still 2 goals here, good *** *)
      apply(clarsimp)
     apply(subgoal_tac "ej = []")
       apply(auto simp only:)
@@ -3687,6 +3754,8 @@ we know this b/c of one of our desc_bounded lemmas
     print_state
     apply(simp add:ll3'_descend_def)
 
+(* *** looks OK here *** *)
+
     apply(subgoal_tac "nat (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl)) mod 115792089237316195423570985008687907853269984665640564039457584007913129639936) = cl")
        apply(clarsimp)
     print_state
@@ -3698,6 +3767,7 @@ we know this b/c of one of our desc_bounded lemmas
     print_state
           apply(simp_all)
 (* cl = a because of determinism here *)
+(* what about ad though? *)
     apply(subgoal_tac "cl = a") apply(simp)
     print_state
          apply(drule_tac x = act in spec) apply(rotate_tac -1)
@@ -3720,14 +3790,11 @@ we know this b/c of one of our desc_bounded lemmas
     apply(subgoal_tac "nat (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl)) mod 115792089237316195423570985008687907853269984665640564039457584007913129639936) = cl")
           apply(clarsimp)
 
-(* i can't believe we haven't proved
-a descendent lemma about valid3' yet lol *)
-(* ll_valid3'_desc_full *)
+
           apply(frule_tac k = "ej" in ll_valid3'_desc_full)
            apply(simp)
     (* idea: we know ej and st are non nil, so we can split
 the descendents *)
-(* ll3_descend_splitpath *)
           apply(case_tac "ej @ st") apply(simp)
           apply(simp)
           apply(frule_tac kh = "ad" in ll_descend_eq_l2r)
@@ -3748,6 +3815,11 @@ the descendents *)
     apply(clarsimp)
     print_state
            apply(rotate_tac -6)
+
+(* *** make sure all the stuff going on above
+is correct. i _think_ we need to split here *** *)
+(* *** case split on x2a ! cl? *** *)
+
            apply(drule_tac ll_valid3'.cases, simp)
     print_state
                 apply(simp)
@@ -3775,12 +3847,40 @@ apply(drule_tac x = venv in spec) apply(rotate_tac -1)
 (* prove a = cl *)
 (* huh, i guess we still need to use valid3' here? *)
 (* idea: LSeq ed ls is in valid3' *)
-    apply(clarsimp)
+(* this is using desc_full *)
+(* next up we use cases to show that the two
+descended labels must have the same location *)
+
+             apply(auto simp only:)
+    apply(frule_tac t = ttree
+                and td = "llt.LSeq ed ls" in ll_valid3'_desc_full)
+             apply(auto simp only:)             
+            apply(thin_tac "
+((0, length x2a), ttree) \<in> ll_valid3'
+")
+            apply(rotate_tac -1)
+
+            apply(rule_tac
+a = " ((ac, ba), llt.LSeq ed ls)" in
+ ll_valid3'.cases)
     print_state
-               
-    print_state
-                apply(auto simp only:)
-    print_state
+                  apply( simp (no_asm_use) only:)
+    apply(case_tac x)
+                 apply( simp)
+                apply( simp)
+    apply( simp)
+              apply( simp)
+             apply( simp)
+
+            apply(rotate_tac -1)
+    apply(drule_tac x = "x21a # x22a" in spec)
+    apply(rotate_tac -1)
+    apply(drule_tac x = "(a,b)" in spec)
+    apply(rotate_tac -1)
+    apply(drule_tac x = "el" in spec)
+    apply(rotate_tac -1)
+    apply(clarify)
+
 (* use determinism of descends here to show
 LSeq ed ls = bd
 
@@ -3793,10 +3893,7 @@ determinism and valid3 cases to show that the
 descended labels have the same location annotations
 *)
 
-    apply(subgoal_tac "")
-
            apply(frule_tac t = ttree and cp = "(ad # x22 @ x21a # x22a)" in program_list_of_lst_validate_head1)
-    print_state (goals_limit 1)
                apply(auto simp only:)
 
 (* now, just need to prove that

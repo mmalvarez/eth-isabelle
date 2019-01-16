@@ -25,17 +25,20 @@ done
 definition map_tree_eq :: "(nat, inst) map \<Rightarrow> (int*inst) avl_tree \<Rightarrow> bool" where
 "map_tree_eq m tree = (\<forall>x. x \<ge> 0 \<longrightarrow> m (nat x) = lookup tree x)"
 
+(*
 lemma empty_eq : "map_tree_eq empty Leaf"
 apply(auto simp:map_tree_eq_def)
 done
+*)
 
+(*
 lemma update_eq :
   "sorted1(inorder tree) \<Longrightarrow> n \<ge> 0 \<Longrightarrow> map_tree_eq m tree \<Longrightarrow>
    map_tree_eq (m(n:=Some t)) (update n t tree)"
 apply(auto simp:map_tree_eq_def)
   apply (simp add: AVL_Map.map_update)
   by (simp add: AVL_Map.map_update nat_eq_iff)
-
+*)
 
 fun store_byte_list_in_map ::
   "nat (* initial position in the AVL *) \<Rightarrow> byte list (* the data *) \<Rightarrow>
@@ -50,7 +53,7 @@ where
 lemma nat_suc : "n \<ge> 0 \<Longrightarrow> Suc (nat n) = nat (n+1)"
 apply(auto)
 done
-
+(*
 lemma store_bytes_inv :
   "sorted1(inorder tree) \<Longrightarrow>
    sorted1(inorder (store_byte_list_in_program n lst tree))"
@@ -83,7 +86,8 @@ proof -
   then show "map_tree_eq (store_byte_list_in_map (nat (na + 1)) lsta (ma(nat na \<mapsto> Unknown a))) (store_byte_list_in_program (na + 1) lsta (update na (Unknown a) treea))"
     using f6 f5 a4 a3 a2 a1 by (metis invar_update le_add2 le_add_same_cancel2 nat_0_le update_eq)
 qed
-
+*)
+(*
 fun program_map_of_lst ::
   "nat (* initial position in the AVL *) \<Rightarrow> inst list (* instructions *)
    \<Rightarrow> (nat, inst) map (* result *)"
@@ -171,11 +175,12 @@ next
     by (simp add: Cons.IH invar_update)
 qed
 qed
-
+*)
 lemma nat_suc2 : "n \<ge> 0 \<Longrightarrow> Suc (nat n + length x2) = nat (n + 1 + length x2)"
 apply(auto)
 done
 
+(*
 lemma content_eq : 
   "n \<ge> 0 \<Longrightarrow>
    map_tree_eq (program_map_of_lst (nat n) lst)
@@ -307,7 +312,7 @@ apply(auto simp:map_tree_eq_def)
   by (smt AVL_Map.map_update Cons.IH Cons.prems fun_upd_apply int_eq_iff int_nat_eq map_tree_eq_def nat_eq_iff nat_suc program_avl_inv semiring_1_class.of_nat_simps(2))
 qed
 qed
-
+*)
 theorem content_small_aux_bytes [simp] :
   "k < pos \<Longrightarrow>
    m k = None \<Longrightarrow>
@@ -316,6 +321,7 @@ apply(induction lst arbitrary:pos k m)
 apply(auto)
 done
 
+(*
 theorem content_small_aux_stack [simp] :
  "(\<And>pos k.
            k < pos \<Longrightarrow>
@@ -343,7 +349,7 @@ theorem content_small [simp] :
 apply(induction lst arbitrary:pos k)
 apply(auto)
 done
-
+*)
 
 theorem update_add :
    "m k = None \<Longrightarrow>
@@ -366,6 +372,7 @@ apply(rule ran_blargh)
 apply(auto)
 done
 
+(*
 fun make_unknown :: "nat \<Rightarrow> byte list \<Rightarrow> (nat,inst) map" where
  "make_unknown pos [] = empty"
 |"make_unknown pos (a#t) =
@@ -376,7 +383,7 @@ theorem make_small [simp] :
 apply(induction bytes arbitrary:pos k)
 apply(auto)
 done
-
+*)
 theorem unfold_update :
    "(m(pos \<mapsto> a)) x = (if x = pos then Some a else m x)"
 apply(auto)
@@ -400,6 +407,7 @@ theorem combine_none :
 apply(auto)
 by (simp add: map_add_def)
 
+(*
 theorem program_list_bytes [simp] :
   "store_byte_list_in_map pos bytes m =
    m ++ make_unknown pos bytes"
@@ -429,7 +437,7 @@ theorem more_lemmas :
 apply(subst make_unknown_lemma)
 apply(auto simp:unknown_union)
 done
-
+*)
 theorem index_one [simp] :
   "0 < n \<Longrightarrow> index (x # lst) n = index lst (n-1)"
 apply(cases n)

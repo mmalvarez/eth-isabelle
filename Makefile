@@ -1,5 +1,7 @@
 .PHONY: all all-isabelle light-isabelle clean clean-pdf clean-thy clean-ocaml clean-hol lem-thy lem-pdf lem-hol lem-ocaml doc
 
+LEMLIB=/home/yorix/winhome/Code/lem/library
+
 all: simplewallet lem-thy lem-pdf lem-ocaml lem-hol lem-coq doc
 
 clean: clean-pdf clean-thy clean-ocaml clean-hol

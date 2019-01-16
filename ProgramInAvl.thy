@@ -70,7 +70,7 @@ declare update.simps [simp del]
 declare lookup.simps [simp del]
 
 text {* Instead, I only allow the following operations to happen (from left to right). *}
-
+(*
 lemma updateL [simp] : "update x y Leaf = Node 1 Leaf (x,y) Leaf"
 apply(simp add: update.simps)
 done
@@ -189,5 +189,5 @@ lemma balR_eq_heavy_r [simp]:
    balR l a (Node bh bl b br) = node (node l a bl) b br"
 apply(simp add: balR_def)
 done
-
+*)
 end
