@@ -370,8 +370,8 @@ fun elle_jumpiD :: "ellest \<Rightarrow> (bool * ellest)" where
           | cond#rest \<Rightarrow>
            let new_env = (e \<lparr> ellest_ir := (InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - (Ghigh + Gverylow)) \<rparr>)) \<rparr>) in
             strict_if (cond =(((word_of_int 0) ::  256 word)))
-             (\<lambda> _ . (True, (new_env) ))
-             (\<lambda> _  . (False, (new_env)))))"
+             (\<lambda> _ . (False, (new_env) ))
+             (\<lambda> _  . (True, (new_env)))))"
 
 fun elle_jumpiD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instruction_result \<Rightarrow> (bool * instruction_result)" where
 "elle_jumpiD' c n ir =
@@ -387,8 +387,8 @@ fun elle_jumpiD' :: "constant_ctx \<Rightarrow> network \<Rightarrow> instructio
           | cond#rest \<Rightarrow>
            let new_env = ((InstructionContinue (v \<lparr> vctx_stack := rest, vctx_gas := (vctx_gas v - (Ghigh + Gverylow)) \<rparr>))) in
             strict_if (cond =(((word_of_int 0) ::  256 word)))
-             (\<lambda> _ . (True, (new_env) ))
-             (\<lambda> _  . (False, (new_env)))))"
+             (\<lambda> _ . (False, (new_env) ))
+             (\<lambda> _  . (True, (new_env)))))"
 
 
 definition elle_interp :: "ellest llinterp" where
