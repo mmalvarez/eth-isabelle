@@ -1,0 +1,6 @@
+session ElleCorrect = "LEM" +
+  description {*
+    Dependencies of ElleAltSemantics.thy
+  *}
+  sessions "HOL-Number_Theory"
+  theories "ElleCorrect/Valid4" "../EvmFacts" "../example/termination/ProgramList"
