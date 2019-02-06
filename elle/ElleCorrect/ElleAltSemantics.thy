@@ -5814,6 +5814,7 @@ i.e., the JUMP
      apply(subgoal_tac
        "x2a ! nat (int a + (1 + int (length (output_address ej)))) = Pc JUMP")
 
+     apply(subgoal_tac "(uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address ej))) :: 256 word)) =  ej")
      
      apply(simp add:check_resources_def)
      apply(split option.split_asm) apply(clarsimp)
@@ -5827,6 +5828,9 @@ i.e., the JUMP
      apply(simp)
 
      (* branching begins *)
+     (* *** do we want to try to extract
+information about x2b = JUMPDEST here? *)
+  apply(simp)
      apply(safe)
      apply(clarsimp)
 
@@ -5834,196 +5838,144 @@ i.e., the JUMP
      apply(simp_all)
      apply(clarsimp)
      apply(case_tac xl, clarsimp)
-     apply(case_tac cpre) apply(clarsimp)
-                apply(rotate_tac -2)
-                apply(drule_tac x = "cl" in spec) 
-                apply(case_tac cl) apply(clarsimp)
-                apply(clarsimp)
-                      apply(auto simp only:)
-                apply(clarsimp)
-                apply(rotate_tac -1) apply(drule_tac x = ab in spec)
-apply(rotate_tac -1) apply(drule_tac x = b in spec)
-apply(rotate_tac -1) apply(drule_tac x = el in spec)
-apply(simp add:ll_descend_eq_l2r)
 
-apply(split option.split_asm)
-apply(clarsimp)
+     apply(frule_tac k = k in ll_descend_eq_r2l)
+          apply(drule_tac k = k and  q' = "(ac, bb)" in ll_descend_eq_r2l)
+          apply(case_tac k) apply(clarsimp)
+          apply(clarsimp)
+     apply(frule_tac adl = ej and cp = "ad#lista" in program_list_of_lst_validate_head1)
+     apply(simp_all)
 
-
-     apply(subgoal_tac "x2b = Pc JUMPDEST") apply(clarsimp)
-     apply(case_tac xl, clarsimp)
-
-     apply(subgoal_tac
-       "ab = 
-uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address ej))) :: 256 word)")
+     defer (* label fact *)
+     apply(clarsimp) (* need to know ej < length x2a *)
+     apply(subgoal_tac "ej < length x2a")
      apply(clarsimp)
+     apply(case_tac "index x2a ej") apply(clarsimp) 
+     apply(case_tac "x2a ! ej", auto)
+
+     apply(case_tac "cpre @ cl") apply(clarsimp)
+     apply(clarsimp)
+
+     (* cpre should be nil *)
+     apply(case_tac cpre) apply(clarsimp)
+
+
+     apply(drule_tac x = "ac#listb" in spec) apply(clarsimp)
+     apply(drule_tac kh = "ac" and kt = listb
+                     and e = e and q = "(0, length x2a)" in ll_descend_eq_l2r_list)
+     apply(subgoal_tac "(\<exists>a b ba.
+           (((0, length x2a), llt.LSeq e la), ((a, b), llt.LLab ba (length listb)),
+            ac # listb)
+           \<in> ll3'_descend)")
+     apply(clarsimp)
+
+     apply(rotate_tac -1)
+     apply(drule_tac ll_descend_eq_r2l)
+     apply(rotate_tac -2)
+     apply(drule_tac ll_descend_eq_r2l)
+     apply(clarsimp)
+
      apply(drule_tac x = "ContractFail l" in spec)
      apply(clarsimp)
-     apply(rotate_tac -1)
-     apply(drule_tac x = vc in spec)
-     apply(rotate_tac -1)
-     apply(drule_tac x = venv in spec)
-     apply(rotate_tac -1)
-     apply(drule_tac x = nata in spec)
-     apply(case_tac vi)
-     apply(clarsimp)
-
-     defer (* gross math goal *)
+     apply(case_tac vi) apply(clarsimp)
      
-  (*   
-apply(split option.split_asm) apply(clarsimp)
-    (* added *)
-    apply(split if_split_asm)
-    apply(clarsimp)
-
-    (*
-    apply(case_tac "x2a ! nat (int a + (1 + int (length (output_address ej))))", auto)
-    *)
-    (*
-      apply(case_tac "vctx_gas vi < 11")
-       apply(auto simp del:elle_instD'.simps program_sem.simps)
-     apply(frule_tac elle_alt_sem_halted) apply(auto)
-       apply(case_tac "int (length (vctx_stack vi)) \<le> 1023 \<and> 3 \<le> vctx_gas vi", auto)
-
-       apply(case_tac nata, auto)
-        apply(auto simp add:Int.nat_add_distrib)
-*)
-
-    apply(case_tac " index x2a (nat (uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)))")
-    apply(auto)
-    print_state
-(* need a  lemma relating the address to the result on the stack *)
-    apply(simp add:word_of_int_def)
-    apply(simp add:Abs_word_inverse)
-apply(cut_tac cl = cl in "reconstruct_address_gen2")
-    apply(simp add: sym[OF Bit_Representation.bintrunc_mod2p])
-(* descend_eq_lr2, but we need to do a case split on ej @ st first *)
-     apply(case_tac "ej @ dj", clarify) apply(simp)
-    apply(simp)
-    apply(frule_tac kh = ab in ll_descend_eq_l2r)
-    apply(frule_tac validate_jump_targets_spec)
-     apply(simp)
-(* case split on whether cl > 2 ^ 256.
-if it is greater, then we can derive a contradiction from the fact that 
-PUSH_N (output_address cl) is in x2a
-and that x2a passed through program_list_of_lst_validate
-(need an auxiliary result about how if PUSH_N is in a result of
-program_list_of_lst_validate, then the PUSH_N argument has 1-32 bytes
-)
-(then, need a lemma about how if we have a bytestream of 1-32 bytes,
-bincat'ing them will yield a number less than 2^256)
-
-otherwise, we know cl mod 2 ^ 256 = cl
-so we can proceed with the theorem and use the fact that JUMPDEST
-is at cl.
-*)
-
-(* *** Here is where the branching gets going *** *)
-    apply(simp) apply(safe)
-(* we need a fact about label/inst *)
-(* something weird is happening here.
-i think we need uniqueness of labels, which comes from
-valid3' of the root *)
-
-(*
-another thought.
-perhaps what we actually need is
-to use list_of_lst_validate_head' on the label,
-so we can prove that the lookup results in a PC Jumpdest
-*)
-
-(* we have a fact about "!" here, but we may need an additional
-fact about index being less than length *)
-(* know aa < length x2a
-we know this b/c of one of our desc_bounded lemmas
-*)
-
-(* here we need to put together
-- reconstruct_address_gen2
-- output_address_length_bound
-- "a < b \<longrightarrow> a mod b = a"
-- at that point we will be
-"looking up" the value we want
-*)
-    print_state
-     apply(simp add:ll_valid3'_def)
-(* *** first use of valid3'_cases - should be the only one, I think *** *)
-     apply(drule_tac "ll_valid3'p.cases")
-           apply(simp_all)
-    print_state
-
-(* *** still 2 goals here, good *** *)
+     (* proof of subgoal thesis (hypothesis of lemma about descended labels being equal) *)
+     apply(rule_tac x = ab in exI)
+     apply(rule_tac x = ba in exI)
+     apply(rule_tac x = el in exI)
      apply(clarsimp)
-    apply(subgoal_tac "ej = []")
-      apply(auto simp only:)
-      apply(simp_all)
-    apply(rotate_tac -2)
-    apply(drule_tac x = st in spec)
-      apply(auto simp only:)
+     
+     (* proof that cpre is nil *)
+     apply(clarify)
+     apply(simp)
+     apply(clarify)
+     apply(simp (no_asm_use))
 
-(* relabel, then l2r *)
-       apply(case_tac st, simp) apply(simp)
-    apply(frule_tac q = "(0, length x2a)" and e = e in ll_descend_eq_l2r_list)
-    print_state
-    apply(simp add:ll3'_descend_def)
+     (* proof about ej, boundednesss *)
+     apply(frule_tac cp = "ad#lista" and ad = "(ej, bb)" and d = " llt.LLab True (length lista)"  in qvalid_get_node2) apply(clarsimp)
+     apply(drule_tac qvalid_llab) apply(clarsimp)
+     apply(drule_tac nd = ej and nd' = bb and cp = "ad#lista" and desc = " llt.LLab True (length lista)" in qvalid_desc_bounded1) apply(clarsimp) apply(clarsimp)
 
-(* *** looks OK here *** *)
+     (* other big case, then deferred goals *)
 
-    apply(subgoal_tac "nat (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl)) mod 115792089237316195423570985008687907853269984665640564039457584007913129639936) = cl")
-       apply(clarsimp)
-    print_state
+     (* first, prove descendent is valid.
+then repeat case above. *)
+apply(frule_tac k = cpre in ll_valid3'_desc_full) apply(clarsimp)
+apply(rotate_tac -1)
+          apply(drule_tac ll_valid3'.cases)
+     apply(simp_all)
+     apply(clarsimp)
+     apply(case_tac xl, clarsimp)
+     apply(case_tac k) apply(clarsimp)
+     apply(clarsimp)
 
-       apply(frule_tac a = "(0, length x2a)" and cp = st
-             and adl = cl in program_list_of_lst_validate_head1)
-           apply(rule_tac ll_descend_eq_r2l)
-    apply(simp)
-    
-    print_state
-          defer (* fact about label, easy *)
-    print_state
-          apply(simp_all)
-        apply(clarsimp)
-
-        apply(drule_tac x = act in spec)
-        apply(rotate_tac -1)
-    apply(drule_tac x = vc in spec)
-        apply(rotate_tac -1)
-    apply(drule_tac x = venv in spec)
-        apply(clarsimp)
-    apply(rotate_tac -1)
-        apply(drule_tac x = nata in spec)
-                                                
-(* *** OK. we are basically done here.
-we just need to sort out the relationship between
-- cl
-- roundtrip ser/deser of cl
-- a
-these should all be equal, question is what is the easiest way to prove it.
-*** *)
-(* *** use reconstruct_address_gen2_int ? *** *)
-    apply(subgoal_tac "cl = a")
-         apply(clarsimp)
-    apply(subgoal_tac
-"uint
-                 (word_of_int
-                   (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)
- = int cl")
-    apply(case_tac vi)
+     apply(frule_tac ll_get_node_comp2) apply(clarsimp)
+     apply(frule_tac k = cpre in ll_descend_eq_r2l)
+     apply(clarsimp)
+          apply(frule_tac k = "ae#lista" in ll_descend_eq_r2l)
           apply(clarsimp)
-         apply(simp add:Word.int_word_uint)
+          apply(case_tac cl) apply(clarsimp)
+          apply(clarsimp)
+          apply(drule_tac x = "ac#listb" in spec)
 
-(* determinism *) defer
+          apply(clarsimp)
 
-        apply(subgoal_tac "cl < 2^256")
+          apply(subgoal_tac "(\<exists>a b ba.
+           (((af, bd), llt.LSeq e la), ((a, b), llt.LLab ba (length listb)),
+            ac # listb)
+           \<in> ll3'_descend)")
+          apply(clarsimp)
+
+          apply(subgoal_tac "index x2a ej = Some (Pc JUMPDEST)")
+          apply(clarsimp)
+          apply(case_tac "x2a ! ej", auto)
+
+
+          apply(drule_tac x = "ContractFail l" in spec) apply(clarsimp)
+          apply(case_tac vi) apply(clarsimp)
+
+               apply(frule_tac cp = "cpre@ac#listb" and ad = "(ej, ba)" and d = " llt.LLab el (length listb)"  in qvalid_get_node1) apply(clarsimp)
+     apply(drule_tac qvalid_llab) apply(clarsimp)
+     apply(drule_tac nd = ej and nd' = ba and cp = "cpre@ac#listb" and desc = " llt.LLab el (length listb)" in qvalid_desc_bounded1) apply(clarsimp) apply(clarsimp)
+
+     apply(frule_tac adl = ej and adr = ba and d = " llt.LLab el (length listb)"
+ and cp = "cpre @ ac # listb" in program_list_of_lst_validate_head1)
+     apply(clarsimp)
+                    apply(frule_tac cp = "cpre@ac#listb" and ad = "(ej, ba)" and d = " llt.LLab el (length listb)"  in qvalid_get_node1) apply(clarsimp)
+                    apply(drule_tac qvalid_llab) apply(clarsimp)
+                    apply(clarsimp) apply(simp_all)
+
+                    apply(clarsimp)
+
+                    apply(rotate_tac -1)
+                    apply(drule_tac x = ab in spec)
+                    apply(rotate_tac -1)
+                    apply(drule_tac x = b in spec)
+                    apply(rotate_tac -1)
+                    apply(drule_tac x = el in spec)
+                    apply(simp add:ll_descend_eq_l2r)
+
+                    (* deferred goals *)
+                    apply(simp add:Word.int_word_uint)
+                            apply(subgoal_tac
+                              "
+ nat (foldl (\<lambda>u. bin_cat u 8) 0
+        (map uint (output_address ej)) mod
+       115792089237316195423570985008687907853269984665640564039457584007913129639936) =
+       ej
+")
+                            apply(simp)
+                            apply(cut_tac cl = ej in reconstruct_address_gen2)                    
+        apply(subgoal_tac "ej < 2^256")
          apply(simp add: Word_Miscellaneous.nat_mod_eq')
         apply(simp)
-        apply(subgoal_tac "length (output_address cl) \<le> 32")
-        apply(cut_tac cl = cl in output_address_length_bound)
+        apply(subgoal_tac "length (output_address ej) \<le> 32")
+        apply(cut_tac cl = ej in output_address_length_bound)
          apply(simp)
-         apply(case_tac "length (output_address cl) = 32")
+         apply(case_tac "length (output_address ej) = 32")
           apply(simp)
     apply(subgoal_tac
-"256 ^ (length (output_address cl) :: nat) <
+"256 ^ (length (output_address ej) :: nat) <
  (256 ^ 32 :: nat)")
     apply(simp)
     apply(rule_tac  Power.linordered_semidom_class.power_strict_increasing)
@@ -6031,180 +5983,287 @@ these should all be equal, question is what is the easiest way to prove it.
     apply(simp (no_asm_simp)) 
     apply(simp (no_asm_simp)) 
 
-(* done with gross math part *)
-       apply(case_tac dj)
-apply(simp del: elle_instD'.simps program_sem.simps)
-    apply(simp del: elle_instD'.simps program_sem.simps)
-       apply(case_tac ej)
-apply(simp (no_asm_simp) del: elle_instD'.simps program_sem.simps)
-       apply(simp del: elle_instD'.simps program_sem.simps)
-    apply(clarify)
-       apply(simp (no_asm_use))
-
-(* next big case *)
-    defer
-
-(* this case (previously defered:
-- root is valid
-- descendent is valid
-- thus cl < ba because of LLab *)
-
-      apply(drule_tac k = st in ll_descend_eq_r2l)
-      apply(drule_tac t = "llt.LSeq st l"
-                  and ad = "(cl, ba)"
-                  and d = "llt.LLab el idxl"  in qvalid_get_node1)
+    (* next deferred goal *)
+    apply(subgoal_tac "nat (int a + (1 + int (length (output_address ej)))) = 
+Suc (a + length (output_address ej))")
     apply(simp)
-      apply(simp)
-    apply(rotate_tac -1)
-    apply(drule_tac qvalid_llab) apply(simp)
+    apply(simp add:Int.nat_int_add)
 
-(* this case is because of determinism of
-descends/ll_get_node - probably can use
-descend_eq_r2l *)
-      apply(drule_tac k = st in ll_descend_eq_r2l)
-    apply(simp)
-
-(* *** current point  *** *)
-
-(* copied in *)
-
-    apply(subgoal_tac "nat (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl)) mod 115792089237316195423570985008687907853269984665640564039457584007913129639936) = cl")
-       apply(clarsimp)
-    print_state
-
-    apply(subgoal_tac "cl = a")
-         apply(clarsimp)
-
-
-       apply(frule_tac a = "(0, length x2a)" and cp = "ej @ st"
-             and adl = cl in program_list_of_lst_validate_head1)
-    apply(simp)
-
-         defer 
-    apply(simp)
-    apply(simp)
-
-       apply(clarsimp)
-       apply(drule_tac x = act in spec) apply(rotate_tac -1)
-    apply(drule_tac x = vc in spec) apply(rotate_tac -1)
-       apply(drule_tac x = venv in spec) apply(rotate_tac -1)
-       apply(clarsimp) apply(rotate_tac -1)
-    apply(drule_tac x = nata in spec) 
-
-    apply(subgoal_tac
-"uint
-                 (word_of_int
-                   (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))) :: 256 word)
- = int cl")
-    apply(case_tac vi)
-          apply(clarsimp)
-         apply(simp add:Word.int_word_uint)
-
-(* *** should be smooth sailing from here :D *** *)
-
-(* for this first case, need to stitch back together the ej @ st path
-then use determinism
-*)
-
-(* need valid3_desc fact to get down
-to the lower sequence we actually care about *)
-(* r2l
-splitpath *)
-
-
-(* this is applying to the wrong fact *)
-    apply(subgoal_tac
-"
-(((0, length x2a), ttree),
- ((a, b), llt.LLab cpre cj),
-ej @ st)
-\<in> ll3'_descend
-"
-)
-       apply(frule_tac k = ej in ll3_descend_nonnil)
-       apply(rotate_tac -2)
-       apply(drule_tac ll3_descend_splitpath)
-       apply(clarsimp)
-    apply(case_tac st)
-        apply(simp)
-       apply(clarsimp)
-
-(* next, determinism *)
-
-    apply(drule_tac k = "hd#tl" in ll_descend_eq_r2l)
-apply(drule_tac k = "hd#tl" in ll_descend_eq_r2l)
-       apply(clarsimp)
-
-
-(* then apply valid3'_desc_full *)
-       apply(rotate_tac -1)
-       apply(drule_tac "ll_descend_eq_l2r")
-    apply(rotate_tac -1)
-       apply(frule_tac ll_valid3'_desc_full)
-        apply(simp)
-    apply(frule_tac k = ed in ll3_descend_nonnil)
-       apply(clarsimp)
-       apply(rotate_tac -1)
-       apply(drule_tac ll_valid3'.cases)
-             apply(simp_all)
-       apply(clarsimp) apply(rotate_tac -1)
-    apply(drule_tac x = "ab#list" in spec)
-       apply(clarsimp)
-       apply(safe)
-
-(* "does-not-exist" case *)
-        apply(clarsimp)
-        apply(rotate_tac -1)
-        apply(drule_tac x = a in spec) apply(rotate_tac -1)
-    apply(drule_tac x = b in spec) apply(rotate_tac -1)
-        apply(drule_tac x = cpre in spec) apply(rotate_tac -1)
-    apply(drule_tac k = "ab#list" in ll_descend_eq_r2l)
-        apply(clarsimp)
-        apply(simp add:ll_descend_eq_l2r)
-
-(* exists-case *)
-       apply(drule_tac k = "ab#list" in ll_descend_eq_r2l)
-       apply(drule_tac k = "ab#list" in ll_descend_eq_r2l)
-       apply(clarsimp)
-
-(* deferred goals *)
-      apply(case_tac "ej@st")
-       apply(clarsimp)
-      apply(clarsimp)
-      apply(rule_tac ll_descend_eq_l2r)
-      apply(clarsimp)
-                                 
-(* gross math (tm) goal *)     
-        apply(subgoal_tac "cl < 2^256")
-         apply(simp add: Word_Miscellaneous.nat_mod_eq')
-        apply(simp)
-        apply(subgoal_tac "length (output_address cl) \<le> 32")
-        apply(cut_tac cl = cl in output_address_length_bound)
-         apply(simp)
-         apply(case_tac "length (output_address cl) = 32")
-          apply(simp)
-    apply(subgoal_tac
-"256 ^ (length (output_address cl) :: nat) <
- (256 ^ 32 :: nat)")
-    apply(simp)
-    apply(rule_tac  Power.linordered_semidom_class.power_strict_increasing)
-          apply(simp (no_asm_simp)) 
-    apply(simp (no_asm_simp)) 
-    apply(simp (no_asm_simp)) 
-
-      apply(drule_tac t = "ttree"
-                  and ad = "(cl, b)"
-                  and d = "llt.LLab cpre cj"  in qvalid_get_node1)
-    apply(simp)
-    apply(rotate_tac -1)
-    apply(drule_tac qvalid_llab) apply(simp)
+    apply(drule_tac cp = "ad#lista" in qvalid_get_node2) apply(simp_all)
+    apply(rotate_tac -1) apply(drule_tac qvalid_llab) apply(simp)
     done
-*)
-sorry
 
 next
 case (6 xl el dl t cpre cj xj ej dj nj cl cc net st st' st'')
-then show ?case sorry
+then show ?case 
+
+(* ***
+preamble from case 5
+*** *)
+    apply(auto)
+    apply(simp add:clearpc'_def)
+     apply(split option.split_asm, auto)
+     apply(split option.split_asm, auto)
+     apply(case_tac fuel, auto)
+     apply(split option.split_asm, auto)
+          apply(split option.split_asm, auto)
+
+     (*apply(split option.split_asm, auto)*) (* this is probably splitting the wrong thing *)
+
+     
+     apply(case_tac t, auto)
+
+
+(* ensure these are applying to the correct descends fact
+i.e., the JUMP
+*)
+(* we need to apply some additional lemma here (but what exactly?) *)
+    apply(case_tac "codegen'_check ((0, tend), ttree)", simp)
+    apply(simp del:elle_instD'.simps program_sem.simps)
+    apply(frule_tac valid3'_qvalid)
+    apply(frule_tac cp = "cpre @ cj" in qvalid_get_node1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
+    print_state
+(*   apply(rotate_tac 2) *)
+     apply(frule_tac cp = "cpre @ cj" in qvalid_desc_bounded1[rotated 1]) apply(auto simp del:elle_instD'.simps program_sem.simps)
+
+      apply(frule_tac program_list_of_lst_validate_jmpi1)
+         apply(auto simp del:elle_instD'.simps program_sem.simps)
+
+       apply(case_tac ild2, auto)
+       apply(case_tac "length (output_address ej) = nj", auto)
+       apply(case_tac "output_address ej = []", auto)
+    apply(case_tac "32 < length (output_address ej) ", auto)
+
+    apply(case_tac " program_content (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a))) (int targstart)")
+     apply(auto simp add:program.defs)
+
+    apply(rotate_tac 16)
+    apply(frule_tac ll_valid_q.cases, auto)
+
+    (* jumpI specific stuff *)
+    apply(case_tac "vctx_gas vi < 13") apply(clarsimp)
+    apply(clarsimp)
+
+    apply(case_tac "1024 \<le> int (length (vctx_stack vi))") apply(clarsimp)
+    apply(clarsimp)
+
+    apply(case_tac "vctx_stack vi") apply(clarsimp)
+    apply(clarsimp)
+
+    apply(simp add: strict_if_def)
+    apply(case_tac "aa = 0") apply(clarsimp)
+
+    apply(clarsimp)
+
+     
+     (* old proof follows *)
+
+    print_state
+    apply(simp add:check_resources_def)
+    apply(case_tac "x2a ! a", auto)
+
+    (* *** current point, doing more heavy-weight proof modifications
+           copied from case 5 ***  *)
+    
+    apply(case_tac "program_content (program.make (\<lambda>i. index x2a (nat i)) (int (length x2a))) (int a)")
+     apply(auto simp add:program.defs)
+
+     apply(case_tac nata, auto)
+
+
+     apply(subgoal_tac
+       "x2a ! nat (int a + (1 + int (length (output_address ej)))) = Pc JUMPI")
+
+     apply(subgoal_tac "(uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address ej))) :: 256 word)) =  ej")
+     
+     apply(simp add:check_resources_def)
+     apply(split option.split_asm) apply(clarsimp)
+     apply(split option.split_asm) apply(clarsimp) apply(clarsimp)
+
+     (* need validate_jump_targets_spec *)
+     apply(case_tac "cpre@cj") apply(clarsimp)
+     apply(clarsimp)
+     apply(frule_tac kh = ab in ll_descend_eq_l2r) 
+     apply(frule_tac validate_jump_targets_spec_jumpi)
+     apply(simp)
+
+     (* branching begins *)
+     (* *** do we want to try to extract
+information about x2b = JUMPDEST here? *)
+  apply(simp)
+     apply(safe)
+     apply(clarsimp)
+
+     apply(drule_tac ll_valid3'.cases)
+     apply(simp_all)
+     apply(clarsimp)
+     apply(case_tac xl, clarsimp)
+
+     apply(frule_tac k = k in ll_descend_eq_r2l)
+          apply(drule_tac k = k and  q' = "(ad, bb)" in ll_descend_eq_r2l)
+          apply(case_tac k) apply(clarsimp)
+          apply(clarsimp)
+     apply(frule_tac adl = ej and cp = "ae#listb" in program_list_of_lst_validate_head1)
+     apply(simp_all)
+
+     defer (* label fact *)
+     
+     apply(clarsimp) (* need to know ej < length x2a *)
+     apply(subgoal_tac "ej < length x2a")
+     apply(clarsimp)
+     apply(case_tac "index x2a ej") apply(clarsimp) 
+     apply(case_tac "x2a ! ej", auto)
+
+     apply(case_tac "cpre @ cl") apply(clarsimp)
+     apply(clarsimp)
+
+     (* cpre should be nil *)
+     apply(case_tac cpre) apply(clarsimp)
+
+
+     apply(drule_tac x = "ad#listc" in spec) apply(clarsimp)
+     apply(drule_tac kh = "ad" and kt = listc
+                     and e = e and q = "(0, length x2a)" in ll_descend_eq_l2r_list)
+     apply(subgoal_tac "(\<exists>a b ba.
+           (((0, length x2a), llt.LSeq e la), ((a, b), llt.LLab ba (length listc)),
+            ad # listc)
+           \<in> ll3'_descend)")
+     apply(clarsimp)
+
+     apply(rotate_tac -1)
+     apply(drule_tac ll_descend_eq_r2l)
+     apply(rotate_tac -2)
+     apply(drule_tac ll_descend_eq_r2l)
+     apply(clarsimp)
+
+     apply(drule_tac x = "ContractFail l" in spec)
+     apply(clarsimp)
+     apply(case_tac vi) apply(clarsimp)
+     
+     (* proof of subgoal thesis (hypothesis of lemma about descended labels being equal) *)
+     apply(rule_tac x = ac in exI)
+     apply(rule_tac x = ba in exI)
+     apply(rule_tac x = el in exI)
+     apply(clarsimp)
+     
+     (* proof that cpre is nil *)
+     apply(clarify)
+     apply(simp)
+     apply(clarify)
+     apply(simp (no_asm_use))
+
+     (* proof about ej, boundednesss *)
+     apply(frule_tac cp = "ae#listb" and ad = "(ej, bb)" and d = " llt.LLab True (length listb)"  in qvalid_get_node2) apply(clarsimp)
+     apply(drule_tac qvalid_llab) apply(clarsimp)
+     apply(drule_tac nd = ej and nd' = bb and cp = "ae#listb" and desc = " llt.LLab True (length listb)" in qvalid_desc_bounded1) apply(clarsimp) apply(clarsimp)
+
+     (* other big case, then deferred goals *)
+
+     (* first, prove descendent is valid.
+then repeat case above. *)
+apply(frule_tac k = cpre in ll_valid3'_desc_full) apply(clarsimp)
+apply(rotate_tac -1)
+          apply(drule_tac ll_valid3'.cases)
+     apply(simp_all)
+     apply(clarsimp)
+     apply(case_tac xl, clarsimp)
+     apply(case_tac k) apply(clarsimp)
+     apply(clarsimp)
+
+     apply(frule_tac ll_get_node_comp2) apply(clarsimp)
+     apply(frule_tac k = cpre in ll_descend_eq_r2l)
+     apply(clarsimp)
+          apply(frule_tac k = "af#listb" in ll_descend_eq_r2l)
+          apply(clarsimp)
+          apply(case_tac cl) apply(clarsimp)
+          apply(clarsimp)
+          apply(drule_tac x = "ad#listc" in spec)
+
+          apply(clarsimp)
+
+          apply(subgoal_tac "(\<exists>a b ba.
+           (((ag, bd), llt.LSeq e la), ((a, b), llt.LLab ba (length listc)),
+            ad # listc)
+           \<in> ll3'_descend)")
+          apply(clarsimp)
+
+          apply(subgoal_tac "index x2a ej = Some (Pc JUMPDEST)")
+          apply(clarsimp)
+          apply(case_tac "x2a ! ej", auto)
+
+
+          apply(drule_tac x = "ContractFail l" in spec) apply(clarsimp)
+          apply(case_tac vi) apply(clarsimp)
+
+               apply(frule_tac cp = "cpre@ad#listc" and ad = "(ej, ba)" and d = " llt.LLab el (length listc)"  in qvalid_get_node1) apply(clarsimp)
+     apply(drule_tac qvalid_llab) apply(clarsimp)
+     apply(drule_tac nd = ej and nd' = ba and cp = "cpre@ad#listc" and desc = " llt.LLab el (length listc)" in qvalid_desc_bounded1) apply(clarsimp) apply(clarsimp)
+
+     apply(frule_tac adl = ej and adr = ba and d = " llt.LLab el (length listc)"
+ and cp = "cpre @ ad # listc" in program_list_of_lst_validate_head1)
+     apply(clarsimp)
+                    apply(frule_tac cp = "cpre@ad#listc" and ad = "(ej, ba)" and d = " llt.LLab el (length listc)"  in qvalid_get_node1) apply(clarsimp)
+                    apply(drule_tac qvalid_llab) apply(clarsimp)
+                    apply(clarsimp) apply(simp_all)
+
+                    apply(clarsimp)
+
+                    apply(rotate_tac -1)
+                    apply(drule_tac x = ac in spec)
+                    apply(rotate_tac -1)
+                    apply(drule_tac x = b in spec)
+                    apply(rotate_tac -1)
+                    apply(drule_tac x = el in spec)
+                    apply(simp add:ll_descend_eq_l2r)
+
+                    (* deferred goals *)
+                    apply(simp add:Word.int_word_uint)
+                            apply(subgoal_tac
+                              "
+ nat (foldl (\<lambda>u. bin_cat u 8) 0
+        (map uint (output_address ej)) mod
+       115792089237316195423570985008687907853269984665640564039457584007913129639936) =
+       ej
+")
+                            apply(simp)
+                            apply(cut_tac cl = ej in reconstruct_address_gen2)                    
+        apply(subgoal_tac "ej < 2^256")
+        apply(simp add: Word_Miscellaneous.nat_mod_eq')
+        (* *** 
+current point
+*** *)
+(*
+apply(frule_tac kh = ad and kt = listc
+and t = " ((ac, b),
+         llt.LLab el (length listc))"
+and e = e and q = "" in ll_descend_eq_l2r_list)
+*)
+        apply(simp)
+        apply(subgoal_tac "length (output_address ej) \<le> 32")
+        apply(cut_tac cl = ej in output_address_length_bound)
+         apply(simp)
+         apply(case_tac "length (output_address ej) = 32")
+          apply(simp)
+    apply(subgoal_tac
+"256 ^ (length (output_address ej) :: nat) <
+ (256 ^ 32 :: nat)")
+    apply(simp)
+    apply(rule_tac  Power.linordered_semidom_class.power_strict_increasing)
+          apply(simp (no_asm_simp)) 
+    apply(simp (no_asm_simp)) 
+    apply(simp (no_asm_simp)) 
+
+    (* next deferred goal *)
+    apply(subgoal_tac "nat (int a + (1 + int (length (output_address ej)))) = 
+Suc (a + length (output_address ej))")
+    apply(simp)
+    apply(simp add:Int.nat_int_add)
+
+    apply(drule_tac cp = "ae#listb" in qvalid_get_node2) apply(simp_all)
+    apply(rotate_tac -1) apply(drule_tac qvalid_llab) apply(simp)
+    done
+
+
 next
 case (7 t cp x e d n cc net st st' st'')
 then show ?case 
@@ -6537,7 +6596,9 @@ then show ?case
           apply(simp add:program.defs clearprog'_def check_resources_def)
 
           apply(simp add:program.defs clearprog'_def check_resources_def inst_stack_numbers.simps misc_inst_numbers.simps)
-
+          apply(simp add:program.defs clearprog'_def check_resources_def inst_stack_numbers.simps misc_inst_numbers.simps)
+          apply(simp add:program.defs clearprog'_def check_resources_def inst_stack_numbers.simps misc_inst_numbers.simps)
+          done
 next
 case (10 t cp x e cp' cc net z z')
 then show ?case
