@@ -800,9 +800,14 @@ should it just be (llll * funs_tab)?
 in the long run we need to add support for invalid jumps *)
 
 definition invalidInst :: inst where
-"invalidInst = Unknown (word8FromNat 249)"
+"invalidInst = Unknown (word8FromNat 254)"
 
 value "invalidInst"
+
+fun l4constSize :: "llll \<Rightarrow> int option" where
+"l4constSize (L4L_Str s) = Some (max (length s) (length (truncate_string s)))"
+| "l4constSize (L4L_Int i) = Some (length (intToBytes i))"
+| "l4constSize _ = None"
 
 (* default *)
 definition default_llll_funs :: funs_tab where
@@ -875,13 +880,18 @@ definition default_llll_funs :: funs_tab where
                 | _ \<Rightarrow> None))
 (* other constructs, loads/stores - for later*)
 ,(''mstore'', (\<lambda> l . case l of
-                loc#[sz] \<Rightarrow> Some (L4I2 (Memory MSTORE) loc sz)
+                loc#[item] \<Rightarrow> Some (L4I2 (Memory MSTORE) loc item)
                 | _ \<Rightarrow> None))
 ,(''mload'', (\<lambda> l . case l of
                 [loc] \<Rightarrow> Some (L4I1 (Memory MLOAD) loc)
                 | _ \<Rightarrow> None))
 ,(''return'', (\<lambda> l . case l of
-                loc#[sz] \<Rightarrow> Some (L4I2 (Misc RETURN) loc sz)
+                [con] \<Rightarrow> Some ( L4Seq [
+                              L4I2 (Memory MSTORE) (L4L_Int 0) con,
+                              L4I2 (Misc RETURN) (L4L_Int 0) (L4L_Int 32)
+                            ])
+                        
+                | loc#[sz] \<Rightarrow> Some (L4I2 (Misc RETURN) loc sz)
                 | _ \<Rightarrow> None))
 ,(''stop'', (\<lambda> l . Some (L4I0 (Misc STOP))))
 ,(''calldataload'', (\<lambda> l . case l of
@@ -918,11 +928,13 @@ definition default_llll_funs :: funs_tab where
 (* literals - only support 1 argument for now
 TODO: need to calculate number of bytes and push them *)
 ,(''lit'', (\<lambda> l . case l of
-                loc#[lit] \<Rightarrow> Some (L4Seq [
-                                   lit,
-                                   L4I0 (Dup 0),
-                                   loc,
-                                   L4I0 (Memory MSTORE)])
+                loc#[lit] \<Rightarrow> 
+                  (case l4constSize lit of
+                        Some i \<Rightarrow>
+                          Some (L4Seq [
+                                   L4I2 (Memory MSTORE) lit loc,
+                                   L4L_Int i])
+                      | _ \<Rightarrow> None)
                 | _ \<Rightarrow> None ))
 ]
 "

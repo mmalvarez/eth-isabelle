@@ -1198,6 +1198,83 @@ let rec word160FromNatural
 let w160_0 : num1 bit0 bit1 bit0 bit0 bit0 bit0 bit0 word
   = word160FromNatural Zero_nat;;
 
+let rec minus_nat m n = match m, n with Suc m, Suc n -> minus_nat m n
+                    | Zero_nat, n -> Zero_nat
+                    | m, Zero_nat -> m;;
+
+let rec sgn_integer
+  k = (if Big_int.eq_big_int k Big_int.zero_big_int then Big_int.zero_big_int
+        else (if Big_int.lt_big_int k Big_int.zero_big_int
+               then (Big_int.minus_big_int (Big_int.big_int_of_int 1))
+               else (Big_int.big_int_of_int 1)));;
+
+let rec apsnd f (x, y) = (x, f y);;
+
+let rec divmod_integer
+  k l = (if Big_int.eq_big_int k Big_int.zero_big_int
+          then (Big_int.zero_big_int, Big_int.zero_big_int)
+          else (if Big_int.eq_big_int l Big_int.zero_big_int
+                 then (Big_int.zero_big_int, k)
+                 else comp (comp apsnd Big_int.mult_big_int) sgn_integer l
+                        (if Big_int.eq_big_int (sgn_integer k) (sgn_integer l)
+                          then Big_int.quomod_big_int (Big_int.abs_big_int k)
+                                 (Big_int.abs_big_int l)
+                          else (let (r, s) =
+                                  Big_int.quomod_big_int (Big_int.abs_big_int k)
+                                    (Big_int.abs_big_int l)
+                                  in
+                                 (if Big_int.eq_big_int s Big_int.zero_big_int
+                                   then (Big_int.minus_big_int r,
+  Big_int.zero_big_int)
+                                   else (Big_int.sub_big_int
+   (Big_int.minus_big_int r) (Big_int.big_int_of_int 1),
+  Big_int.sub_big_int (Big_int.abs_big_int l) s))))));;
+
+let rec nat_of_integer
+  k = (if Big_int.le_big_int k Big_int.zero_big_int then Zero_nat
+        else (let (l, j) = divmod_integer k (Big_int.big_int_of_int 2) in
+              let la = nat_of_integer l in
+              let lb = plus_nat la la in
+               (if Big_int.eq_big_int j Big_int.zero_big_int then lb
+                 else plus_nat lb one_nat)));;
+
+let rec truncate_string_sub
+  x0 n = match x0, n with
+    [], n ->
+      (if equal_nata n Zero_nat then []
+        else byteFromNat Zero_nat ::
+               truncate_string_sub [] (minus_nat n one_nat))
+    | h :: t, n ->
+        (if equal_nata n Zero_nat then []
+          else byteFromNat (nat_of_integer (integer_of_char h)) ::
+                 truncate_string_sub t (minus_nat n one_nat));;
+
+let rec truncate_string
+  s = truncate_string_sub s
+        (nat_of_num (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One))))));;
+
+let rec l4constSize
+  = function
+    L4L_Str s ->
+      Some (of_nat semiring_1_int
+             (max ord_nat (size_list s) (size_list (truncate_string s))))
+    | L4L_Int i -> Some (of_nat semiring_1_int (size_list (intToBytes i)))
+    | L4I0 v -> None
+    | L4I1 (v, va) -> None
+    | L4I2 (v, va, vb) -> None
+    | L4I3 (v, va, vb, vc) -> None
+    | L4I4 (v, va, vb, vc, vd) -> None
+    | L4In (v, va) -> None
+    | L4Seq v -> None
+    | L4Arith (v, va) -> None
+    | L4Logic (v, va) -> None
+    | L4Comp (v, va, vb) -> None
+    | L4When (v, va) -> None
+    | L4Unless (v, va) -> None
+    | L4If (v, va, vb) -> None
+    | L4For (v, va, vb, vc) -> None
+    | L4Revert -> None;;
+
 let rec stree_append x0 uu = match x0, uu with STStr x, uu -> STStr x
                        | STStrs xs, s -> STStrs (xs @ [s]);;
 
@@ -1380,10 +1457,6 @@ and llll_parse1_args
 
 let rec makeLogical i = [i; L (Arith ISZERO); L (Arith ISZERO)];;
 
-let rec minus_nat m n = match m, n with Suc m, Suc n -> minus_nat m n
-                    | Zero_nat, n -> Zero_nat
-                    | m, Zero_nat -> m;;
-
 let rec divmod_nat
   m n = (if equal_nata n Zero_nat || less_nat m n then (Zero_nat, m)
           else (let a = divmod_nat (minus_nat m n) n in
@@ -1460,57 +1533,6 @@ let rec program_of_lst
     Program_ext
       (program_content_formatter lst, of_nat semiring_1_int (size_list lst),
         ());;
-
-let rec sgn_integer
-  k = (if Big_int.eq_big_int k Big_int.zero_big_int then Big_int.zero_big_int
-        else (if Big_int.lt_big_int k Big_int.zero_big_int
-               then (Big_int.minus_big_int (Big_int.big_int_of_int 1))
-               else (Big_int.big_int_of_int 1)));;
-
-let rec apsnd f (x, y) = (x, f y);;
-
-let rec divmod_integer
-  k l = (if Big_int.eq_big_int k Big_int.zero_big_int
-          then (Big_int.zero_big_int, Big_int.zero_big_int)
-          else (if Big_int.eq_big_int l Big_int.zero_big_int
-                 then (Big_int.zero_big_int, k)
-                 else comp (comp apsnd Big_int.mult_big_int) sgn_integer l
-                        (if Big_int.eq_big_int (sgn_integer k) (sgn_integer l)
-                          then Big_int.quomod_big_int (Big_int.abs_big_int k)
-                                 (Big_int.abs_big_int l)
-                          else (let (r, s) =
-                                  Big_int.quomod_big_int (Big_int.abs_big_int k)
-                                    (Big_int.abs_big_int l)
-                                  in
-                                 (if Big_int.eq_big_int s Big_int.zero_big_int
-                                   then (Big_int.minus_big_int r,
-  Big_int.zero_big_int)
-                                   else (Big_int.sub_big_int
-   (Big_int.minus_big_int r) (Big_int.big_int_of_int 1),
-  Big_int.sub_big_int (Big_int.abs_big_int l) s))))));;
-
-let rec nat_of_integer
-  k = (if Big_int.le_big_int k Big_int.zero_big_int then Zero_nat
-        else (let (l, j) = divmod_integer k (Big_int.big_int_of_int 2) in
-              let la = nat_of_integer l in
-              let lb = plus_nat la la in
-               (if Big_int.eq_big_int j Big_int.zero_big_int then lb
-                 else plus_nat lb one_nat)));;
-
-let rec truncate_string_sub
-  x0 n = match x0, n with
-    [], n ->
-      (if equal_nata n Zero_nat then []
-        else byteFromNat Zero_nat ::
-               truncate_string_sub [] (minus_nat n one_nat))
-    | h :: t, n ->
-        (if equal_nata n Zero_nat then []
-          else byteFromNat (nat_of_integer (integer_of_char h)) ::
-                 truncate_string_sub t (minus_nat n one_nat));;
-
-let rec truncate_string
-  s = truncate_string_sub s
-        (nat_of_num (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One))))));;
 
 let rec llll_compile
   = function L4L_Str s -> L (Stack (PUSH_N (truncate_string s)))
@@ -2372,7 +2394,7 @@ let default_llll_funs : (char list * (llll list -> llll option)) list
          Chara (true, false, true, false, false, true, true, false)],
         (fun a ->
           (match a with [] -> None | [_] -> None
-            | [loc; sz] -> Some (L4I2 (Memory MSTORE, loc, sz))
+            | [loc; item] -> Some (L4I2 (Memory MSTORE, loc, item))
             | _ :: _ :: _ :: _ -> None)));
       ([Chara (true, false, true, true, false, true, true, false);
          Chara (false, false, true, true, false, true, true, false);
@@ -2389,8 +2411,14 @@ let default_llll_funs : (char list * (llll list -> llll option)) list
          Chara (false, true, false, false, true, true, true, false);
          Chara (false, true, true, true, false, true, true, false)],
         (fun a ->
-          (match a with [] -> None | [_] -> None
-            | [loc; sz] -> Some (L4I2 (Misc RETURN, loc, sz))
+          (match a with [] -> None
+            | [con] ->
+              Some (L4Seq
+                     [L4I2 (Memory MSTORE, L4L_Int Zero_int, con);
+                       L4I2 (Misc RETURN, L4L_Int Zero_int,
+                              L4L_Int
+                                (Pos (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One)))))))])
+            | [con; sz] -> Some (L4I2 (Misc RETURN, con, sz))
             | _ :: _ :: _ :: _ -> None)));
       ([Chara (true, true, false, false, true, true, true, false);
          Chara (false, false, true, false, true, true, true, false);
@@ -2524,10 +2552,9 @@ let default_llll_funs : (char list * (llll list -> llll option)) list
         (fun a ->
           (match a with [] -> None | [_] -> None
             | [loc; lit] ->
-              Some (L4Seq
-                     [lit; L4I0 (Dup (zero_word
-                                       (len0_bit0 (len0_bit0 len0_num1))));
-                       loc; L4I0 (Memory MSTORE)])
+              (match l4constSize lit with None -> None
+                | Some i ->
+                  Some (L4Seq [L4I2 (Memory MSTORE, lit, loc); L4L_Int i]))
             | _ :: _ :: _ :: _ -> None)))];;
 
 let rec llll_parse1_default

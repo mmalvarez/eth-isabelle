@@ -1,0 +1,4 @@
+(for (mstore 0 20)
+       (> (mload 0) 0)
+       3
+       (mstore 0 (+ (mload 0) 1)))
