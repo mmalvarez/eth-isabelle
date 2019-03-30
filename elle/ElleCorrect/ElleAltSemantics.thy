@@ -3210,8 +3210,15 @@ inst_valid i \<longrightarrow>
 proof(cases i)
 case (Unknown x1)
   then show ?thesis
-    apply(clarify)
-    apply(fastforce)
+  apply(clarify)
+  apply(case_tac x1)
+      apply(case_tac vcstart, case_tac vcstart', clarsimp) (* experimental line *)
+
+       apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
+arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
+gas_def create_log_entry_def
+split:list.splits prod.splits instruction_result.splits option.splits )
     done
 next
   case (Bits x2)
@@ -3765,11 +3772,16 @@ next
     apply(clarify)
     apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
     apply(case_tac x13, simp)
-    apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
+        apply(simp_all add:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
 program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
 arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps
 gas_def
 split:list.splits prod.splits instruction_result.splits option.splits )
+        
+        apply(clarsimp)
+        apply(auto)
+        apply(simp add: vctx_returned_bytes_def)
+        apply(simp add: vctx_returned_bytes_def)
     done
 qed
 
@@ -3810,7 +3822,9 @@ lemma check_resources_gen :
               apply(simp add: check_resources_def)
               apply(simp add: check_resources_def)
    apply(simp add: check_resources_def)
-  apply(simp add: check_resources_def del:meter_gas_def)
+   apply(simp add: check_resources_def del:meter_gas_def)
+   apply(case_tac x13)
+   apply(simp_all add: check_resources_def)
   done
 
 (*

@@ -39,14 +39,16 @@ use ll4_load_lst_validate *)
 (* then, use the primitives here to dump the code to output *)
 definition ellecompilev_1_4 :: "ll1 \<Rightarrow> ll4 option" where
 "ellecompilev_1_4 l =
-  (case ellecompile_untrusted l of
-    Some l' \<Rightarrow>
-    (if check_ll3 l' then
-      (if ll4_validate_jump_targets [] l' then
-        Some l'
-        else None)
-        else None)
-        | _ \<Rightarrow> None)"
+  (if ll1_valid l then
+    (case ellecompile_untrusted l of
+      Some l' \<Rightarrow>
+      (if check_ll3 l' then
+        (if ll4_validate_jump_targets [] l' then
+          Some l'
+          else None)
+       else None)
+     | _ \<Rightarrow> None)
+   else None)"
 
 definition ellecompilev_4_cc :: "ll4 \<Rightarrow> constant_ctx option" where          
 "ellecompilev_4_cc l =

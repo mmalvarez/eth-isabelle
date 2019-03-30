@@ -39,9 +39,13 @@ qed
 
 (* we need to rule out invalid, PC, and misc instrs *)
 (* stack manipulation should be OK *)
+(* instruction 254 is specified as
+an invalid instruction to cause a revert. *)
 fun inst_valid :: "inst => bool" where
-  "inst_valid (Unknown _) = False"
+"inst_valid (Unknown x) = (x = 254)"
 | "inst_valid (Pc _) = False"
+| "inst_valid (Misc RETURN) = True"
+| "inst_valid (Misc STOP) = True"
 | "inst_valid (Misc _) = False"
 (* codecopy also? *)
 | "inst_valid (Info CODESIZE) = False"

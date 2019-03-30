@@ -1640,6 +1640,60 @@ let rec makeInterlude
                 [Stack (PUSH_N (output_address Zero_nat))] @
                   [Misc RETURN] @ payload;;
 
+let rec equal_word _A k l = equal_inta (uint _A k) (uint _A l);;
+
+let rec inst_valid
+  = function
+    Unknown x ->
+      equal_word (len0_bit0 (len0_bit0 (len0_bit0 len0_num1))) x
+        (word_of_int (len0_bit0 (len0_bit0 (len0_bit0 len0_num1)))
+          (Pos (Bit0 (Bit1 (Bit1 (Bit1 (Bit1 (Bit1 (Bit1 One)))))))))
+    | Pc uu -> false
+    | Misc RETURN -> true
+    | Misc STOP -> true
+    | Misc CREATE -> false
+    | Misc CALL -> false
+    | Misc CALLCODE -> false
+    | Misc DELEGATECALL -> false
+    | Misc SUICIDE -> false
+    | Info CODESIZE -> false
+    | Memory CODECOPY -> false
+    | Bits v -> true
+    | Sarith v -> true
+    | Arith v -> true
+    | Info ADDRESS -> true
+    | Info BALANCE -> true
+    | Info ORIGIN -> true
+    | Info CALLER -> true
+    | Info CALLVALUE -> true
+    | Info CALLDATASIZE -> true
+    | Info GASPRICE -> true
+    | Info EXTCODESIZE -> true
+    | Info BLOCKHASH -> true
+    | Info COINBASE -> true
+    | Info TIMESTAMP -> true
+    | Info NUMBER -> true
+    | Info DIFFICULTY -> true
+    | Info GASLIMIT -> true
+    | Info GAS -> true
+    | Dup v -> true
+    | Memory MLOAD -> true
+    | Memory MSTORE -> true
+    | Memory MSTORE8 -> true
+    | Memory CALLDATACOPY -> true
+    | Memory EXTCODECOPY -> true
+    | Memory MSIZE -> true
+    | Storage v -> true
+    | Stack v -> true
+    | Swap v -> true
+    | Log v -> true;;
+
+let rec ll1_valid = function L i -> inst_valid i
+                    | LSeq is -> list_all ll1_valid is
+                    | LLab v -> true
+                    | LJmp v -> true
+                    | LJmpI v -> true;;
+
 let rec ll3_bump
   n x1 = match n, x1 with
     n, ((xa, x), LSeqa (e, lsdec)) :: ls ->
@@ -2208,11 +2262,14 @@ let rec check_ll3
             (gather_ll3_labels_list ls [] Zero_nat Zero_nat) [v :: va];;
 
 let rec ellecompilev_1_4
-  l = (match ellecompile_untrusted l with None -> None
-        | Some la ->
-          (if check_ll3 la
-            then (if ll4_validate_jump_targets [] la then Some la else None)
-            else None));;
+  l = (if ll1_valid l
+        then (match ellecompile_untrusted l with None -> None
+               | Some la ->
+                 (if check_ll3 la
+                   then (if ll4_validate_jump_targets [] la then Some la
+                          else None)
+                   else None))
+        else None);;
 
 let rec ellecompilev_full
   l = (match ellecompilev_1_4 l with None -> None
