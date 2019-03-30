@@ -1,5 +1,5 @@
 theory ElleAltSemantics
-  imports Main "ElleCorrect.Valid4" "ElleCorrect.EvmFacts" "ElleCorrect.ProgramList"
+  imports Main "Valid4" "../../EvmFacts" "../../example/termination/ProgramList"
 begin
 
 (*
@@ -3058,13 +3058,14 @@ lemma reconstruct_address_gen2 :
 *)
 
 (* bintrunc stuff here? *)
+(*
 lemma reconstruct_address_gen2_int :
 "(cl :: int) mod (2 ^ 256) = 
 uint (word_of_int (foldl (\<lambda>u. bin_cat u 8) 0 (map uint (output_address cl))))"
   apply(insert reconstruct_address_gen2[of cl])
   apply(simp)
   sorry
-
+*)
 
 (* lemma output_address_bounded :
 "length (output_address z) \leq  n \<longrightarrow>
@@ -3581,7 +3582,7 @@ next
     apply(clarify)
     apply(case_tac vcstart, case_tac vcstart', case_tac cc, case_tac cc', clarify) (* cc'? *)
     apply(case_tac x5, clarsimp)
-
+    
   apply(simp_all only:irmap.simps subtract_gas.simps vctx_advance_pc_def vctx_next_instruction_def
 program.defs check_resources_def list.cases clearpc'_def clearprog'_def variable_ctx.defs inst_stack_numbers.simps bits_stack_nums.simps
 arith_inst_numbers.simps meter_gas_def elle_instD'.simps new_memory_consumption.simps

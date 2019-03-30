@@ -1,5 +1,5 @@
 theory FourL
-  imports Main ElleSyntax ElleCompiler ElleUtils
+  imports Main "ElleCompilerVerified" "ElleUtils"
 begin
 
 (* deal with literals:
@@ -46,20 +46,25 @@ def and mac as defined here need a recursive llll argument
 *)
 datatype llll =
    L4L_Str "string"
-   | L4L_Nat "nat"
+   | L4L_Int "int"
 (* now we handle defs/macros before the llll stage (parsing) *)
 (*   | L4Def "string" "string list" *)
 (*   | L4Mac "string" "llll list"  *)
    | L4I0 "inst"
    | L4I1 "inst" "llll"
    | L4I2 "inst" "llll" "llll"
+   | L4I3 "inst" "llll" "llll" "llll"
+   | L4I4 "inst" "llll" "llll" "llll" "llll"
+   | L4In "inst" "llll list"
   | L4Seq "llll list"
   | L4Arith "llllarith" "llll list"
   | L4Logic "lllllogic" "llll list"
   | L4Comp "llllcompare" "llll" "llll" (* all comparisons must be binary *)
   | L4When "llll" "llll"
+  | L4Unless "llll" "llll"
   | L4If "llll" "llll" "llll"
-  | L4While "llll" "llll"
+  | L4For "llll" "llll" "llll" "llll"
+  | L4Revert (* for now this will be an infinite loop to consume all gas *)
 
 (* Read in a string as a word list (truncate to 32 bytes)*)
 (* TODO: need to explicitly pad with zeros? *)
@@ -69,7 +74,7 @@ fun truncate_string_sub :: "string \<Rightarrow> nat \<Rightarrow> 8 word list"
  "truncate_string_sub [] (n) = 
     (if n = 0 then [] else byteFromNat 0 # truncate_string_sub [] (n-1))"
 | "truncate_string_sub (h#t) (n) =
-    (if n = 0 then [] else byteFromNat (String.char.nat_of_char h) #
+    (if n = 0 then [] else byteFromNat (nat_of_integer (String.integer_of_char h)) #
    truncate_string_sub t (n-1))"
 
 definition truncate_string :: "string \<Rightarrow> 8 word list"
@@ -81,30 +86,52 @@ definition truncate_string :: "string \<Rightarrow> 8 word list"
 PUSHes are little-endian?
 but no, numbers _are_ big endian in EVM
 *)
-definition intToBytes :: "int \<Rightarrow> 8 word list" where
-"intToBytes i = output_address (Int.nat i)"
 
-value "intToBytes 2049"
+function int_to_bytes' :: "int \<Rightarrow> 8 word list" where
+    "int_to_bytes' n = 
+      (let n' = divide_int_inst.divide_int n 256 in
+       (let mo = modulo_int_inst.modulo_int n 256 in
+        (if n' = 0 then [Evm.byteFromNat (nat mo)]
+          else (Evm.byteFromNat (nat mo))#(int_to_bytes' n'))))"
+  by auto
+termination sorry
+
+
+(* TODO nats here = big no no *)
+definition intToBytes :: "int \<Rightarrow> 8 word list" where
+"intToBytes i = List.rev (int_to_bytes' i)"
 
 (* TODO: do we need raw?
 If so, how do we get it?
 Raw means we need to basically save the first non-void result *)
 
+definition makeLogical :: "ll1 \<Rightarrow> ll1 list" where
+"makeLogical i =                                           
+  [i, ll1.L (Arith ISZERO), ll1.L (Arith ISZERO)]"
+
 (* TODO: is this the right ("jnz") semantics? *)
 (* Idea: literals translate into pushes *)
-fun llll_compile :: "llll \<Rightarrow> ll1"
+fun llll_compile :: "llll \<Rightarrow> ll1"                                    
 (*and llll_arith_compile :: "llllarith \<Rightarrow> ll1" *) where
 "llll_compile (L4L_Str s) = ll1.L (Evm.inst.Stack (PUSH_N (truncate_string s)))"
-| "llll_compile (L4L_Nat i) = ll1.L (Evm.inst.Stack (PUSH_N (intToBytes (int i))))"
+| "llll_compile (L4L_Int i) = ll1.L (Evm.inst.Stack (PUSH_N (intToBytes ( i))))"
 | "llll_compile (L4I0 i) = ll1.L i"
 | "llll_compile (L4I1 i l) = ll1.LSeq (llll_compile l # [ll1.L i])"
 | "llll_compile (L4I2 i l1 l2) = ll1.LSeq (llll_compile l2 # llll_compile l1 # [ll1.L i])"
+| "llll_compile (L4I3 i l1 l2 l3) = ll1.LSeq (llll_compile l3 # llll_compile l2 # llll_compile l1 # [ll1.L i])"
+| "llll_compile (L4I4 i l1 l2 l3 l4) = ll1.LSeq (llll_compile l4 # llll_compile l3 # 
+                                                 llll_compile l2 # llll_compile l1 # [ll1.L i])"
+| "llll_compile (L4In i ls) = 
+ll1.LSeq ((map llll_compile (rev ls)) @  [ll1.L i])"                                                 
 | "llll_compile (L4Seq l) = ll1.LSeq (map llll_compile l)"
 | "llll_compile (L4When c l) =
-   ll1.LSeq [llll_compile c, ll1.L (Arith ISZERO), ll1.LJmpI 0, llll_compile l, ll1.LLab 0]" (* wrong logic *)
+   ll1.LSeq [llll_compile c, ll1.L (Arith ISZERO), ll1.LJmpI 0, llll_compile l, ll1.LLab 0]"
+| "llll_compile (L4Unless c l) =
+   ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l, ll1.LLab 0]"
 | "llll_compile (L4If c l1 l2) = 
    ll1.LSeq [ ll1.LSeq [llll_compile c, ll1.LJmpI 0, llll_compile l2, ll1.LJmp 1, ll1.LLab 0, llll_compile l1, ll1.LLab 1]]"
 (* TODO: we can have a more efficient loop *)
+(*
 | "llll_compile (L4While c l) = 
    ll1.LSeq [
    ll1.LSeq [
@@ -115,70 +142,115 @@ fun llll_compile :: "llll \<Rightarrow> ll1"
              llll_compile l,
              ll1.LJmp 0,
              ll1.LLab 2]]]"
+*)
+| "llll_compile (L4For i p post body) =
+   ll1.LSeq [
+   ll1.LSeq [
+   llll_compile i,
+   ll1.LSeq [ll1.LLab 0,
+             llll_compile p,
+             ll1.L (Arith ISZERO),
+             ll1.LJmpI 1,
+             llll_compile body,
+             llll_compile post,
+             ll1.LJmp 0],
+   ll1.LLab 0]]"
+| "llll_compile L4Revert =
+   ll1.LSeq [ ll1.LLab 0, ll1.LJmp 0 ]"
 (* TODO: for addition e.g., handle multiple results properly *)
 | "llll_compile (L4Arith LAPlus ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith ADD)])"
 | "llll_compile (L4Arith LAExp ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith EXP)])"
 | "llll_compile (L4Arith LADiv ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith DIV)])"
+| "llll_compile (L4Arith LAMinus ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith SUB)])"
+
+| "llll_compile (L4Arith LAOr ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Bits inst_OR)])"
+| "llll_compile (L4Arith LAAnd ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Bits inst_AND)])"
+| "llll_compile (L4Arith LANot ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Bits inst_NOT)])"
+
+| "llll_compile (L4Logic LLOr ls) = 
+  (let res = (map llll_compile (rev ls)) in
+    ll1.LSeq (List.concat (map makeLogical res) @ [ll1.L (Bits inst_OR)]))"
+| "llll_compile (L4Logic LLAnd ls) = (let res = (map llll_compile (rev ls)) in
+    ll1.LSeq (List.concat (map makeLogical res) @ [ll1.L (Bits inst_AND)]))"
+| "llll_compile (L4Logic LLNot ls) = ll1.LSeq ((map llll_compile (rev ls)) @ [ll1.L (Arith ISZERO)])"
+
 | "llll_compile (L4Comp LCEq l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith inst_EQ)]"
+| "llll_compile (L4Comp LCNeq l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith inst_EQ), ll1.L (Arith ISZERO)]"
+| "llll_compile (L4Comp LCGt l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith inst_GT)]"
+| "llll_compile (L4Comp LCGe l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith ISZERO), ll1.L (Arith inst_LT)]"
+| "llll_compile (L4Comp LCLt l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith inst_LT)]"
+| "llll_compile (L4Comp LCLe l1 l2) = ll1.LSeq [(llll_compile l2), llll_compile l1, ll1.L (Arith ISZERO), ll1.L (Arith inst_GT)]"
+
 
 (* whitespace characters: bytes 9-13, 32 *)
 definition isWs :: "char \<Rightarrow> bool"
   where
 "isWs = 
   List.member
-  (map String.char_of_nat
+  (map String.char_of_integer
     [9, 10, 11, 12, 13, 32])"
-value "String.char_of_nat 10"
+value "String.char_of_integer 10"
 
 definition isNewline :: "char \<Rightarrow> bool"
-  where "isNewline c = (c = String.char_of_nat 10)"
+  where "isNewline c = (c = String.char_of_integer 10)"
 
 fun stree_append :: "stree \<Rightarrow> stree \<Rightarrow> stree" where
 "stree_append (STStr x) _ = STStr x"
 | "stree_append (STStrs xs) s = STStrs (xs @ [s])"
 
 definition newline :: "char" where
-"newline = String.char_of_nat 10"
+"newline = String.char_of_integer 10"
 
-(* TODO: support comments
-idea: add an extra flag (" we are in a comment") when we see a ;
-clear it when we see a newline *)
+definition quote :: char where
+"quote = String.char_of_integer 34"
+
 (* With thanks to Alex Sanchez-Stern *)
-fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> bool \<Rightarrow> stree option" where
-"llll_parse' [] _ _ _ = None"
+(* first flag: in a comment *)
+(* second flag: in a quoted string *)
+
+fun llll_parse' :: "string \<Rightarrow> string \<Rightarrow> stree list \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> stree option" where
+"llll_parse' [] _ _ _ _ = None"
 (* TODO: ensure partial token handling works w/r/t comments *)
-| "llll_parse' (h#t) token parsed isComment =
+| "llll_parse' (h#t) token parsed isComment isQuote =
    (if isComment then
        (if h = newline then
            (if token \<noteq> [] then 
                   (case parsed of
                      [] \<Rightarrow> None
-                     | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt) False)
-                  else llll_parse' t [] parsed False)
-           else llll_parse' t token parsed isComment
+                     | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt) False False)
+                  else llll_parse' t [] parsed False False)
+           else llll_parse' t token parsed True False
            )
-
    else 
-      (if h = CHR '';''  then llll_parse' t token parsed True
+   (if isQuote then 
+    (if h = quote then 
+        (if token = [] then None
+            else ( case parsed of
+                        [] \<Rightarrow> None
+                        | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr (token@[h])) # pt ) False False))
+      else llll_parse' t (token@[h]) parsed False True)
+    else 
+      (if h = CHR '';''  then llll_parse' t token parsed True False
+      else (if h = quote then llll_parse' t (token@[h]) parsed False True (* what to do with token? *)
       else (if h = CHR ''(''
-          then llll_parse' t token ((STStrs [])#parsed) False
+          then llll_parse' t token ((STStrs [])#parsed) False False
         else (if h = CHR '')''
               then (case parsed of
                     [] \<Rightarrow> None
                     | ph#[] \<Rightarrow> if token \<noteq> [] then Some (stree_append ph (STStr token))
                                              else Some ph
-                    | ph1#ph2#pt \<Rightarrow> if token \<noteq> [] then llll_parse' t [] (stree_append ph2 (stree_append ph1 (STStr token)) # pt) False
-                                                  else llll_parse' t [] (stree_append ph2 ph1#pt) False)
+                    | ph1#ph2#pt \<Rightarrow> if token \<noteq> [] then llll_parse' t [] (stree_append ph2 (stree_append ph1 (STStr token)) # pt) False False
+                                                  else llll_parse' t [] (stree_append ph2 ph1#pt) False False)
         else (if isWs h
               then (if token \<noteq> [] then 
                     (case parsed of
                        [] \<Rightarrow> None
-                       | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt) False)
-                    else llll_parse' t [] parsed False) 
-        else llll_parse' t (token@[h]) parsed False)))))"
+                       | ph#pt \<Rightarrow> llll_parse' t [] (stree_append ph (STStr token) #pt) False False)
+                    else llll_parse' t [] parsed False False) 
+        else llll_parse' t (token@[h]) parsed False False)))))))"
 
 fun llll_parse0 :: "string \<Rightarrow> stree option" where
-"llll_parse0 s = llll_parse' s [] [] False"
+"llll_parse0 s = llll_parse' s [] [] False False"
 
 value "llll_parse0 '';;a b c
 (+ 11 1)''"
@@ -189,6 +261,11 @@ value "llll_parse0 ''(+ 11 (+ 1 1) (- 2 1))''"
 
 
 value "llll_parse0 ''(+ (+ 1 1) 2)''"
+
+definition strtest1 where
+"strtest1 = ''(''@[quote]@(''abc def'')@[quote]@'')''"
+
+value "llll_parse0 strtest1"
 
 (* Q: best way to deal with the fact that
 conditionals might not result in a value? *)
@@ -253,7 +330,9 @@ type_synonym ('a, 'b) parser =
 
 value "CHR ''b''"
 
-definition hex_parse_table :: "(char * nat) list" where
+
+
+definition hex_parse_table :: "(char * int) list" where
 "hex_parse_table =
   [(CHR ''0'', 0)
   ,(CHR ''1'', 1)
@@ -274,7 +353,7 @@ definition hex_parse_table :: "(char * nat) list" where
   ]"
 
 (* basic hex utils *)
-fun parseHexNumeral :: "(nat, 'a) parser" where
+fun parseHexNumeral :: "(int, 'a) parser" where
 "parseHexNumeral [] s f r = f []"
 | "parseHexNumeral (h#t) s f r =
    (case Map.map_of hex_parse_table h of
@@ -282,36 +361,61 @@ fun parseHexNumeral :: "(nat, 'a) parser" where
     | Some n \<Rightarrow> s n t)"
 (* does the r parameter need to change? *)
 
-fun parseNumeral :: "(nat, 'a) parser" where
+fun parseNumeral :: "(int, 'a) parser" where
 "parseNumeral [] s f r = f []" (* at this point we have no string to operate on *)
 | "parseNumeral (h#t) s f r =
    (if LemExtraDefs.is_digit_char h
     then s (LemExtraDefs.char_to_digit h) t
     else f (h#t))"
 
+fun parseStringChar :: "(string, 'a) parser" where
+"parseStringChar [] s f r = f []"
+| "parseStringChar (h#t) s f r =
+    (if h = quote then f (h#t)
+        else s [h] t)"
+
 (* idea: now we need to parse an arbitrary series of numerals
 (as in TRX, we are including tokenization)
 our failure case will not consume the next item yet
 *)
 
-function(sequential) parseNatSub :: "nat \<Rightarrow> (nat, 'a) parser" where
-"parseNatSub i [] su fa r  = su i []"
-| "parseNatSub i (h#t) su fa r  =
+function(sequential) parseIntSub :: "int \<Rightarrow> (int, 'a) parser" where
+"parseIntSub i [] su fa r  = su i []"
+| "parseIntSub i (h#t) su fa r  =
    parseNumeral (h#t) 
-                (\<lambda> n l . parseNatSub (10*i + n) l su fa r)
+                (\<lambda> n l . parseIntSub (10*i + n) l su fa r)
                 (\<lambda> l . su i l) r
    "
   by pat_completeness auto
 termination sorry
 
-function(sequential) parseHexSub :: "nat \<Rightarrow> (nat, 'a) parser" where
+function(sequential) parseHexSub :: "int \<Rightarrow> (int, 'a) parser" where
 "parseHexSub i [] su fa r = su i []"
 | "parseHexSub i (h#t) su fa r =
    parseHexNumeral (h#t)
                    (\<lambda> n l . parseHexSub (16 * i + n) l su fa r)
                    (\<lambda> l . su i l) r"
   by pat_completeness auto
-termination sorry
+  termination sorry
+
+
+function(sequential) parseStringSub :: "string \<Rightarrow> (string, 'a) parser" where
+"parseStringSub s [] su fa r = fa []"
+| "parseStringSub s (h#t) su fa r =
+   (if h = quote then 
+       (if s = [] then fa (h#t)
+          else su s t)
+       else parseStringChar (h#t)
+            (\<lambda> nextc l . parseStringSub (s@nextc) l su fa r)
+            (fa)
+            r)"
+            by pat_completeness auto
+            termination sorry
+
+
+            definition teststr where
+"teststr = [quote] @ ''abc'' @ [quote]"
+
 
 (*
 function(sequential) parseIntSub :: "int \<Rightarrow> (int, 'a) parser" where
@@ -324,11 +428,11 @@ function(sequential) parseIntSub :: "int \<Rightarrow> (int, 'a) parser" where
   by pat_completeness auto
 termination sorry
 *)
-fun parseNat :: "(nat, 'a) parser" where
-"parseNat [] su fa r = fa []"
-| "parseNat (h#t) su fa r =
+fun parseInt :: "(int, 'a) parser" where
+"parseInt [] su fa r = fa []"
+| "parseInt (h#t) su fa r =
    parseNumeral (h#t) 
-    (\<lambda> n l . parseNatSub n l su fa r)
+    (\<lambda> n l . parseIntSub n l su fa r)
     fa r"
 
 
@@ -343,7 +447,7 @@ fun parseKeyword :: "string \<Rightarrow> (unit, 'a) parser" where
     else fa (h'#t'))"
 
 
-fun parseHex :: "(nat, 'a) parser" where
+fun parseHex :: "(int, 'a) parser" where
 "parseHex ((h0)#(hx)#h#t) su fa r =
   (if (h0 = CHR ''0'' \<and> hx = CHR ''x'') then
     (parseHexNumeral (h#t)
@@ -352,6 +456,23 @@ fun parseHex :: "(nat, 'a) parser" where
   else fa (h0#hx#h#t))"
 | "parseHex l su fa r = fa l"
 
+fun parseString :: "(string, 'a) parser" where
+"parseString [] su fa r = fa []"
+| "parseString (h#t) su fa r =
+   (if h = quote then
+       (parseStringChar t 
+         (\<lambda> s l . parseStringSub s l su fa r)
+        fa r)
+       else fa (h#t))
+"
+(*
+
+*)
+
+(*
+fun parseString :: "(string, 'a) parser" where
+"parseString (
+*)
 (* execute a parser on a string *)
 function(sequential) run_parse :: "('a, 'b) parser \<Rightarrow> ('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> string \<Rightarrow> 'b" where
 "run_parse p done dfl s =
@@ -399,9 +520,9 @@ parsers is not great *)
 fun silly_parse :: "(llll, llll option) parser" where
 "silly_parse l su fa r =
  parseKeyword hello l
-  (\<lambda> x l . su (L4L_Nat 0) l)
+  (\<lambda> x l . su (L4L_Int 0) l)
  (\<lambda> l . parseKeyword ''kitty'' l
-  (\<lambda> x l . su (L4L_Nat 1) l) fa fail') fail'"
+  (\<lambda> x l . su (L4L_Int 1) l) fa fail') fail'"
 
 
 value "run_parse_opt' silly_parse ''kitty''"
@@ -410,11 +531,20 @@ value "run_parse_opt' silly_parse ''other''"
 
 definition fourLParse_int :: "(llll, llll option) parser" where
 "fourLParse_int l su fa r =
- parseNat l (\<lambda> x s . su (L4L_Nat (x)) s) fa fail'"
+ parseInt l (\<lambda> x s . su (L4L_Int (x)) s) fa fail'"
 
 value "run_parse_opt' fourLParse_int ''1000''"
 
-value "run_parse_opt' parseNat ''20''"
+value "run_parse_opt' parseInt ''20''"
+
+value "run_parse_opt' parseHex ''0x20''"
+
+value "run_parse_opt' parseHex ''0xac37eebb''"
+
+value "run_parse_opt' parseString teststr"
+
+value "run_parse_opt' parseString (quote#''blo  op''@[quote])"
+
 
 fun mapAll :: "('a \<Rightarrow> 'b option) \<Rightarrow> 'a list \<Rightarrow> 'b list option" where
 "mapAll _ [] = Some []"
@@ -429,7 +559,7 @@ fun mapAll :: "('a \<Rightarrow> 'b option) \<Rightarrow> 'a list \<Rightarrow> 
 (* TODO: proper EOS handling for tokens (right now our tokens might have
 crap at the end that gets ignored *)
 (*
-TODO: redo parseNat without parser combinators (?)
+TODO: redo parseInt without parser combinators (?)
 TODO: add macro forms - constants only for now
 when looking for parameters we will need to peek ahead
 *)
@@ -460,9 +590,9 @@ handle macros after tokenization
 (*
 function(sequential) llll_parse1 :: "funs_tab \<Rightarrow> vars_tab \<Rightarrow> stree \<Rightarrow> llll option" where
 "llll_parse1 _ _ (STStr s) =
-  (case run_parse_opt' parseNat s of
+  (case run_parse_opt' parseInt s of
     None \<Rightarrow> None
-   | Some n \<Rightarrow> Some (L4L_Nat n))" (* TODO: string literals are also a thing *)
+   | Some n \<Rightarrow> Some (L4L_Int n))" (* TODO: string literals are also a thing *)
 | "llll_parse1 ft vt (STStrs (h#t)) = 
   (* TODO: first check if h is a definition *)
    (case mapAll (llll_parse1 ft vt) t of
@@ -510,10 +640,12 @@ value "lookupS [(''a'',1), (''a'',2)] ''a'' :: nat option"
 (* TODO: support "lit", "lll" constructs *)
 
 
-value "String.char_of_nat 39"
+value "String.char_of_integer 39"
 
 definition apos :: char where
-"apos = String.char_of_nat 39"
+"apos = String.char_of_integer 39"
+
+
 
 (* TODO: have vars_tab argument to anything but parse1_def?  *)
 (* TODO: have llll_parse1_seq for parsing a sequence of arguments *)
@@ -561,7 +693,11 @@ what this means is that we return a function that constructs a series of funstab
      STStr v \<Rightarrow> llll_parse1_def name ft (v#vt) t 
     | _ \<Rightarrow> None)"
 
-| "llll_parse1_args ft [] = None"
+(* | "llll_parse1_args ft [] = None" *)
+
+| "llll_parse1_args ft [] =
+    Some ([], None, ft)"
+
 (* is payload handling correct here? *)
 | "llll_parse1_args ft (h#[]) = 
     (case llll_parse1 ft h of
@@ -586,14 +722,18 @@ actually it looks like this is right...?*)
 | "llll_parse1 ft (STStr s) =
   (case run_parse_opt' parseHex s of
     None \<Rightarrow>
-    (case run_parse_opt' parseNat s of
-      None \<Rightarrow> (case lookupS ft s of
+    (case run_parse_opt' parseInt s of
+      None \<Rightarrow>
+       (case run_parse_opt' parseString s of
+        None \<Rightarrow>
+          (case lookupS ft s of
                       None \<Rightarrow> None
                       | Some f \<Rightarrow> (case f [] of 
                                      None \<Rightarrow> None
                                     | Some l \<Rightarrow> Some (l, None, ft)))
-      | Some n \<Rightarrow> Some (L4L_Nat n, None, ft))
-    | Some n \<Rightarrow> Some (L4L_Nat n, None, ft)) " (* TODO: string literals are also a thing *)
+        | Some s \<Rightarrow> Some (L4L_Str s, None, ft))                      
+      | Some n \<Rightarrow> Some (L4L_Int (n), None, ft))
+    | Some n \<Rightarrow> Some (L4L_Int (n), None, ft)) " (* TODO: string literals are also a thing *)
 
 (* arguments of the definition are going to be in an extra layer of parens *)
 | "llll_parse1 ft (STStrs (h#t)) = 
@@ -656,8 +796,13 @@ should it just be (llll * funs_tab)?
 (* everything we don't recognize just becomes a macro invocation *)
 *)
 
-(* TODO functions for threading POPs in between elements of SEQ *)
-(* *)
+(* 0xf9 should be invalid, at least for now
+in the long run we need to add support for invalid jumps *)
+
+definition invalidInst :: inst where
+"invalidInst = Unknown (word8FromNat 249)"
+
+value "invalidInst"
 
 (* default *)
 definition default_llll_funs :: funs_tab where
@@ -672,19 +817,39 @@ definition default_llll_funs :: funs_tab where
 ,(''when'', (\<lambda> l . case l of
                  c # [br] \<Rightarrow> Some (L4When c br)
                  | _ \<Rightarrow> None))
+,(''unless'', (\<lambda> l . case l of
+                 c # [br] \<Rightarrow> Some (L4Unless c br)
+                 | _ \<Rightarrow> None))
+,(''for'', (\<lambda> l . case l of
+                i # p # body # [post] \<Rightarrow> Some (L4For i p body post)
+                | _ \<Rightarrow> None))
 (* integer arithmetic *)
 ,(''+'', (\<lambda> l . Some (L4Arith LAPlus l)))
+,(''add'', (\<lambda> l . Some (L4Arith LAPlus l)))
 ,(''-'', (\<lambda> l . Some (L4Arith LAMinus l)))
 ,(''*'', (\<lambda> l . Some (L4Arith LATimes l)))
 ,(''div'', (\<lambda> l . Some (L4Arith LADiv l)))
 ,(''exp'', (\<lambda> l . Some (L4Arith LAExp l)))
 ,(''/'', (\<lambda> l . Some (L4Arith LADiv l)))
 ,(''%'', (\<lambda> l . Some (L4Arith LAMod l)))
+(* crypto stuff *)
+,(''sha3'', (\<lambda> l . case l of
+                   start#[width] \<Rightarrow> Some (L4I2 (Arith SHA3) start width)
+                   | _ \<Rightarrow> None))
+,(''keccak256'', (\<lambda> l . case l of
+                   start#[width] \<Rightarrow> Some (L4I2 (Arith SHA3) start width)
+                   | _ \<Rightarrow> None))
+
 (* bitwise logic *)
 ,(''&'', (\<lambda> l . Some (L4Arith LAAnd l)))
 ,(''|'', (\<lambda> l . Some (L4Arith LAOr l)))
 ,(''^'', (\<lambda> l . Some (L4Arith LAXor l)))
 ,(''~'', (\<lambda> l . Some (L4Arith LANot l)))
+(* TODO *)
+,(''shr'', (\<lambda> l .
+                  (case l of
+                    val#[shift] \<Rightarrow> Some (L4Arith LADiv [val, L4Arith LAExp [L4L_Int 2, shift]])
+                    | _ \<Rightarrow> None )))
 (* boolean logic *)
 ,(''&&'', (\<lambda> l . Some (L4Logic LLAnd l)))
 ,(''||'', (\<lambda> l . Some (L4Logic LLOr l)))
@@ -693,22 +858,72 @@ definition default_llll_funs :: funs_tab where
 ,(''='', (\<lambda> l . case l of
                 lhs#[rhs] \<Rightarrow> Some (L4Comp LCEq lhs rhs)
                 | _ \<Rightarrow> None))
+,(''!='', (\<lambda> l . case l of
+                lhs#[rhs] \<Rightarrow> Some (L4Comp LCNeq lhs rhs)
+                | _ \<Rightarrow> None))
+,(''>'', (\<lambda> l . case l of
+                lhs#[rhs] \<Rightarrow> Some (L4Comp LCGt lhs rhs)
+                | _ \<Rightarrow> None))
+,(''<'', (\<lambda> l . case l of
+                lhs#[rhs] \<Rightarrow> Some (L4Comp LCLt lhs rhs)
+                | _ \<Rightarrow> None))
+,(''<='', (\<lambda> l . case l of
+                lhs#[rhs] \<Rightarrow> Some (L4Comp LCLe lhs rhs)
+                | _ \<Rightarrow> None))
+,(''>='', (\<lambda> l . case l of
+                lhs#[rhs] \<Rightarrow> Some (L4Comp LCGe lhs rhs)
+                | _ \<Rightarrow> None))
 (* other constructs, loads/stores - for later*)
 ,(''mstore'', (\<lambda> l . case l of
                 loc#[sz] \<Rightarrow> Some (L4I2 (Memory MSTORE) loc sz)
                 | _ \<Rightarrow> None))
+,(''mload'', (\<lambda> l . case l of
+                [loc] \<Rightarrow> Some (L4I1 (Memory MLOAD) loc)
+                | _ \<Rightarrow> None))
 ,(''return'', (\<lambda> l . case l of
                 loc#[sz] \<Rightarrow> Some (L4I2 (Misc RETURN) loc sz)
                 | _ \<Rightarrow> None))
+,(''stop'', (\<lambda> l . Some (L4I0 (Misc STOP))))
 ,(''calldataload'', (\<lambda> l . case l of
                 [loc] \<Rightarrow> Some (L4I1 (Stack CALLDATALOAD) loc)
                 | _ \<Rightarrow> None))
+,(''calldatacopy'', (\<lambda> l . case l of
+                dst#src#[len] \<Rightarrow> Some (L4I3 (Memory CALLDATACOPY) dst src len)
+                | _ \<Rightarrow> None))
+,(''calldatasize'', (\<lambda> l . Some (L4I0 (Info CALLDATASIZE))))
+,(''callvalue'', (\<lambda> l . Some (L4I0 (Info CALLVALUE))))
+,(''caller'', (\<lambda> l . Some (L4I0 (Info CALLER))))
 ,(''sstore'', (\<lambda> l . case l of
                 loc#[sz] \<Rightarrow> Some (L4I2 (Storage SSTORE) loc sz)
                 | _ \<Rightarrow> None))
 ,(''sload'', (\<lambda> l . case l of
                 [loc] \<Rightarrow> Some (L4I1 (Storage SLOAD) loc)))
 (* data insertion - for later*)
+(* log opcodes *)
+,(''log0'', (\<lambda> l . (if length l = 2 then Some (L4In (Log LOG0) l) else None)))
+,(''log1'', (\<lambda> l . (if length l = 3 then Some (L4In (Log LOG1) l) else None)))
+,(''log2'', (\<lambda> l . (if length l = 4 then Some (L4In (Log LOG2) l) else None)))
+,(''log3'', (\<lambda> l . (if length l = 5 then Some (L4In (Log LOG3) l) else None)))
+,(''log4'', (\<lambda> l . (if length l = 6 then Some (L4In (Log LOG4) l) else None)))
+(*
+,(''event0'', (\<lambda> l . (if length l = 2 then Some (L4In (Log LOG0) l) else None)))
+,(''event1'', (\<lambda> l . (if length l = 3 then Some (L4In (Log LOG1) l) else None)))
+,(''event2'', (\<lambda> l . (if length l = 4 then Some (L4In (Log LOG2) l) else None)))
+,(''event3'', (\<lambda> l . (if length l = 5 then Some (L4In (Log LOG3) l) else None)))
+,(''event4'', (\<lambda> l . (if length l = 6 then Some (L4In (Log LOG4) l) else None)))
+*)
+(* revert by means of an infinite loop *)
+,(''revert'', (\<lambda> l .
+    Some (L4Revert)))
+(* literals - only support 1 argument for now
+TODO: need to calculate number of bytes and push them *)
+,(''lit'', (\<lambda> l . case l of
+                loc#[lit] \<Rightarrow> Some (L4Seq [
+                                   lit,
+                                   L4I0 (Dup 0),
+                                   loc,
+                                   L4I0 (Memory MSTORE)])
+                | _ \<Rightarrow> None ))
 ]
 "
 
@@ -791,19 +1006,46 @@ value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
 value "llll_parse_complete ''(seq (+ 2 3) (+ 1 a))''"
 
 
-value "llll_parse_complete ''(seq (def 'a 1) (+ 2 3) (+ 1 a)))''"
+value "llll_parse_complete ''(seq (def 'a 1) (+ 2 3) (+ 1 a))''"
 
 value "llll_parse_complete ''(seq (def a 1) (def a 2) a)''"
 
+value "llll_parse_complete ''(seq (def 'a 1) (+ 2 3) (returnlll (+ 1 a)))''"
+
+
 (* echo *)
 
-value "llll_parse_complete
-  ''(seq
+value [nbe] "llll_parse0
+''(seq
   (def 'scratch 0x00)
   (def 'identity 0xac37eebb)
-  (def 'function (function-hash code-body) (+ 1 2)))''"
+  (def 'function (function-hash code-body)
+    (when (= (div (calldataload 0x00) (exp 2 224)) function-hash)
+      code-body))
+  (def 'plus (avar bvar) (+ avar bvar))
+  (returnlll
+    (function identity
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))''"
 
-value "llll_parse_complete
+
+value [nbe] "llll_parse0
+''(seq
+  (def 'scratch 0x00)
+  (def 'identity 0xac37eebb)
+  (def 'function (function-hash code-body)
+    (when (= (div (calldataload 0x00) (exp 2 224)) function-hash)
+      code-body))
+  (def 'plus (avar bvar) (+ avar bvar))
+  (returnlll
+    (function identity
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))''"
+
+
+value  "llll_parse_complete
 ''(seq
   (def 'scratch 0x00)
   (def 'identity 0xac37eebb)
@@ -834,12 +1076,14 @@ value "llll_parse_complete
 *)
 (* finally, we need to integrate our function for making the interlude *)
 (* then, plug this into FourLExtract *)
+(* use inst_code_clean here *)
+(*
 definition il2wl :: "inst list \<Rightarrow> 8 word list" where
 "il2wl il = List.concat (map Evm.inst_code il)"
-
+*)
 (* translations to word-lists for string literals *)
 definition chartow :: "char \<Rightarrow> 8 word" where
-"chartow c = Evm.byteFromNat (String.char.nat_of_char c)"
+"chartow c = Evm.byteFromNat (nat_of_integer (String.integer_of_char c))"
 
 definition strtowl :: "string \<Rightarrow> 8 word list" where
 "strtowl s = List.map chartow s"
@@ -851,23 +1095,32 @@ definition fourL_compiler_string :: "string \<Rightarrow> string option" where
   (case llll_parse_complete s of
    None \<Rightarrow> None
   | Some (l4pre, None) \<Rightarrow>
-   ( case pipeline (llll_compile l4pre) (get_process_jumps_fuel (ll_pass1 (llll_compile l4pre))) of
+   ( case ellecompilev_full (llll_compile l4pre)  of
       None \<Rightarrow> None
       | Some wl \<Rightarrow> Some (hexwrite wl)
    )
   | Some (l4pre, Some l4pay) \<Rightarrow>
-    (case pipeline'' (llll_compile l4pre) (get_process_jumps_fuel (ll_pass1 (llll_compile l4pre))) of
+    (case ellecompilev_1_il (llll_compile l4pre) of
      None \<Rightarrow> None
-     | Some il_pre \<Rightarrow> (case pipeline'' (llll_compile l4pay) (get_process_jumps_fuel (ll_pass1 (llll_compile l4pay))) of
+     | Some il_pre \<Rightarrow> (case ellecompilev_1_il (llll_compile l4pay)  of
         None \<Rightarrow> None
         | Some il_pay \<Rightarrow>
           (case llll_combine_payload_sub combine_payload_fuel (ilsz il_pre) (ilsz il_pay) 0 0 of
             None \<Rightarrow> None
             | Some (startbytes, endbytes) \<Rightarrow> 
-              Some (hexwrite (il2wl (makeInterlude startbytes endbytes il_pre il_pay)))
-           )
- )))"
+                (case codegen_clean (makeInterlude startbytes endbytes il_pre il_pay) of
+                  None \<Rightarrow> None
+                  | Some wl \<Rightarrow> Some (hexwrite wl))))))"
 
+definition fourL_compiler_elle :: "string \<Rightarrow> (ll1 * ll1 option) option" where
+"fourL_compiler_elle s =
+  (case llll_parse_complete s of
+   None \<Rightarrow> None
+  | Some (l4pre, None) \<Rightarrow> Some (llll_compile l4pre, None)
+  | Some (l4pre, Some l4pay) \<Rightarrow>
+    Some (llll_compile l4pre, Some (llll_compile l4pay)))"
+                  
+ (*
 value "llll_parse_complete  ''(seq 1 2)''"
 
 value "fourL_compiler_string  ''(seq 1 2)''"
@@ -877,6 +1130,6 @@ value "case llll_parse_complete ''(seq 1 2)'' of
        None \<Rightarrow> None
        | Some (pre, None) \<Rightarrow> pipeline'' (llll_compile pre) (ll1_get_process_jumps_fuel (llll_compile pre))
       | _ \<Rightarrow> None"
-
+*)
 end
 

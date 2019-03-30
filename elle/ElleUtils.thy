@@ -1,5 +1,5 @@
 theory ElleUtils
-  imports Main ElleSyntax
+  imports Main ElleCorrect.ElleSyntax
 begin
 
 (* this file is going to contain some miscellaneous tools

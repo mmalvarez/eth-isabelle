@@ -1,6 +1,7 @@
 theory FourLExtract
-  imports Main ElleSyntax ElleCompiler FourL ElleUtils String "~~/src/HOL/Library/Code_Char"
+  imports Main ElleCompilerVerified FourL ElleUtils 
 begin
+(* String "~~/src/HOL/Library/Code_Char" *)
 
 definition compilerFuel where "compilerFuel = 100"
 
@@ -38,8 +39,6 @@ module_name FourL file "./generated/FourL.sml"
 - use OCaml ints, not strs *)
 
 value "compiler (String.implode ''(seq 1 2)'')"
-
-
 
 export_code compiler in OCaml
 module_name FourL file "./generated/FourL.ml"
