@@ -81,6 +81,40 @@ value "fourL_compiler_string
     b)
 ''"
 
+(* echo *)
+
+value "fourL_compiler_string
+
+''(seq
+  (def 'scratch 0x00)
+  (def 'identity 0xac37eebb) ; function hash, for ABI compliance
+  (def 'function (function-hash code-body)
+    (when (= (div (calldataload 0x00)
+                  (exp 2 224)) function-hash)
+      code-body))
+  (returnlll
+    (function identity
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))
+ ''"
+
+ value "fourL_parse_elle
+
+''(seq
+  (def 'scratch 0x00)
+  (def 'identity 0xac37eebb) ; function hash, for ABI compliance
+  (def 'function (function-hash code-body)
+    (when (= (div (calldataload 0x00)
+                  (exp 2 224)) function-hash)
+      code-body))
+  (returnlll
+    (function identity
+      (seq
+        (mstore scratch (calldataload 0x04))
+        (return scratch 32)))))
+ ''"
+
 
 (* ENS *)
 

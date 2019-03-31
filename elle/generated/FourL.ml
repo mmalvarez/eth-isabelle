@@ -1611,35 +1611,6 @@ let rec mypeel
     | Some h :: t ->
         (match mypeel t with None -> None | Some ta -> Some (h :: ta));;
 
-let rec zero_word _A = word_of_int _A Zero_int;;
-
-let rec nat_to_bytes
-  n = (match
-        divmod_nat n
-          (nat_of_num
-            (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One)))))))))
-        with (Zero_nat, mo) -> [byteFromNat mo]
-        | (Suc na, mo) -> byteFromNat mo :: nat_to_bytes (Suc na));;
-
-let rec output_address n = rev (nat_to_bytes n);;
-
-let base_interlude_size : nat = nat_of_num (Bit1 (Bit0 (Bit0 One)));;
-
-let rec makeInterlude
-  startbytes endbytes prelude payload =
-    prelude @
-      [Stack (PUSH_N (output_address (ilsz payload)))] @
-        [Dup (zero_word (len0_bit0 (len0_bit0 len0_num1)))] @
-          [Stack (PUSH_N
-                   (output_address
-                     (plus_nat
-                       (plus_nat (plus_nat (ilsz prelude) startbytes) endbytes)
-                       base_interlude_size)))] @
-            [Stack (PUSH_N (output_address Zero_nat))] @
-              [Memory CODECOPY] @
-                [Stack (PUSH_N (output_address Zero_nat))] @
-                  [Misc RETURN] @ payload;;
-
 let rec equal_word _A k l = equal_inta (uint _A k) (uint _A l);;
 
 let rec inst_valid
@@ -1858,6 +1829,16 @@ let rec cctx_program_update
     (Constant_ctx_ext (cctx_program, cctx_this, cctx_hash_filter, more)) =
     Constant_ctx_ext
       (cctx_programa cctx_program, cctx_this, cctx_hash_filter, more);;
+
+let rec nat_to_bytes
+  n = (match
+        divmod_nat n
+          (nat_of_num
+            (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One)))))))))
+        with (Zero_nat, mo) -> [byteFromNat mo]
+        | (Suc na, mo) -> byteFromNat mo :: nat_to_bytes (Suc na));;
+
+let rec output_address n = rev (nat_to_bytes n);;
 
 let rec codegen_check
   = function (uu, La (uv, i)) -> Some [i]
@@ -2285,6 +2266,8 @@ let rec ellecompilev_1_il
           (match ellecompilev_4_cc l4 with None -> None
             | Some a -> ellecompilev_cc_il a));;
 
+let base_interlude_size : nat = nat_of_num (Bit1 (Bit0 (Bit0 One)));;
+
 let rec llll_combine_payload_sub
   fuel presz paysz startbytes endbytes =
     (if equal_nata fuel Zero_nat then None
@@ -2304,6 +2287,30 @@ let rec llll_combine_payload_sub
 let combine_payload_fuel : nat
   = plus_nat (nat_of_num (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One))))))
       (nat_of_num (Bit0 (Bit0 (Bit0 (Bit0 (Bit0 One))))));;
+
+let rec zero_word _A = word_of_int _A Zero_int;;
+
+let rec combineWithInterlude
+  startbytes endbytes prelude payload =
+    (match codegen_clean prelude with None -> None
+      | Some preludew ->
+        (match codegen_clean payload with None -> None
+          | Some payloadw ->
+            Some (preludew @
+                   maps inst_code
+                     ([Stack (PUSH_N (output_address (size_list payloadw)))] @
+                       [Dup (zero_word (len0_bit0 (len0_bit0 len0_num1)))] @
+                         [Stack (PUSH_N
+                                  (output_address
+                                    (plus_nat
+                                      (plus_nat
+(plus_nat (size_list preludew) startbytes) endbytes)
+                                      base_interlude_size)))] @
+                           [Stack (PUSH_N (output_address Zero_nat))] @
+                             [Memory CODECOPY] @
+                               [Stack (PUSH_N (output_address Zero_nat))] @
+                                 [Misc RETURN]) @
+                     payloadw)));;
 
 let default_llll_funs : (char list * (llll list -> llll option)) list
   = [([Chara (true, true, false, false, true, true, true, false);
@@ -2638,8 +2645,7 @@ let rec fourL_compiler_string
                     with None -> None
                     | Some (startbytes, endbytes) ->
                       (match
-                        codegen_clean
-                          (makeInterlude startbytes endbytes il_pre il_pay)
+                        combineWithInterlude startbytes endbytes il_pre il_pay
                         with None -> None | Some wl -> Some (hexwrite wl))))));;
 
 let rec explode

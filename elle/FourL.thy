@@ -990,17 +990,26 @@ definition combine_payload_fuel :: nat where
 "combine_payload_fuel = 32 + 32"
 
 (* assumes that sizes of startbytes and endbytes calculated correctly *)
-definition makeInterlude :: "nat \<Rightarrow> nat \<Rightarrow> inst list \<Rightarrow> inst list \<Rightarrow> inst list" where
-"makeInterlude startbytes endbytes prelude payload =
- prelude @ 
- [Evm.inst.Stack (PUSH_N (output_address (ilsz payload)))] @
+definition combineWithInterlude :: "nat \<Rightarrow> nat \<Rightarrow> inst list \<Rightarrow> inst list \<Rightarrow> 8 word list option" where
+"combineWithInterlude startbytes endbytes prelude payload =
+  (case codegen_clean prelude of
+    None \<Rightarrow> None
+    | Some preludew \<Rightarrow>
+      (case codegen_clean payload of
+        None \<Rightarrow> None
+        | Some payloadw \<Rightarrow>
+          Some (
+          preludew @ 
+ List.concat (map Evm.inst_code
+ (
+ [Evm.inst.Stack (PUSH_N (output_address (length payloadw)))] @
  [Evm.inst.Dup 0] @
- [Evm.inst.Stack (PUSH_N (output_address (ilsz prelude + startbytes + endbytes + base_interlude_size)))] @
+ [Evm.inst.Stack (PUSH_N (output_address (length preludew + startbytes + endbytes + base_interlude_size)))] @
  [Evm.inst.Stack (PUSH_N (output_address 0))] @
  [Evm.inst.Memory CODECOPY] @
  [Evm.inst.Stack (PUSH_N (output_address 0))] @
- [Evm.inst.Misc RETURN] @
- payload"
+ [Evm.inst.Misc RETURN] )) @
+ payloadw)))"
 
 
 (*
@@ -1120,7 +1129,7 @@ definition fourL_compiler_string :: "string \<Rightarrow> string option" where
           (case llll_combine_payload_sub combine_payload_fuel (ilsz il_pre) (ilsz il_pay) 0 0 of
             None \<Rightarrow> None
             | Some (startbytes, endbytes) \<Rightarrow> 
-                (case codegen_clean (makeInterlude startbytes endbytes il_pre il_pay) of
+                (case (combineWithInterlude startbytes endbytes il_pre il_pay) of
                   None \<Rightarrow> None
                   | Some wl \<Rightarrow> Some (hexwrite wl))))))"
 
