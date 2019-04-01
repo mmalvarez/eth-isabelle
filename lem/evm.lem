@@ -1874,9 +1874,6 @@ let next_state stopper c net pr =
      match vctx_next_instruction v c with
       | Nothing -> InstructionToEnvironment (ContractFail [ShouldNotHappen]) v Nothing
       | Just i ->
-        (*
-        prerr_endline ("Inst " ^ String.concat "," (List.map (fun x -> Z.format "%x" (word8ToNatural x)) (inst_code i)));
-        *)
         if check_resources v c v.vctx_stack i net then
           instruction_sem v c i net
         else
