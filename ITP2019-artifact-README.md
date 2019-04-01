@@ -44,14 +44,24 @@ created.
 
 ## Building llllc (FourL Compiler)
 
-navigate to `generated`, then run `make` to build
+Navigate to `generated`, then run `make` to build
 the compiler from its ML source using OCaml
 (or `make llllc_opt` to
 build a version of the compiler using Ocamlopt)
 
 ## Running llllc (FourL Compiler)
 
-there are a number of `.lll` files in the `elle/tests` directory that
+There are a number of `.lll` files in the `elle/tests` directory that
 `llllc` should be able to run on all files in this directory, except
 for `ENS.lll` and `erc20.lll` (it should be able to run on the modified
 versions, `ENSmod.lll` and `erc20mod.lll`)
+
+If you want to inspect the output of the compiler, you can use
+the parser that comes with `Eth-Isabelle` (i.e., is
+due to Yoichi Hirai).
+Just run (from the
+repository root) `parser/hexparser.rb` on a file containing the
+bytecode you want to parse (or pipe the output from `llllc` directly
+into it). You'll need an installation of Ruby
+(tested with 2.5.1p57)
+to use this tool.
