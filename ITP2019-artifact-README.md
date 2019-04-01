@@ -14,6 +14,7 @@ the hash `0927743c1bd31d7bba20a54260ba4c4dd3ce49e9`
 Build lem by navigating to `lem-installation` and running `make`
 
 Add the generated `lem` executable to your PATH (it will be located at `lem-installation/bin/lem`)
+i.e., something like `export PATH=$pwd/lem-installation/bin:$PATH`
 
 run `export LEMLIB=$pwd/lem-installation/library` in order to make sure
 that Lem loads the correct set of library files (otherwise it may attempt
@@ -36,7 +37,7 @@ in `elle/ElleCorrect/ElleAltSemantics.thy`
 ## Recreating FourL.ml
 
 Run Isabelle-Jedit, with the `ElleCorrect` session:
-`isabelle jedit -d ../lem -d . -l ElleCorrect`
+`isabelle jedit -d ./lem -d ./elle -l ElleCorrect`
 
 Then, open the file `elle/FourLExtract.thy`. If processed to the end,
 this file should result in a new version of `elle/generated/FourL.ml` being
