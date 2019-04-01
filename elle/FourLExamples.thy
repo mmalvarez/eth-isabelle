@@ -99,7 +99,7 @@ value "fourL_compiler_string
         (return scratch 32)))))
  ''"
 
- value "fourL_parse_elle
+ value "fourL_compiler_elle
 
 ''(seq
   (def 'scratch 0x00)

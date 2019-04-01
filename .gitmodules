@@ -1,3 +1,6 @@
 [submodule "tests"]
 	path = tests
 	url = https://github.com/ethereum/tests.git
+[submodule "lem-installation"]
+	path = lem-installation
+	url = https://github.com/rems-project/lem

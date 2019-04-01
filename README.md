@@ -1,3 +1,7 @@
+# If you are an artifact evaluator for ITP 2019
+
+Please read [the artifact README](./ITP2019-artifact-README.md) first.
+
 # Formalization of Ethereum Virtual Machine in Lem
 
 This repository contains
