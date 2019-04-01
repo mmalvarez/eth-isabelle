@@ -30,6 +30,15 @@ it's better not to run that session)
 
 `isabelle jedit -d ./lem -l HOL`
 
+For some proofs (particularly the more complex ones in `elle/ElleCorrect`)
+you will need to increase the editor's limit on the number of allowed tracing
+messages (or else the proofs will pause and appear to get stuck). To do this,
+navigate through the Isabelle/JEdit menus as follows
+
+`Plugins > Plugin Options > Isabelle > General > Editor Tracing Messages`
+
+Increase this value to 30000.
+
 The most interesting proofs are in `elle/ElleCorrect`. The final
 correctness theorems for the compiler are `elle_alt_correct*`
 in `elle/ElleCorrect/ElleAltSemantics.thy`
