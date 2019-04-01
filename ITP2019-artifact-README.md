@@ -6,7 +6,9 @@ installation is Ubuntu installed on Windows 10 WSL.
 ## Dependencies
 
 Ocaml (tested with v 4.05.0)
+
 Ocamlbuild
+
 Ocaml Zarith (including Zarith development libraries)
 
 (i.e. `apt-get install ocaml ocamlbuild libzarith-ocaml libzarith-ocaml-dev`
@@ -35,7 +37,7 @@ Navigate back to the root of this repository ("eth-isabelle") and run `make lem-
 
 Run Isabelle-Jedit, with the `HOL` session (in order to be able to
 step through the proofs contained in the `ElleCorrect` session,
-it's better not to run that session)
+it's better not to run the `ElleCorrect` session)
 
 `isabelle jedit -d ./lem -l HOL`
 
