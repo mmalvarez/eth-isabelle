@@ -5,6 +5,9 @@ installation is Ubuntu installed on Windows 10 WSL.
 
 ## Dependencies
 
+Machine with 16Gb of RAM for building the proofs
+(you may be able to get away with less; 16Gb is the least I've successfully tested it with)
+
 Ocaml (tested with v 4.05.0)
 
 Ocamlbuild
