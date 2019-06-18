@@ -1,0 +1,370 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Installation &mdash; elle  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Usage of the LLL Frontend" href="usage.html" />
+    <link rel="prev" title="Overview" href="overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> elle
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#getting-elle">Getting Elle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation-as-an-end-user-of-elle">Installation as an End-User of Elle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation-for-modifying-and-examining-elle">Installation for Modifying and Examining Elle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#examining-elle-sources">Examining Elle Sources</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#recreating-fourl-ml">Recreating FourL.ml</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage of the LLL Frontend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="syntax.html">Syntax</a></li>
+<li class="toctree-l1"><a class="reference internal" href="semantics.html">Semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="implementation.html">Implementation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="correctness.html">Correctness</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">elle</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Installation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<p>Elle’s installation is quite straightforward if
+all you want to do is use the FourL frontend as described in
+<a class="reference internal" href="usage.html"><span class="doc">Usage of the LLL Frontend</span></a>, and somewhat more involved if you want to
+be able to generate, build, check, or modify
+the implementation and proofs of Elle.</p>
+<div class="section" id="getting-elle">
+<h2>Getting Elle<a class="headerlink" href="#getting-elle" title="Permalink to this headline">¶</a></h2>
+<p>In the rest of this file, let <code class="docutils literal notranslate"><span class="pre">&gt;</span></code> stand for a bash-compatible shell
+prompt (that is, lines starting with <code class="docutils literal notranslate"><span class="pre">&gt;</span></code> are to be understood as input)</p>
+<p>Clone Elle from the <a class="reference external" href="https://github.com/mmalvarez/eth-isabelle">Github repo</a>
+as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">mmalvarez</span><span class="o">/</span><span class="n">eth</span><span class="o">-</span><span class="n">isabelle</span>
+</pre></div>
+</div>
+<p>Later in this file, we assume that Elle is checked out into
+a directory called <code class="docutils literal notranslate"><span class="pre">eth-isabelle</span></code>. (This repository has this name because
+it is a fork of <cite>Yoichi Hirai’s eth-isabelle &lt;https://github.com/pirapira/eth-isabelle&gt;</cite>
+project specifying EVM in the Isabelle proof assistant.)</p>
+<p>Since Elle is no longer under active development, the <code class="docutils literal notranslate"><span class="pre">master</span></code> branch should
+be stable enough to build reliably. For a version of Elle that is more guaranteed
+to build successfully, try the <code class="docutils literal notranslate"><span class="pre">ITP2019</span></code> branch, which contains an artifact
+submission for the 2019 edition of the Interactive Theorem Proving conference:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">cd</span> <span class="n">eth</span><span class="o">-</span><span class="n">isabelle</span>
+<span class="o">&gt;</span> <span class="n">git</span> <span class="n">checkout</span> <span class="n">ITP2019</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="installation-as-an-end-user-of-elle">
+<span id="end-user-installation"></span><h2>Installation as an End-User of Elle<a class="headerlink" href="#installation-as-an-end-user-of-elle" title="Permalink to this headline">¶</a></h2>
+<p>The following dependencies are required to build <code class="docutils literal notranslate"><span class="pre">llllc</span></code>, the
+FourL command-line interface to the FourL compiler frontend that makes
+use of Elle’s verified compiler.</p>
+<ul class="simple">
+<li>Ocaml (tested with v4.05.0)</li>
+<li>OcamlBuild</li>
+<li>OCaml Zarith</li>
+</ul>
+<p>On an Ubuntu-like system, these can be installed as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">ocaml</span> <span class="n">ocamlbuild</span> <span class="n">libzarith</span><span class="o">-</span><span class="n">ocaml</span> <span class="n">libzarith</span><span class="o">-</span><span class="n">ocaml</span><span class="o">-</span><span class="n">dev</span>
+</pre></div>
+</div>
+<p>Once these dependencies are installed, navigate to <code class="docutils literal notranslate"><span class="pre">eth-isabelle/elle/generated</span></code>
+and run <code class="docutils literal notranslate"><span class="pre">make</span></code>. This should succeed and generate a file called <code class="docutils literal notranslate"><span class="pre">llllc</span></code>.
+When run on an lll file, it will print (to standard output) a hexadecimal
+representation of the bytecode produced by the compiler for that smart contract
+(similar to Solidity LLL’s command-line tool, but with fewer options and error
+messages). Files to run <code class="docutils literal notranslate"><span class="pre">llllc</span></code> on can be found in the <code class="docutils literal notranslate"><span class="pre">eth-isabelle/elle/tests</span></code>
+directory.</p>
+<p>For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">cd</span> <span class="n">eth</span><span class="o">-</span><span class="n">isabelle</span><span class="o">/</span><span class="n">elle</span><span class="o">/</span><span class="n">generated</span>
+<span class="c1"># output snipped</span>
+<span class="o">&gt;</span> <span class="n">make</span>
+<span class="c1"># output snipped</span>
+<span class="o">&gt;</span> <span class="o">./</span><span class="n">llllc</span> <span class="o">../</span><span class="n">tests</span><span class="o">/</span><span class="k">if</span><span class="o">.</span><span class="n">lll</span>
+<span class="mi">6001600</span><span class="n">a576003600d565b60025b</span>
+</pre></div>
+</div>
+<p>Usage of <code class="docutils literal notranslate"><span class="pre">llllc</span></code> is described further in <a class="reference internal" href="usage.html"><span class="doc">Usage of the LLL Frontend</span></a></p>
+<p>To help inspect the output of <code class="docutils literal notranslate"><span class="pre">llllc</span></code>, you may find it useful to use the
+EVM bytecode parser contained in eth-isabelle:
+<cite>eth-isabelle/parser/hexparser.rb &lt;https://github.com/mmalvarez/eth-isabelle/blob/master/parser/hexparser.rb&gt;</cite></p>
+<p>You’ll need an installation of Ruby (tested with 2.5.1p57) to use this tool. It takes hex bytecodes like those
+output by <code class="docutils literal notranslate"><span class="pre">llllc</span></code> (or other compilers for Ethereum, such as Solidity LLL) on standard input and outputs
+(on standard output)
+a series of mnemonics describing the opcodes in the input.</p>
+</div>
+<div class="section" id="installation-for-modifying-and-examining-elle">
+<h2>Installation for Modifying and Examining Elle<a class="headerlink" href="#installation-for-modifying-and-examining-elle" title="Permalink to this headline">¶</a></h2>
+<p>The Elle git repository includes the file
+<cite>eth-isabelle/elle/generated/FourL.ml &lt;https://github.com/mmalvarez/eth-isabelle/blob/master/elle/generated/FourL.ml&gt;</cite>.
+This file is generated from the formal Isabelle model contained in the rest of the Elle repository, and is all that
+is needed to build a working executable version of Elle/FourL as described in <a class="reference internal" href="#end-user-installation">end-user-installation</a>.</p>
+<p>In order to work with the formal model directly, Isabelle itself is needed as a dependency. Elle requires
+Isabelle 2018, which can be downloaded <cite>here&lt;https://isabelle.in.tum.de/website-Isabelle2018/index.html&gt;</cite>
+(binaries for Linux, MacOS, and Windows are provided).</p>
+<p>Once Isabelle is installed, the user will need to set up Lem, a framework used to generate the some of the
+Isabelle specifications used by Elle. In order to do this, first run the following, to update the
+Lem submodule contained in Elle’s git repository:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">cd</span> <span class="n">eth</span><span class="o">-</span><span class="n">isabelle</span>
+<span class="o">&gt;</span> <span class="n">git</span> <span class="n">submodule</span> <span class="n">init</span>
+<span class="c1"># output snipped</span>
+<span class="o">&gt;</span> <span class="n">git</span> <span class="n">submodule</span> <span class="n">update</span> <span class="n">lem</span><span class="o">-</span><span class="n">installation</span>
+<span class="c1"># output snipped</span>
+</pre></div>
+</div>
+<p>we have tested with the version of Lem having the Git hash of <code class="docutils literal notranslate"><span class="pre">0927743c1bd31d7bba20a54260ba4c4dd3ce49e9</span></code>.
+Newer versions should also work. Older versions may not support generating code compatible with Isabelle2018.</p>
+<p>In order to build Lem, run the following:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">cd</span> <span class="n">lem</span><span class="o">-</span><span class="n">installation</span>
+<span class="o">&gt;</span> <span class="n">make</span>
+<span class="c1"># output snipped</span>
+</pre></div>
+</div>
+<p>If this succeeds, it will generate an executable called <code class="docutils literal notranslate"><span class="pre">lem</span></code>. Add it to your path, and ensure the
+it will look for its libraries in the correct place, by running the following:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>&gt; `export PATH=$PWD/lem-installation/bin:$PATH`
+&gt; `export LEMLIB=$PWD/lem-installation/library`
+</pre></div>
+</div>
+<p>Finally, navigate back to the root of the repository (<code class="docutils literal notranslate"><span class="pre">eth-isabelle</span></code>), and run the following to
+build the <code class="docutils literal notranslate"><span class="pre">.thy</span></code> files that Elle depends on of from their Lem sources:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">make</span> <span class="n">lem</span><span class="o">-</span><span class="n">thy</span>
+</pre></div>
+</div>
+<div class="section" id="examining-elle-sources">
+<h3>Examining Elle Sources<a class="headerlink" href="#examining-elle-sources" title="Permalink to this headline">¶</a></h3>
+<p>Isabelle allows <code class="docutils literal notranslate"><span class="pre">.thy</span></code> files representing formal models and
+proofs to be grouped together into <em>sessions</em>. Sessions make it easier
+to automate the process of compiling Isabelle developments, as well
+as allowing for caching the results of compilation and proof-checking
+so that work does not need to be repeated each time Isabelle is
+re-opened. Elle contains a session called <code class="docutils literal notranslate"><span class="pre">ElleCorrect</span></code>, which
+packs together all the files containing Elle’s correctness proofs into
+a single session file.</p>
+<p>However, in order to be able to
+step through the proofs contained in the <code class="docutils literal notranslate"><span class="pre">ElleCorrect</span></code> session,
+it’s better not to run the <code class="docutils literal notranslate"><span class="pre">ElleCorrect</span></code> session, since. Therefore,
+to examine Elle’s proofs,
+run Isabelle-Jedit, with the <code class="docutils literal notranslate"><span class="pre">HOL</span></code> session</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">isabelle</span> <span class="n">jedit</span> <span class="o">-</span><span class="n">d</span> <span class="o">./</span><span class="n">lem</span> <span class="o">-</span><span class="n">l</span> <span class="n">HOL</span>
+</pre></div>
+</div>
+<p>For some proofs (particularly the more complex ones in <code class="docutils literal notranslate"><span class="pre">elle/ElleCorrect</span></code>)
+you will need to increase the editor’s limit on the number of allowed tracing
+messages (or else the proofs will pause and appear to get stuck). To do this,
+navigate through the Isabelle/JEdit menus as follows</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Plugins</span> <span class="o">&gt;</span> <span class="n">Plugin</span> <span class="n">Options</span> <span class="o">&gt;</span> <span class="n">Isabelle</span> <span class="o">&gt;</span> <span class="n">General</span> <span class="o">&gt;</span> <span class="n">Editor</span> <span class="n">Tracing</span> <span class="n">Messages</span>
+</pre></div>
+</div>
+<p>Increase this value to 30000.</p>
+<p>The most interesting proofs are in <code class="docutils literal notranslate"><span class="pre">eth-isabelle/elle/ElleCorrect</span></code>. The final
+correctness theorems for the compiler are <code class="docutils literal notranslate"><span class="pre">elle_alt_correct*</span></code>
+in <code class="docutils literal notranslate"><span class="pre">eth-isabelle/elle/ElleCorrect/ElleAltSemantics.thy</span></code></p>
+<p>For more details on the structure of Elle, see <a class="reference internal" href="implementation.html"><span class="doc">Implementation</span></a>.</p>
+</div>
+<div class="section" id="recreating-fourl-ml">
+<h3>Recreating FourL.ml<a class="headerlink" href="#recreating-fourl-ml" title="Permalink to this headline">¶</a></h3>
+<p>The command-line binary version of the Elle-based FourL compiler depends on
+<code class="docutils literal notranslate"><span class="pre">FourL.ml</span></code>, an Ocaml file that is produced from a formal Isabelle model
+via Isabelle’s built-in extraction mechanism. As such, FourL.ml can be regenerated
+from Elle’s sources, provided Isabelle is installed. This can be done as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">isabelle</span> <span class="n">jedit</span> <span class="o">-</span><span class="n">d</span> <span class="o">./</span><span class="n">lem</span> <span class="o">-</span><span class="n">d</span> <span class="o">./</span><span class="n">elle</span> <span class="o">-</span><span class="n">l</span> <span class="n">ElleCorrect</span>
+</pre></div>
+</div>
+<p>This will open the <code class="docutils literal notranslate"><span class="pre">ElleCorrect</span></code> session (building this session for the first time
+can take some time - as much as a couple of hours on a 16Gb machine). Once this session
+is done being processed, open the file <code class="docutils literal notranslate"><span class="pre">eth-isabelle/elle/ElleCorrect/FourLExtract.thy</span></code>.
+If that file is processed to the end (which can be forced by moving the cursor to the end of the file)
+it will create a new version of <code class="docutils literal notranslate"><span class="pre">eth-isabelle/elle/generated/FourL.ml</span></code>, which can then be built as
+described in <a class="reference internal" href="#end-user-installation">end-user-installation</a>.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="usage.html" class="btn btn-neutral float-right" title="Usage of the LLL Frontend" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="overview.html" class="btn btn-neutral float-left" title="Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Mario M. Alvarez
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
