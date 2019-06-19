@@ -11,7 +11,7 @@ it is *foundationally verified*: that is, it is implemented inside of
 `Isabelle <https://isabelle.in.tum.de/>`_, a *proof assistant* that enables programmers to state
 and prove *mathematical theorems* about their code. In the case of
 Elle, a theorem exists stating that the behavior of the code output by the
-Elle compiler matches the behavior of its input (see :doc:`correctness`).
+Elle compiler matches the behavior of its input (see :doc:`Correctness`).
 
 Assuming we trust the model
 of Elle's source language (an LLL/Yul/WASM-like structured programming
@@ -21,19 +21,16 @@ programmer's intent: that is, that behave the same way that input programs are s
 to behave.
 
 In the rest of this documentation, we'll cover
-:doc:`how to install Elle <installation>`, and then
-:doc:`how to use Elle's FourL frontend <usage>` as
-to compile smart contracts written in the LLL language into EVM
+`:ref:how to install Elle <installation>`,
+`how to use Elle's FourL frontend <usage_>` as
+an end user to compile smart contracts written in the LLL language into EVM
 bytecode. Next, we'll dive into the details of Elle's source-level representation,
-covering its :doc:`syntax <syntax>` and its :doc:`formal semantics <semantics>`. Next, we'll talk about
-:doc:`the internals of the implementation <implementation>` of the Elle compiler
+covering its `syntax <syntax_>` and its `formal semantics <semantics_>`. Next, we'll talk about
+`the internals of the implementation <implementation_>` of the Elle compiler
 (along with the FourL frontend) as well
-as Elle's :doc:`correctness proof <correctness>`.
+as its `correctness proof <correctness_>`.
 
-Elle is intended to be supplanted by `Gazelle <https://github.com/mmalvarez/gazelle>`_, a
-generalized platform inspired by Elle for
-building verified compilers that allows for greater ease of adaptation
-than the Elle system.
+Elle is intended to be supplanted by `Gazelle <https://github.com/mmalvarez/gazelle>`_, a .
 As such, Elle itself is unlikely to see significant changes at this point. Nonetheless, Elle as it exists is a useful
 system: it can be used to compile real-world LLL smart contracts; namely Dan Ellison's
 `Echo <https://media.consensys.net/deploying-your-first-lll-contract-part-2-910d9eff497e>`_ smart contract,

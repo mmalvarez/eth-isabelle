@@ -2,6 +2,8 @@
 Installation
 *************
 
+.. contents::
+
 Elle's installation is quite straightforward if
 all you want to do is use the FourL frontend as described in
 :doc:`usage`, and somewhat more involved if you want to
@@ -63,28 +65,10 @@ representation of the bytecode produced by the compiler for that smart contract
 messages). Files to run ``llllc`` on can be found in the ``eth-isabelle/elle/tests``
 directory.
 
-For example:
+For more details on using ``llllc``, see :ref:`basic-usage`.
 
-::
-   
-   > cd eth-isabelle/elle/generated
-   # output snipped
-   > make
-   # output snipped
-   > ./llllc ../tests/if.lll
-   6001600a576003600d565b60025b
+.. _elle-isabelle-installation:
 
-Usage of ``llllc`` is described further in :doc:`usage`
-
-To help inspect the output of ``llllc``, you may find it useful to use the
-EVM bytecode parser contained in eth-isabelle:
-`eth-isabelle/parser/hexparser.rb <https://github.com/mmalvarez/eth-isabelle/blob/master/parser/hexparser.rb>`
-
-You'll need an installation of Ruby (tested with 2.5.1p57) to use this tool. It takes hex bytecodes like those
-output by ``llllc`` (or other compilers for Ethereum, such as Solidity LLL) on standard input and outputs
-(on standard output)
-a series of mnemonics describing the opcodes in the input.
-   
 Installation for Modifying and Examining Elle
 ==============================================
 
@@ -100,7 +84,6 @@ Isabelle 2018, which can be downloaded `here<https://isabelle.in.tum.de/website-
 Once Isabelle is installed, the user will need to set up Lem, a framework used to generate the some of the
 Isabelle specifications used by Elle. In order to do this, first run the following, to update the
 Lem submodule contained in Elle's git repository:
-
 
 ::
    
