@@ -111,7 +111,7 @@ Note that this approach provides the locality that we need: two disjoint Seq nod
 Elle-Core Syntax
 ====================
 
-**TODO: present Elle Core syntax in a comprehensible diagram**
+.. **TODO: present Elle Core syntax in a comprehensible diagram**
 
 To cut to the chase, here is the syntax definition for the Elle-Core language, as implemented in Isabelle:
 
@@ -129,8 +129,9 @@ To cut to the chase, here is the syntax definition for the Elle-Core language, a
 
 
 
-
-## Label Resolution in Elle-Core
+=============================
+Label Resolution in Elle
+=============================
 
 Hopefully I've convinced you that de Bruijn indices are a convenient way to represent the binding structures Elle needs to handle. Next I'm going to describe how we translate this code (that is, syntax trees of type ll1) into EVM bytecode.
 
@@ -167,8 +168,6 @@ Once we have resolved all jump addresses successfully, we have reached a form wh
 Conclusion
 ===========
 
-In this post, I have described the syntax of Elle-Core, the intermediate representation of the Elle system enabling structured programming, and its translation to EVM. The goal of the Elle project is to formally verify this translation - but that will have to wait for a future post (very briefly, we will write an interpreter for Elle and use induction to prove that the compiled EVM code will always behave the same way as the interpreted Elle code, where the EVM code's behavior is described by the model given in the Eth-Isabelle project).
-
-TODO
-In the previous article (:doc:`usage`) we talked about how to use the FourL frontend to write LLL code.
-As covered in :doc:`implementation`, 
+In this post, I have described the syntax of Elle-Core, the intermediate representation of the Elle system enabling structured programming, and its translation to EVM. The goal of the Elle project is to formally verify this translation. The translation itself is
+described in :doc:`implementation`, and additional details about the verification
+can be found in :doc:`correctness`.

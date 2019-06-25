@@ -15,14 +15,12 @@ This document is intended to describe the semantics of the Elle-Core intermediat
 
 Before continuing, it is worth noting that this semantics uses the original EVM semantics to describe the behavior of individual instructions. However, all higher-level control flow is described by the Elle semantics, capturing the key abstraction Elle is intended to provide (structured control flow).
 
-In the formal Isabelle development implementing Elle, this is actually described as a `*big-step operational semantics* <https://en.wikipedia.org/wiki/Operational_semantics#Big-step_semantics>`_. For clarity of exposition here (i.e., to make the presentation more comprehensible for people not already familiar with inductive semantics) I will describe it here as a "non-deterministic" interpreter. The big-step version of the semantics
-is given later in (TODO)
+In the formal Isabelle development implementing Elle, this is actually described as a `*big-step operational semantics* <https://en.wikipedia.org/wiki/Operational_semantics#Big-step_semantics>`_. For clarity of exposition here (i.e., to make the presentation more comprehensible for people not already familiar with inductive semantics) I will describe it here as a "non-deterministic" interpreter.
+The big-step version of the semantics can be found in ``elle/ElleCorrect/ElleAltSemantics.thy``, `here <https://github.com/mmalvarez/eth-isabelle/blob/ITP2019/elle/ElleCorrect/ElleAltSemantics.thy#L295>`__
 
 Elle's semantics is nondeterministic
 "in theory" but not “in practice”. What I mean by this is that while
-source programs can describe nondeterministic behaviors, the Elle compiler will refuse to compile them into EVM programs (this is important, as the EVM is by necessity a deterministic virtual machine). Additionally, it is relatively straightforward to characterize which Elle programs are deterministic (a predicate called "valid3" captures precisely this condition).
-
-TODO link in valid3?
+source programs can describe nondeterministic behaviors, the Elle compiler will refuse to compile them into EVM programs (this is important, as the EVM is by necessity a deterministic virtual machine). Additionally, it is relatively straightforward to characterize which Elle programs are deterministic (a predicate called "valid3" captures precisely this condition, discussed in more detail in `:ref: valid3<valid3>`).
 
 Elle's interpreter uses a *logical program counter* which consists of an index into a syntax tree. In particular, this is expressed as a list of natural numbers, describing the path taken through the tree at each syntax node (that is, "[0,1,2]" means "the root's first child's second child's third child"; these paths are zero-indexed). In the codebase these lists are referred to as *childpaths* or *cp* for short. Most of the correctness proof revolves around showing that this logical program counter advances in such a way that the Elle program's behavior matches that of the EVM program with its standard (integer) program counter.
 
@@ -153,7 +151,7 @@ Interpreter (Pseudo)Code
            if(getnext (root, cp) = null) return state;
            else return (ellesem(root, getnext(root, cp), state));
           }
-          // if the list has children, run its first child nexts
+          // if the list has children, run its first child
           else return ellesem(root, cp@[0], state);
      }
     
@@ -166,20 +164,10 @@ Notes on Interpreter
 
 The "jump" and "jumpI" cases in the above code explicitly return sets of states, which captures the nondeterminism of the semantics. All other (deterministic) cases can be considered to be implicitly returning singleton sets containing the single next state (for clarity I have left these implicit).
 
+Again, the actual semantics of Elle programs are phrased somewhat differently, using an inductive relation rather than
+an explicit interpreter. While it would be possible to encode this interpreter directly in Isabelle and explicitly
+prove that it matches the inductive semantics given in ``elle/ElleCorrect/ElleAltSemantics.thy``, this has not been done
+for Elle, although it is planned for Elle's successor, `Gazelle <https://github.com/mmalvarez/gazelle>`__. Nonetheless,
+the intepreter is likely easier to read and understand for most programmers not used to seeing formal semantics.
 
-=============================
-Inductive Semantics for Elle
-=============================
-
-(While this presentation of Elle's semantics may appear different from the
-interpreter, it should be possible to prove their equivalence. Indeed, this
-is a goal of the Gazelle project's semantics framework.)
-
-
-TODO: have the formal semantics (e.g. copy diagram from paper) in addition to interpreter
-
-TODOS
-
-Have a practical example of what the semantics do with a concrete program
-
-Say more about what the proof does? (Or at least link to :doc:`correctness`)
+.. TODO: paste in the semantics diagram from the paper?
