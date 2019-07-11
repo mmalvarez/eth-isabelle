@@ -30,6 +30,8 @@ Isabelle2018
 
 Build lem by navigating to `lem-installation` and running `make`
 
+Navigate back to the repository root
+
 Add the generated `lem` executable to your PATH (it will be located at `lem-installation/bin/lem`)
 i.e., something like `export PATH=$PWD/lem-installation/bin:$PATH`
 
@@ -37,7 +39,7 @@ run `export LEMLIB=$PWD/lem-installation/library` in order to make sure
 that Lem loads the correct set of library files (otherwise it may attempt
 to generate code that is incompatible with Isabelle2018)
 
-Navigate back to the root of this repository ("eth-isabelle") and run `make lem-thy` to create the `.thy` files that Elle depends on
+Navigate back to the root of this repository and run `make lem-thy` to create the `.thy` files that Elle depends on
 
 ## Inspecting The Proofs
 
