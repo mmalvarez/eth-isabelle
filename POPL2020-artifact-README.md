@@ -27,8 +27,6 @@ Isabelle2018
 
 ## Installing
 
-Run `git submodule init` and then `git submodule update lem-installation` to pull in the Lem submodule (located at lem-installation). We have tested with the Lem version having
-the hash `0927743c1bd31d7bba20a54260ba4c4dd3ce49e9`
 
 Build lem by navigating to `lem-installation` and running `make`
 
@@ -94,3 +92,8 @@ bytecode you want to parse (or pipe the output from `llllc` directly
 into it). You'll need an installation of Ruby
 (tested with 2.5.1p57)
 to use this tool.
+
+## Installing Solidity LLL
+
+In the paper, we compare FourL to the LLL compiler included with the
+Solidity compiler. This compiler can be found [here](https://github.com/ethereum/solidity).
