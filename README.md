@@ -1,6 +1,6 @@
-# If you are an artifact evaluator for ITP 2019
+# If you are an artifact evaluator for POPL 2020
 
-Please read [the artifact README](./ITP2019-artifact-README.md) first.
+Please read [the artifact README](./POPL2020-artifact-README.md) first.
 
 # Formalization of Ethereum Virtual Machine in Lem
 
@@ -84,16 +84,6 @@ version of Elle.
 ### Roadmap
 
 ### Warning
-
-Though it aims for ironclad correctness stemming from foundational guarantees, Elle's correctness proofs are
-not yet complete, and it has not been thoroughly tested. Therefore it should not be considered production-quality
-at this time.
-
-That said, if you're interested in learning more about the compiler and being part of the testing or development process, please [contact Mario on Gitter](https://gitter.im/mmalvarez).
-
-### Acknowledgement
-
-The development of the Elle project is generously funded by ConsenSys.
 
 ### Legacy Version
 
