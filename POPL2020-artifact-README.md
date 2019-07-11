@@ -1,5 +1,10 @@
 # Artifact README
 
+
+Note that this development is a fork of the original
+[eth-isabelle](https://github.com/pirapira/eth-isabelle) project.
+Everything in the `elle` directory is the work of the author of this popl submission.
+
 I have tested these build steps under a Lubuntu virtual machine. My primary
 installation is Ubuntu installed on Windows 10 WSL.
 

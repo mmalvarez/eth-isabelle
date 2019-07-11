@@ -2,6 +2,10 @@
 
 Please read [the artifact README](./POPL2020-artifact-README.md) first.
 
+Note that this readme is adapted from the readme for the original
+[eth-isabelle](https://github.com/pirapira/eth-isabelle) project. this development is a fork of that
+development. everything in the `elle` directory is the work of the author of this popl submission.
+
 # Formalization of Ethereum Virtual Machine in Lem
 
 This repository contains
